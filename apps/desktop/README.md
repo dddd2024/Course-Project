@@ -1,8 +1,8 @@
-# Desktop App Skeleton
+# Desktop Contract Spike
 
 Owner: `@hinaLove1` (Track B)
 
-This directory will contain the local desktop workbench defined in `docs/desktop-app-guide.md`.
+This directory contains the D0 desktop contract spike for the local workbench defined in `docs/desktop-app-guide.md`.
 
 Planned structure:
 

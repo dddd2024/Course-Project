@@ -126,6 +126,8 @@ If the PR head changes, or `main` changes after the valid CI run, previous CI ev
 
 A literal merge/rebase of `main` into every feature branch is not required solely for governance. GitHub pull-request CI on the current head is sufficient when its synthetic merge result uses the current `main`. If base metadata is stale or ambiguous, verify the synthetic merge commit parents before treating the run as current.
 
+Merge authorization is serialized: do not merge multiple PRs concurrently against the same validated `main` snapshot. Once one PR changes `main`, all other previously green PRs must be re-evaluated before merge. If `main` changes between final validation and the merge action, abort that authorization and retrigger CI.
+
 Automated or human comments may still be used as optional engineering feedback, but they never block merge. Do not request approval as a merge requirement.
 
 `merge-gate` must depend on every blocking CI job. If a new blocking job is added, add it to `merge-gate.needs` in the same change.

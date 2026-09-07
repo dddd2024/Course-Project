@@ -10,7 +10,7 @@ This register separates **candidate technology choices** from **accepted project
 | jsonschema | contract fixture validation | dev/CI | A | pinned by installer resolution until lock introduced | upstream verification required | active in CI |
 | Scapy | PCAP normalization | optional until integrated | D | TBD | TBD | not integrated |
 | NFStream | flow feature baseline | optional | D | TBD | TBD | not integrated |
-| Netzob | PRE/alignment baseline | optional | D | TBD | TBD | not integrated |
+| Netzob | PRE/alignment baseline | optional | D | 2.0.0 (PyPI sdist; not installable in current env) | GPLv3 (upstream COPYING) | adapter + `dependency_unavailable` fallback in repo; upstream smoke validation pending |
 | BinaryInferno | field-inference research baseline/reference | optional | D/C | TBD | TBD | not integrated |
 | Kaitai Struct | `.ksy` schema/parser export backend | optional V1/V2 backend | A | emitted `ks-version: 0.10`; compiler version not pinned until compiler invocation lands | compiler license verification required before invocation | project-native `.ksy` exporter active; external compiler invocation not yet integrated |
 | scikit-learn | behavior baseline | optional | D/C | TBD | TBD | not integrated |

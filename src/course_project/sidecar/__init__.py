@@ -16,6 +16,11 @@ from course_project.sidecar.runtime import (
     SidecarError,
     SidecarRuntime,
 )
+from course_project.sidecar.semantic_bridge import (
+    SemanticAnalysis,
+    SemanticBackend,
+    validate_semantic_analysis,
+)
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 __all__ = [
@@ -26,7 +31,10 @@ __all__ = [
     "SIDE_CAR_METHODS",
     "AnalysisBackend",
     "MetadataOnlyBackend",
+    "SemanticAnalysis",
+    "SemanticBackend",
     "SidecarError",
     "SidecarRuntime",
     "TrackDBaselineBackend",
+    "validate_semantic_analysis",
 ]

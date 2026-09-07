@@ -66,7 +66,7 @@ The V1 delivery path remains the minimum runnable course demo. V2 adds **Evidenc
 ├── tests/                        # unit/integration/contract/evaluation tests
 ├── data/                         # policy only; teacher data stays external unless allowed
 ├── examples/                     # reproducible demos
-└── .github/                      # CI, CODEOWNERS, PR/issue templates
+└── .github/                      # CI and PR/issue templates
 ```
 
 ## Four-Person Ownership
@@ -89,7 +89,7 @@ AI coding agents must start with [`AGENTS.md`](AGENTS.md), identify the human op
 - Track C / `@sunny1ce`: [`docs/tracks/track-c.md`](docs/tracks/track-c.md), Issue `#14` + research `#9`
 - Track D / `@zhaohongjun20-creator`: [`docs/tracks/track-d.md`](docs/tracks/track-d.md), Issue `#15`
 
-An AI agent may inspect the whole repository, but should not silently take over another Track or change shared contracts merely for convenience. Shared-interface changes follow the review/migration rules in `AGENTS.md` and `docs/architecture.md`.
+An AI agent may inspect the whole repository, but should not silently take over another Track or change shared contracts merely for convenience. Shared-interface changes follow the contract migration/test rules in `AGENTS.md` and `docs/architecture.md`.
 
 ## Start Here
 
@@ -114,7 +114,7 @@ Before writing cross-Track integration code, use the frozen contracts rather tha
 - Track D → C DTOs: `InputMetadata`, `MessageCandidate`, `MessageFamily`, `AlignmentResult`, `FieldCandidate`, `BehaviorFeatures` and related project-native models;
 - desktop-facing result linkage: `findings[].evidenceIds` → `evidence[]`, with larger outputs exposed through `artifacts[]` controlled references.
 
-Any incompatible or semantic change follows the shared-contract migration/review process in `docs/architecture.md` and `AGENTS.md`.
+Any incompatible or semantic change follows the shared-contract migration/testing process in `docs/architecture.md` and `AGENTS.md`.
 
 ## Design Documents
 
@@ -135,9 +135,22 @@ Any incompatible or semantic change follows the shared-contract migration/review
 3. Cross-language work is contract-first: schema + golden fixture first, then producer/consumer implementations.
 4. Every accepted protocol-semantic claim must retain evidence and verification records.
 5. Do not commit raw private traffic, credentials, test keys, restored sensitive plaintext, teacher files without permission, or unrestricted shell hooks.
-6. Keep `main` green; integrate reviewed work frequently instead of doing a final-day merge.
+6. Keep `main` green; merge task-sized PRs as soon as their current-version CI is fully green.
 7. New third-party dependencies must pass the version/license/adapter gate before merge.
+8. Human/Codex review is optional feedback only and is never a merge requirement.
+
+## Merge Policy
+
+The only merge governance gate is current-version CI:
+
+- `test (3.10)` success;
+- `test (3.11)` success;
+- `windows-integration` success;
+- `merge-gate` success;
+- no merge conflict.
+
+If the PR head or `main` changes after the valid CI evaluation, synchronize and rerun CI before merge. See `AGENTS.md` and `docs/repository-settings.md`.
 
 ## Current Status
 
-**Phase: Day-0 shared contracts and pre-implementation readiness are established; the four Track implementations may proceed once the manual `main` protection setting is enabled.**
+**Phase: Day-0 shared contracts and pre-implementation readiness are established; four Track implementations are active. `main` ruleset still needs a server-side update from review-gated to CI-only enforcement.**

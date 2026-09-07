@@ -25,35 +25,30 @@ A PR may merge only when:
 
 1. it has no merge conflict;
 2. its current head is the version being evaluated;
-3. it is synchronized with current `main` whenever `main` changed after the last valid evaluation;
-4. all four blocking checks above have completed with `success` for that current version;
+3. GitHub has evaluated that head against the current `main`;
+4. all four blocking checks above have completed with `success` for that current merge result;
 5. no blocking job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful.
 
-A green run for an older head or an outdated base is not merge evidence. If the head or relevant base changes, synchronize and rerun CI.
+A green run for an older head or an older `main` is not merge evidence. If the PR head or `main` changes after the valid run, retrigger CI before merging.
 
-## 3. Required GitHub `main` ruleset
+A literal merge/rebase of `main` into every feature branch is **not** required solely for governance. A GitHub pull-request CI run on the current head is sufficient when its synthetic merge result is built from the current `main`. If GitHub metadata is ambiguous or stale, the merge actor should verify the synthetic merge commit parents before treating the run as current.
 
-Target configuration:
+## 3. Server enforcement state
 
-- require a pull request before merging;
-- **required approving reviews: 0**;
-- **Code Owner review: disabled**;
-- **review-thread resolution: disabled**;
-- **extra approval for unattributed changes: disabled**;
-- do not make `CHANGES_REQUESTED` a merge gate;
-- require these status checks:
-  - `test (3.10)`;
-  - `test (3.11)`;
-  - `windows-integration`;
-  - `merge-gate`;
-- require the tested branch/merge result to be up to date with `main` when GitHub exposes that option;
-- block force pushes/non-fast-forward updates;
-- block branch deletion;
-- no bypass actors during normal development.
+Project-owner decision on 2026-09-07: repository ruleset `main-protection` is intentionally **disabled**.
 
-The pull-request requirement is retained so task-sized branches and CI remain visible and attributable; it does **not** imply a review requirement.
+This is an explicit project setting, not a pending configuration task. Agents must not re-enable, replace, or strengthen the ruleset unless the project owner explicitly changes this decision.
 
-`.github/CODEOWNERS` is not needed under this policy because ownership lives in `AGENTS.md` and is not an approval mechanism.
+Consequences:
+
+- GitHub does not server-enforce human approvals;
+- GitHub does not server-enforce the four CI checks;
+- GitHub may technically allow an unchecked merge or direct update that the project process forbids;
+- therefore the human or AI merge actor must fail closed and enforce the CI-only rule before every merge.
+
+The repository workflow still uses task-sized branches and pull requests so CI has a reproducible merge candidate, changes remain attributable, and squash merges remain reversible. Ruleset-disabled does **not** mean CI-optional and does not authorize bypassing the PR workflow for ordinary development.
+
+`.github/CODEOWNERS` is intentionally absent because ownership lives in `AGENTS.md` and is not an approval mechanism.
 
 ## 4. CI platform baseline
 
@@ -63,17 +58,30 @@ CI has three layers:
 2. `windows-integration`: Python 3.11 + Node 22 + Rust/Tauri validation on the target desktop OS;
 3. `merge-gate`: final aggregate result.
 
+The workflow runs both on PRs targeting `main` and on pushes to `main`. PR CI is the pre-merge authorization evidence. `main` push CI is a post-merge safety net that detects an integration regression if a manual/concurrent merge slips past process discipline; a post-merge green run does not retroactively make a stale pre-merge decision correct.
+
+The Windows job may include additional integration checks, such as the Tauri -> Python Sidecar round-trip. Such checks are part of `windows-integration`; they do not create a separate human gate.
+
 A signed/package installer build is a release/demo gate, not a requirement for every PR.
 
 ## 5. Merge behavior
 
 Preferred method: **squash merge**.
 
-Immediately before merge, the human or AI merge actor fresh-reads the PR head/base state and the blocking CI results. No manual review-state check is required.
+Immediately before merge, the human or AI merge actor must fresh-read:
 
-PR authors do not need to copy SHAs or job results into PR descriptions. Exact-head/base validity is handled by the merge actor/agent.
+- the PR state and current head;
+- the current `main` head;
+- the current pull-request CI run / tested merge result;
+- all blocking CI job conclusions.
 
-When the CI-only conditions are satisfied, the merge actor should merge promptly. A green PR must not remain open merely waiting for a reviewer, owner acknowledgement, or discussion resolution.
+No manual review-state check is required.
+
+Merges must be serialized by process: do not authorize two PRs for merge against the same `main` snapshot and then merge them concurrently. After one PR changes `main`, every other previously green PR must be re-evaluated against the new `main` before it merges. If `main` changes between the final validation and the merge action, abort that authorization and retrigger CI.
+
+PR authors do not need to copy SHAs or job results into PR descriptions. Exact head/base validity is handled by the merge actor/agent.
+
+When the CI-only conditions are satisfied, merge promptly. A green PR must not remain open merely waiting for a reviewer, owner acknowledgement, or discussion resolution.
 
 ## 6. Permissions and secrets
 
@@ -81,18 +89,15 @@ All four collaborators may create branches and PRs. Ownership boundaries in `AGE
 
 Baseline CI requires no repository secret. Real model credentials remain local or in an approved secret store. Never expose credentials through fixtures, logs, screenshots, Actions output or demo recordings.
 
-## 7. Current server-truth gap
+## 7. Server-truth checkpoint
 
-Server truth checked on 2026-09-07: ruleset `main-protection` is active, targets the default branch, has no bypass actors, blocks deletion/non-fast-forward updates, but currently still requires **one approval** and **review-thread resolution**, and does **not** yet require the four CI status checks.
+Fresh server truth on 2026-09-07:
 
-Therefore the server configuration is not yet aligned with this CI-only policy. Required manual ruleset correction:
+- ruleset ID: `22429560`;
+- name: `main-protection`;
+- target: branch/default-branch scope;
+- enforcement: **disabled**.
 
-1. set required approving reviews to `0`;
-2. disable review-thread resolution;
-3. keep Code Owner review disabled;
-4. disable extra approval for unattributed changes if the UI exposes it;
-5. add the four required status checks;
-6. enable up-to-date/strict status checks if available;
-7. keep deletion/non-fast-forward protection and no bypass actors.
+This disabled state matches the current project-owner decision. It should be treated as intentional until the owner explicitly changes it.
 
-Until that server change is made, GitHub itself may continue blocking merges for obsolete review reasons even when CI is green. This is the only remaining governance mismatch; repository files and CI policy must not reintroduce a human-review requirement to compensate for it.
+Because server enforcement is disabled, repository governance tests and `AGENTS.md` exist to keep agents consistent, but they are not substitutes for checking CI immediately before merge. Never infer permission to merge from `mergeable=true` alone.

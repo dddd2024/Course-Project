@@ -25,6 +25,7 @@ def _probe_ok(command: Sequence[str], _cwd: Path) -> tuple[int, str] | None:
     outputs = {
         "node": "v22.18.0",
         "npm": "10.9.3",
+        "rustup": "stable-x86_64-pc-windows-msvc (overridden by rust-toolchain.toml)",
         "rustc": "rustc 1.89.0 (29483883e 2025-08-04)",
         "cargo": "cargo 1.89.0 (c24e10642 2025-06-23)",
     }
@@ -39,6 +40,7 @@ def test_collect_checks_passes_matching_baseline(tmp_path: Path) -> None:
 
     assert not [check for check in checks if check.status == "fail"]
     assert next(check for check in checks if check.name == "node").actual == "v22.18.0"
+    assert next(check for check in checks if check.name == "rust-toolchain").status == "pass"
     assert next(check for check in checks if check.name == "platform").status == "info"
 
 
@@ -56,6 +58,35 @@ def test_collect_checks_fails_on_node_major_mismatch(tmp_path: Path) -> None:
     assert node.status == "fail"
     assert node.expected == "major 22"
     assert "mismatch" in node.detail
+
+
+def test_collect_checks_fails_on_wrong_active_rust_channel(tmp_path: Path) -> None:
+    _write_baseline(tmp_path)
+
+    def probe(command: Sequence[str], cwd: Path) -> tuple[int, str] | None:
+        if command[0] == "rustup":
+            return 0, "nightly-x86_64-pc-windows-msvc (default)"
+        return _probe_ok(command, cwd)
+
+    checks = doctor.collect_checks(tmp_path, python_version=(3, 11), probe=probe)
+    toolchain = next(check for check in checks if check.name == "rust-toolchain")
+
+    assert toolchain.status == "fail"
+    assert toolchain.expected == "stable"
+    assert "mismatch" in toolchain.detail
+
+
+def test_collect_checks_fails_on_malformed_rust_toolchain(tmp_path: Path) -> None:
+    _write_baseline(tmp_path)
+    (tmp_path / "rust-toolchain.toml").write_text(
+        '[toolchain]\nprofile = "minimal"\n', encoding="utf-8"
+    )
+
+    checks = doctor.collect_checks(tmp_path, python_version=(3, 11), probe=_probe_ok)
+    toolchain = next(check for check in checks if check.name == "rust-toolchain")
+
+    assert toolchain.status == "fail"
+    assert toolchain.actual == "unparseable"
 
 
 def test_collect_checks_fails_closed_when_baseline_file_is_missing(tmp_path: Path) -> None:

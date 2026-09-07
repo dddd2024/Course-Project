@@ -462,7 +462,7 @@ For changes to `models.py`, `contracts/`, shared sidecar methods/config, or arti
 3. update `docs/architecture.md` when the semantic boundary changes;
 4. update producer and consumers;
 5. add compatibility/integration tests;
-6. request Track A review plus at least one affected Track owner;
+6. obtain the single required human review selected by `AGENTS.md`;
 7. intentionally change `protocolVersion` when the change is incompatible.
 
 ## 12. Four-Track Ownership Boundary

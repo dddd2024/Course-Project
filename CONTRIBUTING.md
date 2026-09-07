@@ -20,12 +20,12 @@
 
 1. 从最新 `main` 创建 task-sized branch。
 2. 读取自己 Track 的 GitHub Issue、`docs/tracks/track-*.md` 和相关设计。
-3. 只修改当前 Track/Issue 需要的文件。
+3. 只修改当前 Track/Issue 需要的文件；跨 Track 修改必须明确说明接口影响。
 4. 如果必须修改 shared contract，先更新 schema + golden fixture + architecture/migration 说明，再更新 producer/consumer。
 5. 新增第三方依赖前更新 `docs/dependency-register.md`；复制/再分发第三方材料时同时更新 `THIRD_PARTY_NOTICES.md`。
 6. 提交前运行相关测试，并保存必要的实验结果/环境版本摘要。
-7. 创建 Pull Request，至少由一名非作者成员 review；共享接口由 Track A + 受影响 owner review。
-8. CI 全绿后再合并。
+7. 创建 Pull Request。
+8. 当前版本与当前 `main` 同步后，四项阻塞 CI 全绿即可合并；不要求人工审查或 approval。
 
 `main` 的 GitHub branch protection/ruleset 按 `docs/repository-settings.md` 配置。
 
@@ -53,15 +53,28 @@ pytest -q
 
 CI/离线开发默认使用 mock LLM，不需要任何真实 API key。
 
+## Merge Gate
+
+唯一合并门槛是当前版本 CI：
+
+- `test (3.10)` success；
+- `test (3.11)` success；
+- `windows-integration` success；
+- `merge-gate` success；
+- 无 merge conflict。
+
+如果 PR head 或 `main` 在有效 CI 之后发生变化，需要同步并重新跑 CI，不能沿用旧的绿色结果。
+
+人工 comment、Codex 建议、approval、Code Owner、review thread、`CHANGES_REQUESTED` 都不作为合并门槛。
+
 ## Definition of Done
 
 一个任务只有在以下条件全部满足后才算完成：
 
-- 代码/文档通过 PR 进入 review；
 - 对应 Issue acceptance criterion 满足；
-- 测试与 CI 通过；
+- 测试与当前版本 CI 通过；
 - shared contract 兼容，或有明确 migration + fixture + integration test；
-- 输出可由另一名成员复现；
+- 输出具备可复现证据；
 - 新依赖已记录版本/license/环境/adapter/fallback；
 - 没有提交密钥、凭据、私人流量、老师不允许再分发的数据或敏感还原明文；
 - 协议语义推断保留 evidence / verification / uncertainty，而不是只有模型自然语言结论；

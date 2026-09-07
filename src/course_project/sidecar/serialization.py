@@ -31,8 +31,14 @@ def validate_controlled_ref(ref: str) -> str:
     if not ref or "\\" in ref:
         raise ValueError("controlled refs must be non-empty POSIX-style relative paths")
     path = PurePosixPath(ref)
-    if path.is_absolute() or ".." in path.parts or ":" in path.parts[0]:
-        raise ValueError("controlled refs must not be absolute or contain traversal")
+    if (
+        not path.parts
+        or path == PurePosixPath(".")
+        or path.is_absolute()
+        or ".." in path.parts
+        or ":" in path.parts[0]
+    ):
+        raise ValueError("controlled refs must be normal relative paths without traversal")
     return ref
 
 

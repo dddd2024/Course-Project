@@ -89,7 +89,9 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
         and item.get("data", {}).get("status") == "PARTIAL"
         for item in task_messages
     )
-    result_message = next(item for item in task_messages if "resultRef" in item and "event" not in item)
+    result_message = next(
+        item for item in task_messages if "resultRef" in item and "event" not in item
+    )
     assert result_message["resultRef"] == "tasks/task-1/analysis-result.json"
 
     fetched = next(item for item in responses if item.get("id") == "result-1")
@@ -98,7 +100,7 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     result_path = state_dir / "tasks" / "task-1" / "analysis-result.json"
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert result["taskId"] == "task-1"
-    assert result["status"] == "partial"
+    assert result["status"] == "PARTIAL"
     assert result["inputId"] == input_ref
     assert result["resultRef"] == "tasks/task-1/analysis-result.json"
     assert result["limitations"]

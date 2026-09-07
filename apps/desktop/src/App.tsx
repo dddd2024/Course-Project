@@ -217,6 +217,29 @@ export function App() {
     setFindingReviews((current) => ({ ...current, [findingId]: review }));
   }
 
+  function exportReview() {
+    if (!analysisResult) return;
+    const payload = {
+      protocolVersion: 1,
+      taskId: analysisResult.taskId,
+      sourceResultRef: analysisResult.resultRef,
+      sourceStatus: analysisResult.status,
+      reviews: analysisResult.findings.map((finding) => ({
+        findingId: finding.findingId,
+        sourceStatus: finding.status,
+        review: findingReviews[finding.findingId] || null,
+      })),
+      limitations: ["Local review export contains no raw bytes and is not an accepted protocol result."],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${analysisResult.taskId}-review.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   async function stopTask() {
     if (taskId) await cancelTask(taskId);
   }
@@ -296,7 +319,10 @@ export function App() {
           <section className="result-panel">
             <div className="subheading">
               <div><h3>Analysis result</h3><span>{analysisResult ? analysisResult.status + " / fixture preview" : "awaiting result"}</span></div>
-              <button className="secondary compact" onClick={loadFixture}>Load synthetic fixture</button>
+              <div className="result-actions">
+                <button className="secondary compact" onClick={loadFixture}>Load synthetic fixture</button>
+                <button className="secondary compact" disabled={!analysisResult} onClick={exportReview}>Export review JSON</button>
+              </div>
             </div>
             {analysisResult && <p className="review-summary">{Object.keys(findingReviews).length}/{analysisResult.findings.length} findings reviewed locally; analyzer status remains unchanged.</p>}
             <AnalysisTabs active={activeView} onChange={setActiveView} hasResult={analysisResult !== null} />

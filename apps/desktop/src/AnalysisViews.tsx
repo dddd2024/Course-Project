@@ -123,6 +123,21 @@ function EvidenceCard({ evidence }: { evidence: EvidenceRecord }) {
   );
 }
 
+function ArtifactMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const entries = Object.entries(metadata);
+  if (entries.length === 0) return null;
+  return (
+    <dl className="artifact-metadata">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt>{key}</dt>
+          <dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function ArtifactCard({ artifact }: { artifact: ArtifactRef }) {
   return (
     <article className="artifact-card">
@@ -135,6 +150,7 @@ function ArtifactCard({ artifact }: { artifact: ArtifactRef }) {
         <span>format {artifact.format}</span>
         {artifact.count !== undefined && <span>{artifact.count} records</span>}
       </div>
+      {artifact.metadata && <ArtifactMetadata metadata={artifact.metadata} />}
       <p className="artifact-note">Controlled result reference; the UI does not inline the artifact.</p>
     </article>
   );

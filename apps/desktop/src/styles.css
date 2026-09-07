@@ -312,6 +312,12 @@ h2 {
   margin: 0;
 }
 
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .analysis-tabs {
   border-bottom: 1px solid #30342f;
   display: flex;
@@ -516,6 +522,32 @@ h2 {
   color: #c6ff4a;
   font-size: 0.7rem;
   margin: 0.55rem 0;
+  overflow-wrap: anywhere;
+}
+
+.artifact-metadata {
+  border-left: 2px solid #51564e;
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.65rem 0 0;
+  padding-left: 0.55rem;
+}
+
+.artifact-metadata div {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: 7rem 1fr;
+}
+
+.artifact-metadata dt {
+  color: #99a196;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.artifact-metadata dd {
+  font-size: 0.66rem;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 

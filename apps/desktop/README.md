@@ -29,6 +29,8 @@ Use **Load synthetic fixture** to exercise the result presentation before the fu
 - Evidence cards show provenance, parent evidence and observations.
 - Artifact cards expose controlled result-relative refs without inlining large tables.
 - Packet, alignment, statistics and behavior tabs remain artifact-backed until their producers are connected.
+- Artifact metadata is summarized in the UI for boundary, alignment, statistics and behavior previews without loading large files.
+- Export review JSON records local reviewer decisions and the source result reference; it contains no raw bytes.
 - A finding location moves the Hex range to the referenced offset; it does not turn an uncertain claim into a fact.
 
 

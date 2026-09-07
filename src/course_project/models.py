@@ -4,6 +4,22 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 DecisionStatus = Literal["accepted", "rejected", "uncertain"]
+PublicDecisionStatus = Literal["ACCEPTED", "REJECTED", "UNCERTAIN"]
+InputKind = Literal["dat", "bin", "pcap", "pcapng", "synthetic", "unknown"]
+RegionKind = Literal["stable", "variable", "unknown"]
+
+
+@dataclass(slots=True)
+class InputMetadata:
+    """Project-native metadata for one registered analysis input."""
+
+    input_id: str
+    kind: InputKind
+    size_bytes: int
+    sha256: str | None = None
+    direction_available: bool = False
+    timestamp_available: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -14,6 +30,78 @@ class PacketCandidate:
     evidence: dict[str, Any] = field(default_factory=dict)
     direction: str | None = None
     timestamp: float | None = None
+
+
+@dataclass(slots=True)
+class MessageCandidate:
+    """Normalized message slice used across Track D, C and A boundaries."""
+
+    message_id: str
+    input_id: str
+    start_offset: int
+    end_offset: int
+    confidence: float = 0.0
+    family_id: str | None = None
+    direction: str | None = None
+    timestamp: float | None = None
+    evidence_ids: tuple[str, ...] = ()
+
+
+@dataclass(slots=True)
+class MessageFamily:
+    """A project-native cluster of structurally similar messages."""
+
+    family_id: str
+    message_ids: tuple[str, ...]
+    confidence: float = 0.0
+    features: dict[str, Any] = field(default_factory=dict)
+    evidence_ids: tuple[str, ...] = ()
+
+
+@dataclass(slots=True)
+class AlignmentRegion:
+    start_offset: int
+    end_offset: int
+    kind: RegionKind
+    score: float = 0.0
+    evidence_ids: tuple[str, ...] = ()
+
+
+@dataclass(slots=True)
+class AlignmentResult:
+    """Adapter-neutral alignment output for one message family."""
+
+    family_id: str
+    message_ids: tuple[str, ...]
+    regions: tuple[AlignmentRegion, ...]
+    score: float = 0.0
+    evidence_ids: tuple[str, ...] = ()
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class FieldCandidate:
+    """Pre-semantic normalized field candidate produced by deterministic/PRE stages."""
+
+    candidate_id: str
+    family_id: str | None
+    offset: int
+    size: int | None
+    candidate_types: tuple[str, ...] = ()
+    endian: Literal["big", "little"] | None = None
+    score: float = 0.0
+    evidence_ids: tuple[str, ...] = ()
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class BehaviorFeatures:
+    """Adapter-neutral behavior/flow feature vector before classification."""
+
+    flow_id: str
+    values: dict[str, float | int | str | bool | None] = field(default_factory=dict)
+    sample_ids: tuple[str, ...] = ()
+    evidence_ids: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)

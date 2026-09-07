@@ -89,3 +89,26 @@ jobs:
 
       - name: Check Tauri Rust shell
         run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+
+  merge-gate:
+    name: merge-gate
+    if: ${{ always() }}
+    needs:
+      - test
+      - windows-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Require every blocking CI job to succeed
+        shell: bash
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          WINDOWS_RESULT: ${{ needs.windows-integration.result }}
+        run: |
+          echo "test=$TEST_RESULT"
+          echo "windows-integration=$WINDOWS_RESULT"
+          if [[ "$TEST_RESULT" != "success" || "$WINDOWS_RESULT" != "success" ]]; then
+            echo "::error::Merge gate blocked because not all required CI jobs succeeded."
+            exit 1
+          fi

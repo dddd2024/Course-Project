@@ -72,7 +72,9 @@ Do not make Track C depend on raw Netzob, BinaryInferno, NFStream, Scapy, or oth
 
 - `src/course_project/evidence/`, `llm/`, `verification/` (Track C);
 - `apps/desktop/` (Track B);
-- shared schema/sidecar/CI changes without Track A review.
+- shared schema/sidecar/CI changes without following the shared-contract migration/tests in `AGENTS.md`.
+
+Ownership limits implementation responsibility; it does not create a human approval gate.
 
 ## First implementation sequence
 
@@ -85,4 +87,4 @@ Do not make Track C depend on raw Netzob, BinaryInferno, NFStream, Scapy, or oth
 
 ## Completion standard
 
-A Track D feature is complete only when the same controlled input produces deterministic project-native output, tests cover edge cases, third-party dependencies are isolated behind adapters, and downstream Track C can consume the result without importing Track D implementation internals.
+A Track D feature is complete only when the same controlled input produces deterministic project-native output, tests cover edge cases, third-party dependencies are isolated behind adapters, downstream Track C can consume the result without importing Track D implementation internals, and the current-version CI is fully green.

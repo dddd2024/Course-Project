@@ -85,6 +85,39 @@ For changes to a shared interface:
 
 Do not let third-party library objects leak across project-native contracts.
 
+### 5.1 Frozen Day-0 names
+
+Unless a shared-contract PR intentionally changes them, agents must use these exact names:
+
+**Semantic decisions**
+- JSON/TypeScript/Rust/UI: `ACCEPTED`, `REJECTED`, `UNCERTAIN`;
+- Python internal: `accepted`, `rejected`, `uncertain`.
+
+Do not introduce `ACCEPT`, `REJECT`, or `UNSURE` as enum values.
+
+**Sidecar v1 methods**
+- `register_input`;
+- `inspect_file`;
+- `analyze`;
+- `cancel_task`;
+- `get_result`;
+- `read_range`.
+
+Do not invent aliases such as `run_analysis` for convenience.
+
+**D→C project-native DTOs**
+- `InputMetadata`;
+- `PacketCandidate` / `MessageCandidate`;
+- `MessageFamily`;
+- `AlignmentRegion` / `AlignmentResult`;
+- `FieldCandidate`;
+- `BehaviorFeatures`.
+
+**Desktop-facing result linkage**
+- findings link through `evidenceIds`;
+- small provenance records live in `evidence[]`;
+- large views/results are advertised through `artifacts[]` references.
+
 ## 6. Environment, LLM and dependency rules
 
 - Canonical local baseline is defined by `.python-version`, `.nvmrc`, `rust-toolchain.toml` and `docs/development-environment.md`.
@@ -105,7 +138,7 @@ This project is for coursework, teacher-provided evaluation data, controlled dat
 - The inference pipeline must not read evaluation ground truth.
 - Teacher-provided raw `.dat` / `.bin` files remain local unless redistribution is explicitly allowed.
 - Do not commit private traffic, credentials, test keys, prohibited teacher data, restored sensitive plaintext, or secrets.
-- Synthetic contract/unit fixtures may be committed but must not be presented as formal course benchmark results.
+- Synthetic contract/unit/mechanism fixtures may be committed but must not be presented as formal course benchmark results.
 
 ## 8. Working protocol for every AI task
 

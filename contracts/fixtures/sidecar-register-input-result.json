@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "id": "register-demo-001",
+  "event": "status",
+  "stage": "registered",
+  "data": {
+    "inputRef": "input-0123456789abcdef",
+    "kind": "dat",
+    "sizeBytes": 16,
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "sourceName": "demo.dat",
+    "directionAvailable": false,
+    "timestampAvailable": false
+  }
+}

@@ -1,101 +1,66 @@
 # AGENTS.md — AI Collaboration Entry Point
 
-This file is the first repository instruction for AI coding agents working on this project.
+This is the first repository instruction for AI coding agents working on this four-person cybersecurity course project.
 
-The repository is a four-person cybersecurity course project. Work is intentionally split into four ownership tracks so multiple people and their AI agents can work in parallel without silently changing each other's modules.
+## 1. Identify the operator
 
-## 1. Identify the operator before editing
-
-Map the current human operator to exactly one track:
-
-| GitHub account | Track | Primary tracking issue | Responsibility |
+| GitHub account | Track | Issue | Responsibility |
 |---|---|---:|---|
 | `@dddd2024` | A | `#12` | integration, shared contracts, sidecar, CI, export, end-to-end |
 | `@hinaLove1` | B | `#13` | React/Tauri desktop, visualization, packaging, final demo |
-| `@sunny1ce` | C | `#14` plus research umbrella `#9` | EvidenceGraph-PRE, LLM reasoning, executable verification, experiments |
+| `@sunny1ce` | C | `#14` + research `#9` | EvidenceGraph-PRE, LLM reasoning, executable verification, experiments |
 | `@zhaohongjun20-creator` | D | `#15` | binary analysis, packet boundaries, protocol inference, behavior features |
 
-Track B and Track D work packages were swapped on 2026-09-07. The mapping above is authoritative. All four accounts have collaboration access.
+Track B and Track D work packages were swapped on 2026-09-07. The mapping above is authoritative.
 
-If the operator identity is not known, **do not guess**. Ask the human for the GitHub account or Track letter before making non-trivial edits.
+If the operator identity is unknown, do not guess before making non-trivial edits.
 
-## 2. Required read order
+## 2. Read order
 
-Before implementation, read in this order:
+Before implementation, read:
 
-1. this `AGENTS.md`;
+1. `AGENTS.md`;
 2. the matching `docs/tracks/track-<letter>.md`;
-3. the current tracking Issue (`#12`, `#13`, `#14`, or `#15`) and linked/open sub-tasks when GitHub access is available;
+3. the current tracking Issue;
 4. `docs/architecture.md`;
-5. the design document(s) named by the Track entrypoint;
-6. the existing code/tests in the owned paths.
+5. relevant design/contracts/tests in the owned paths.
 
-Also read the following when relevant:
+Also read `docs/dependency-register.md` for dependency work, `contracts/README.md` for shared-contract work, and `docs/repository-settings.md` for merge governance.
 
-- environment/build/dependency work: `docs/development-environment.md` and `docs/dependency-register.md`;
-- shared contract work: `contracts/README.md` and `contracts/fixtures/`;
-- final integration/demo work: `docs/delivery-checklist.md`;
-- repository governance: `docs/repository-settings.md` and `docs/pre-implementation-readiness.md`.
-
-For Track C also read `docs/design-v2.md` and `docs/research-roadmap.md`. For Track B also read `docs/desktop-app-guide.md`. Track D should read both `docs/design-v1.md` and the V2 evidence interface sections because its outputs feed Track C.
-
-## 3. Authority and conflict rule
+## 3. Authority and ownership
 
 When instructions disagree, use this order:
 
 1. explicit current human request;
 2. current GitHub tracking Issue / accepted project decision;
 3. this file and the matching Track entrypoint;
-4. `docs/architecture.md`, versioned contracts and repository readiness rules;
-5. V1/V2 design and roadmap documents;
-6. README and older historical notes.
+4. architecture and versioned contracts;
+5. older design/README notes.
 
-Do not silently resolve a real contract conflict. Record it in the PR/Issue and request the affected owner review.
+Agents may inspect the whole repository but should implement primarily in their Track's owned paths. Cross-Track edits should be narrow and justified by an actual shared-interface or blocking integration need.
 
-## 4. Stay inside the assigned Track
+Ownership defines implementation responsibility; it is not a merge-approval mechanism.
 
-An agent may inspect the whole repository, but should implement primarily in the Track's owned paths.
+## 4. Shared interfaces
 
-Do **not** take over another Track merely because it is convenient. Cross-track work is allowed only when one of these is true:
+Shared/high-risk surfaces include:
 
-- the current task explicitly requires a shared-interface change;
-- the owning Track requested support;
-- a blocking defect cannot be fixed without a narrow cross-track change and the PR documents it.
-
-When cross-track work is required, keep it minimal and preserve the owning Track's design.
-
-## 5. Shared/high-risk interfaces
-
-The following are shared contracts, not private implementation details:
-
-- `contracts/` and its golden fixtures;
+- `contracts/` and golden fixtures;
 - `src/course_project/models.py`;
 - `docs/architecture.md`;
 - `src/course_project/sidecar/` protocol surface;
 - `.github/workflows/`;
 - root dependency/build/environment configuration.
 
-For changes to a shared interface:
+For a shared-interface change, document the old/new behavior, update schemas/fixtures and producer/consumer tests as needed, and make the migration explicit in the PR. Do not silently change a frozen contract.
 
-1. describe old and new contract;
-2. update schema + golden fixture + documentation first where applicable;
-3. update producer and consumers;
-4. add compatibility/integration tests;
-5. request Track A review plus at least one affected consumer/producer owner.
+### Frozen Day-0 names
 
-Do not let third-party library objects leak across project-native contracts.
-
-### 5.1 Frozen Day-0 names
-
-Unless a shared-contract PR intentionally changes them, agents must use these exact names:
-
-**Semantic decisions**
-- JSON/TypeScript/Rust/UI: `ACCEPTED`, `REJECTED`, `UNCERTAIN`;
+Semantic decisions:
+- JSON / TypeScript / Rust / UI: `ACCEPTED`, `REJECTED`, `UNCERTAIN`;
 - Python internal: `accepted`, `rejected`, `uncertain`.
 
-Do not introduce `ACCEPT`, `REJECT`, or `UNSURE` as enum values.
-
-**Sidecar v1 methods**
+Sidecar v1 methods:
 - `register_input`;
 - `inspect_file`;
 - `analyze`;
@@ -103,9 +68,7 @@ Do not introduce `ACCEPT`, `REJECT`, or `UNSURE` as enum values.
 - `get_result`;
 - `read_range`.
 
-Do not invent aliases such as `run_analysis` for convenience.
-
-**D→C project-native DTOs**
+D→C project-native DTOs:
 - `InputMetadata`;
 - `PacketCandidate` / `MessageCandidate`;
 - `MessageFamily`;
@@ -113,99 +76,81 @@ Do not invent aliases such as `run_analysis` for convenience.
 - `FieldCandidate`;
 - `BehaviorFeatures`.
 
-**Desktop-facing result linkage**
-- findings link through `evidenceIds`;
-- small provenance records live in `evidence[]`;
-- large views/results are advertised through `artifacts[]` references.
+Desktop-facing result linkage:
+- findings use `evidenceIds`;
+- provenance lives in `evidence[]`;
+- large views/results use `artifacts[]` refs.
 
-## 6. Environment, LLM and dependency rules
+## 5. Environment, dependency and safety rules
 
-- Canonical local baseline is defined by `.python-version`, `.nvmrc`, `rust-toolchain.toml` and `docs/development-environment.md`.
-- CI/offline development must work without a real model credential; `.env.example` defaults to `COURSE_PROJECT_LLM_PROVIDER=mock`.
-- Never make baseline CI depend on a paid/cloud LLM call.
-- Before introducing a third-party runtime/research dependency, update `docs/dependency-register.md` with exact upstream/version/license/environment/adapter/fallback information.
-- If third-party source, data, model assets or substantial examples are copied or redistributed, update `THIRD_PARTY_NOTICES.md` before merge.
-- Missing optional analyzers should surface a clear `dependency_unavailable`/degraded state rather than crash unrelated pipeline stages.
+- Follow `.python-version`, `.nvmrc`, `rust-toolchain.toml` and `docs/development-environment.md`.
+- Baseline CI must work without real model credentials; use the mock/offline LLM path.
+- Register new dependencies in `docs/dependency-register.md` with version, license, environment constraints and fallback behavior.
+- Do not leak third-party library objects across project-native contracts.
+- Missing optional analyzers should degrade clearly instead of crashing unrelated stages.
+- Do not commit secrets, private traffic, prohibited teacher data or sensitive plaintext.
+- LLM output is a hypothesis source, not protocol ground truth.
+- Accepted semantic claims must retain evidence and verification records.
 
-## 7. Project safety, data and scientific boundaries
+## 6. Working protocol
 
-This project is for coursework, teacher-provided evaluation data, controlled datasets, and authorized laboratory traffic only.
+For each task:
 
-- Do not add features aimed at unauthorized access, credential theft, persistence, destructive behavior, or unrestricted shell execution.
-- Do not claim that modern correctly implemented cryptography can be recovered without keys.
-- LLM output is a hypothesis source, never protocol ground truth.
-- Accepted protocol-semantic claims must retain evidence and verification records.
-- The inference pipeline must not read evaluation ground truth.
-- Teacher-provided raw `.dat` / `.bin` files remain local unless redistribution is explicitly allowed.
-- Do not commit private traffic, credentials, test keys, prohibited teacher data, restored sensitive plaintext, or secrets.
-- Synthetic contract/unit/mechanism fixtures may be committed but must not be presented as formal course benchmark results.
-
-## 8. Working protocol for every AI task
-
-Before coding, state internally or in the task record:
-
-- operator / Track;
-- tracking Issue;
-- owned paths being changed;
-- shared interfaces affected, if any;
-- dependency/environment changes, if any;
-- acceptance criteria to satisfy.
-
-Then:
-
-1. start from current `main`;
-2. use a task-sized branch (`track-a/...`, `track-b/...`, `track-c/...`, `track-d/...`, `fix/...`, `docs/...`, or `experiment/...`);
-3. implement the smallest coherent change;
-4. add/update tests and fixtures;
-5. run relevant local checks;
+1. identify Track / Issue / owned paths;
+2. start from current `main`;
+3. use a task-sized branch;
+4. implement the smallest coherent change;
+5. add/update relevant tests and fixtures;
 6. open a PR linked to the Issue;
-7. report evidence, known limitations, environment/dependency changes and interface changes in the PR.
-
-### 8.1 Hard merge gate
-
-No human or AI agent may merge a PR until the latest CI run for the PR's **current head SHA** is completely green.
-
-Immediately before any merge action, fresh-read the PR head SHA and its current CI/check results. A merge is allowed only when:
-
-- every blocking CI job for that exact head has completed with `success`;
-- the final `merge-gate` job has completed with `success`;
-- no CI job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful;
-- no newer commit has been pushed after the verified run;
-- required reviews, Code Owner approval, and conversation-resolution conditions are also satisfied.
-
-Never use an older green commit, `mergeable=true`, partial CI success, or a deadline as justification to merge. If the head changes, discard the previous merge authorization and re-check CI from scratch. If a new blocking CI job is added to `.github/workflows/ci.yml`, add it to `merge-gate.needs` in the same PR.
-
-Repository settings should additionally require the emitted CI check names on `main`; see `docs/repository-settings.md`. Until branch protection/rulesets are enabled, this instruction remains a mandatory fail-closed operating rule for every project agent.
+7. record important limitations, contract changes and dependency changes.
 
 Do not use one long-lived personal branch for unrelated work.
 
+## 7. Merge governance — CI only
+
+There is **no required human review, approval, Code Owner approval, review-thread resolution, or `CHANGES_REQUESTED` gate**.
+
+A PR may merge when all of the following CI-validity conditions hold:
+
+- the PR is mechanically mergeable with the current `main` (no merge conflict);
+- the current PR head is the version being evaluated;
+- the branch is synchronized with current `main` whenever `main` has changed since the last valid CI evaluation;
+- every blocking CI job for that current version has completed with `success`:
+  - `test (3.10)`;
+  - `test (3.11)`;
+  - `windows-integration`;
+  - `merge-gate`;
+- no blocking CI job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful.
+
+If the PR head changes, or `main` changes such that the tested merge result is no longer current, previous CI evidence does not authorize merge. Synchronize and rerun CI.
+
+Automated or human comments may still be used as optional engineering feedback, but they never block merge. Do not request approval as a merge requirement.
+
+`merge-gate` must depend on every blocking CI job. If a new blocking job is added, add it to `merge-gate.needs` in the same change.
+
+## 8. Merge behavior
+
+Preferred merge method: **squash merge**.
+
+Immediately before merging, the merge actor/agent fresh-reads the current PR/base state and verifies only the CI-validity conditions above. PR authors do not need to copy SHAs or check results into the PR description.
+
+**Once those CI-only conditions are satisfied, merge promptly. Do not leave a green PR waiting for review, approval, discussion, or owner acknowledgement.**
+
 ## 9. Definition of done
 
-A task is not done merely because code was written. A Track task is done when:
+A task is done when:
 
-- the stated Issue acceptance criterion is met;
-- tests/fixtures cover the changed behavior;
+- its Issue acceptance criterion is met;
+- relevant tests/fixtures cover the changed behavior;
 - shared contracts remain compatible or are explicitly migrated;
-- dependency/version/license records are updated when applicable;
-- all blocking CI is green for the current PR head and `merge-gate` is green before merge;
-- docs/examples are updated when behavior or usage changed;
-- the PR makes ownership and limitations clear.
+- dependency/docs records are updated when applicable;
+- current-version CI is fully green.
 
 ## 10. Track entrypoints
 
-- Track A: [`docs/tracks/track-a.md`](docs/tracks/track-a.md)
-- Track B: [`docs/tracks/track-b.md`](docs/tracks/track-b.md)
-- Track C: [`docs/tracks/track-c.md`](docs/tracks/track-c.md)
-- Track D: [`docs/tracks/track-d.md`](docs/tracks/track-d.md)
+- Track A: `docs/tracks/track-a.md`
+- Track B: `docs/tracks/track-b.md`
+- Track C: `docs/tracks/track-c.md`
+- Track D: `docs/tracks/track-d.md`
 
-The detailed four-person division remains in [`docs/team-division.md`](docs/team-division.md). CODEOWNERS remains the path-level review map, while tracking Issues remain the current execution truth.
-
-## 11. Tool compatibility
-
-`AGENTS.md` is the single source of truth. Thin compatibility files route common coding agents here without duplicating the ownership map:
-
-- GitHub Copilot: `.github/copilot-instructions.md`
-- Claude Code: `CLAUDE.md`
-- Gemini CLI: `GEMINI.md`
-
-Human handoff guidance and the recommended startup prompt are documented in [`docs/ai-collaboration.md`](docs/ai-collaboration.md). If a tool does not automatically read any of these files, explicitly tell it to read `AGENTS.md` first.
+`AGENTS.md` is the single source of truth for coding agents. Compatibility files (`.github/copilot-instructions.md`, `CLAUDE.md`, `GEMINI.md`) should route agents here rather than duplicate governance.

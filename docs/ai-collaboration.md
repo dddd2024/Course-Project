@@ -36,9 +36,11 @@ When one Track is blocked by another:
 
 - create or link a dependency Issue/comment;
 - specify the required contract/output rather than prescribing another Track's internal implementation;
-- if a shared contract must change, follow the migration rules in `AGENTS.md` and `docs/architecture.md`;
+- if a shared contract must change, follow the migration/tests in `AGENTS.md` and `docs/architecture.md`;
 - keep the requesting Track's PR narrow until the dependency is resolved.
 
-## Review evidence
+Cross-Track coordination does not create a human approval gate. Merge eligibility is determined only by current-version CI according to `AGENTS.md`.
 
-For course workload accounting, AI-assisted work should still leave attributable engineering evidence: owned Issue, human-owned branch/PR, tests, review discussion, experiment/result artifacts, documentation, and demo contribution. AI use does not replace the need for a clear human owner.
+## Workload evidence
+
+For course workload accounting, AI-assisted work should still leave attributable engineering evidence: owned Issue, human-owned branch/PR, tests, experiment/result artifacts, documentation, and demo contribution. Optional discussion/comments may be retained as context, but approval is not required for merge.

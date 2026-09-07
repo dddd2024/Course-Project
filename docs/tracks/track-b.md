@@ -24,7 +24,7 @@ Build the local desktop workbench that makes the analysis pipeline inspectable a
 - `apps/desktop/src/`
 - `apps/desktop/src-tauri/`
 - desktop-facing fixtures/examples
-- desktop-facing parts of `contracts/` only through the shared-contract review process
+- desktop-facing parts of `contracts/` only through the shared-contract migration process
 - `examples/` for reproducible UI/demo flows
 
 ## Primary responsibilities
@@ -69,13 +69,15 @@ Consume only project-native/versioned interfaces from Track A. Typical inputs in
 - typed desktop commands/events;
 - stable UI state models derived from contracts;
 - reproducible desktop demo and package configuration;
-- integration defects reported back to Track A instead of silently changing Python internals.
+- integration defects reported through Issues/PR notes instead of silently changing Python internals.
 
 ## Do not own by default
 
 - `src/course_project/io/`, `features/`, `boundary/`, `inference/`, `behavior/` (Track D);
 - `evidence/`, `llm/`, `verification/`, experiment logic (Track C);
-- sidecar protocol or shared model changes without Track A review.
+- sidecar protocol or shared model changes without following the shared-contract migration/tests in `AGENTS.md`.
+
+Ownership limits implementation responsibility; they do not create a human approval gate.
 
 ## First implementation sequence
 
@@ -88,4 +90,4 @@ Consume only project-native/versioned interfaces from Track A. Typical inputs in
 
 ## Completion standard
 
-A UI feature is complete only when it consumes a stable contract/fixture, exposes failure states, links conclusions back to evidence/offsets where applicable, and does not invent protocol facts in the presentation layer.
+A UI feature is complete only when it consumes a stable contract/fixture, exposes failure states, links conclusions back to evidence/offsets where applicable, does not invent protocol facts in the presentation layer, and the current-version CI is fully green.

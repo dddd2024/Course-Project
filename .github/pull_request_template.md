@@ -8,76 +8,45 @@
 - Track: A / B / C / D
 - Linked Issue:
 
-## Affected Areas
+## Scope
 
-- [ ] shared contracts / models / architecture
-- [ ] io / features / boundary / inference
-- [ ] evidence / llm / verification
-- [ ] behavior / experiments
-- [ ] sidecar / exporters / integration
-- [ ] desktop React / Tauri
-- [ ] CI / environment / dependency configuration
-- [ ] docs / examples
+- [ ] Track-internal change
+- [ ] Shared interface / cross-Track change
 
-## Shared Interface / Contract Changes
+If shared/cross-Track, briefly describe the affected contract or consumer/producer:
 
-- [ ] No shared interface changes
-- [ ] Shared interface changed
-
-If changed, describe:
-- old contract:
-- new contract:
-- affected producer/consumer Tracks:
-- schema + golden fixture updated:
-- migration/compatibility plan:
-
-## New / Changed Third-Party Dependency
-
-- [ ] No dependency change
-- [ ] Dependency changed and `docs/dependency-register.md` is updated
-- [ ] Vendored/redistributed material changed and `THIRD_PARTY_NOTICES.md` is updated
-
-If applicable, record exact version/commit, license, environment constraints, adapter boundary and missing-dependency fallback.
-
-## How to Test
+## Test Evidence
 
 ```bash
-# exact commands
+# relevant local commands, if any
 ```
 
-Environment-sensitive PRs should also record the relevant versions (`python --version`, Node/npm, Rust/Cargo as applicable).
-
-## Evidence / Results
-
-<!-- Tests, metrics, screenshots, fixture output, or reproducible result. -->
-
-For research/experiment PRs include git SHA, data identifier/hash, ground-truth availability, config/model/provider and failure cases. Do not commit teacher-provided raw `.dat` files unless redistribution is explicitly allowed.
+CI is the authoritative merge evidence.
 
 ## Risks / Limitations
 
-<!-- What is not solved yet? What may break? Which outputs remain UNCERTAIN? -->
+<!-- What is intentionally not solved? What could still fail? -->
 
-## Merge Gate Evidence
+## Merge Gate — CI Only
 
-<!-- Fill this from the latest PR head immediately before merge. Older-head CI does not count. -->
+A PR is mergeable only when the current PR version, synchronized with current `main` when needed, has all blocking checks green:
 
-- Head SHA checked:
 - [ ] `test (3.10)` = success
 - [ ] `test (3.11)` = success
 - [ ] `windows-integration` = success
 - [ ] `merge-gate` = success
-- [ ] No newer commit was pushed after those checks
-- [ ] Required reviews / conversations are satisfied
+- [ ] no merge conflict
 
-## Checklist
+Human approval, Code Owner approval, review-thread resolution, and `CHANGES_REQUESTED` are not merge requirements.
 
-- [ ] Started from current `main` and follows `AGENTS.md` / owned Track scope
-- [ ] Tests added/updated where appropriate
-- [ ] Contract fixtures validate if shared schemas changed
-- [ ] No secrets, private captures, prohibited teacher data, or sensitive plaintext committed
-- [ ] LLM-derived protocol claims are not marked accepted without verifier evidence
-- [ ] Optional dependencies fail clearly instead of crashing unrelated pipeline stages
-- [ ] Documentation updated for user-visible behavior, environment, dependencies, or shared contracts
-- [ ] All blocking CI jobs are complete and green for the current head SHA
-- [ ] `merge-gate` is green for the current head SHA
-- [ ] Another team member can reproduce the main result when this PR claims integration/demo readiness
+If the PR head changes or `main` changes after the valid CI evaluation, synchronize/rerun CI before merging. Do not reuse an older green run.
+
+## Final Checklist
+
+- [ ] Work stays within the intended Track or explicitly documents a cross-Track need
+- [ ] Relevant tests/fixtures were added or updated
+- [ ] Shared schemas/contracts are compatible or explicitly migrated
+- [ ] Dependency/version/license records are updated when dependencies change
+- [ ] No secrets, private captures, prohibited teacher data, or sensitive plaintext are committed
+- [ ] LLM-derived protocol claims are not presented as accepted without verifier evidence
+- [ ] User-facing or shared behavior changes are documented where needed

@@ -15,7 +15,7 @@ The project is organized around four ownership tracks. The goal is to minimize o
 
 Track B and Track D responsibilities were swapped on 2026-09-07. The GitHub accounts remain attached to their original Track letters; only the work packages changed.
 
-All four members now have repository collaboration access. Track C is assigned to Issue `#14`; Track D is assigned to Issue `#15`.
+All four members have repository collaboration access. Track C is assigned to Issue `#14`; Track D is assigned to Issue `#15`.
 
 The 25/25/25/25 split is an initial planning baseline, not a final grading claim. Final workload percentages should be based on actual Issues, PRs, commits, tests, experiments, documentation and demo ownership.
 
@@ -106,7 +106,7 @@ Responsibilities:
 
 Tracking issue: `#15`.
 
-## 6. Shared Areas and Review Rules
+## 6. Shared Areas and Integration Rules
 
 Shared/high-risk paths:
 - `contracts/`
@@ -116,12 +116,12 @@ Shared/high-risk paths:
 - root dependency/build configuration
 
 Rules:
-1. Shared contract changes require Track A review and at least one affected consumer owner review.
+1. Ownership determines who is responsible for implementation and coordination; it does not create a merge approval requirement.
 2. UI/Rust/Python integration is contract-first: update schema + fixture before changing both sides independently.
 3. Third-party objects must remain behind adapters; do not leak Netzob/NFStream/LLM-provider-specific types across modules.
-4. Every track owns tests for its primary paths.
-5. A PR that changes an interface must state the old contract, new contract, affected tracks and migration/test plan.
-6. `main` should receive reviewed integration at least daily during the short course schedule.
+4. Every Track owns tests for its primary paths.
+5. A PR that changes an interface must state the old contract, new contract, affected Tracks and migration/test plan.
+6. Merge eligibility is determined only by the current-version CI policy in `AGENTS.md` / `docs/repository-settings.md`.
 
 ## 7. Branch Convention
 
@@ -137,7 +137,7 @@ docs/<topic>
 experiment/<topic>
 ```
 
-Do not use one long-lived branch per member for all work. Use task-sized branches and PRs so code review and rollback remain practical.
+Do not use one long-lived branch per member for all work. Use task-sized branches and PRs so CI isolation and rollback remain practical.
 
 ## 8. Existing Issues Mapping
 
@@ -149,16 +149,16 @@ The original WP issues remain useful as task-level history:
 - `#4` LLM/verifier -> Track C
 - `#5` behavior/ML -> Track D with experiment support from Track C
 - `#6` schema/datasets/demo -> Track A + Track B
-- `#7` V1 project tracking -> all tracks
-- `#9` EvidenceGraph-PRE research tracking -> Track C, reviewed by Track A
+- `#7` V1 project tracking -> all Tracks
+- `#9` EvidenceGraph-PRE research tracking -> Track C with integration/reproducibility support from Track A
 - `#11` four-person skeleton migration -> Track A
-- `#12`–`#15` current four ownership tracks
+- `#12`–`#15` current four ownership Tracks
 
 ## 9. Collaboration Access Status
 
-All four members have accepted repository collaboration access. Issue assignment and CODEOWNERS-based review routing can now use the real GitHub accounts recorded above.
+All four members have accepted repository collaboration access. Issue assignment and the ownership map in `AGENTS.md` identify responsibility.
 
-Repository access does not override Track ownership: cross-Track or shared-interface edits still follow `AGENTS.md`, `CODEOWNERS`, contract-first migration, and review rules.
+Repository access does not override Track ownership: cross-Track or shared-interface edits still follow contract-first migration and tests, but no human approval is required for merge.
 
 ## 10. Final Workload Evidence
 

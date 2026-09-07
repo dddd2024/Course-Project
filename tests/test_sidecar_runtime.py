@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Mapping
 from io import StringIO
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from jsonschema import Draft202012Validator
 

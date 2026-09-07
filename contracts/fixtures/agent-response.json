@@ -1,0 +1,31 @@
+{
+  "answer": "One candidate length field is accepted by deterministic verification; the timestamp interpretation remains uncertain.",
+  "findings": [
+    {
+      "findingId": "field-length-001",
+      "claim": "bytes 4-5 are consistent with a big-endian packet-length field",
+      "status": "ACCEPTED",
+      "evidenceIds": ["ev-length-correlation-001", "ev-parser-check-001"],
+      "location": {
+        "inputId": "input-demo-001",
+        "offset": 4,
+        "length": 2
+      },
+      "confidence": {
+        "model": 0.72,
+        "evidence": 0.96,
+        "verification": 0.99
+      },
+      "validation": "Validated across the synthetic contract fixture corpus."
+    }
+  ],
+  "limitations": [
+    "This fixture demonstrates the response contract and is not a real protocol conclusion."
+  ],
+  "suggestedActions": [
+    {
+      "tool": "open_hex_view",
+      "label": "Inspect referenced bytes"
+    }
+  ]
+}

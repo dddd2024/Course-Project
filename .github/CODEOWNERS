@@ -1,6 +1,14 @@
 # Default integration owner
 * @dddd2024
 
+# AI collaboration governance
+/AGENTS.md @dddd2024
+/docs/tracks/README.md @dddd2024
+/docs/tracks/track-a.md @dddd2024
+/docs/tracks/track-b.md @hinaLove1 @dddd2024
+/docs/tracks/track-c.md @sunny1ce @dddd2024
+/docs/tracks/track-d.md @zhaohongjun20-creator @dddd2024
+
 # Shared contracts / architecture
 /contracts/ @dddd2024 @sunny1ce @hinaLove1
 /docs/architecture.md @dddd2024 @hinaLove1 @sunny1ce @zhaohongjun20-creator

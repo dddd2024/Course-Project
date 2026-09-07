@@ -134,6 +134,8 @@ Preferred merge method: **squash merge**.
 
 Immediately before merging, the merge actor/agent fresh-reads the current PR/base state and verifies only the CI-validity conditions above. PR authors do not need to copy SHAs or check results into the PR description.
 
+**Once those CI-only conditions are satisfied, merge promptly. Do not leave a green PR waiting for review, approval, discussion, or owner acknowledgement.**
+
 ## 9. Definition of done
 
 A task is done when:

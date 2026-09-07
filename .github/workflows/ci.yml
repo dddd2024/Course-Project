@@ -69,12 +69,8 @@ jobs:
       - name: Sidecar CLI smoke
         run: python -m course_project.sidecar --help
 
-      - name: Windows contract and sidecar tests
-        run: >-
-          pytest -q
-          tests/test_contract_fixtures.py
-          tests/test_sidecar_runtime.py
-          tests/test_exporters.py
+      - name: Windows full Python test suite
+        run: pytest -q
 
       - name: Set up Node
         uses: actions/setup-node@v4

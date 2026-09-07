@@ -9,7 +9,7 @@ from course_project.behavior import extract_behavior_features, from_packet_candi
 from course_project.boundary import detect_boundaries, to_message_candidates
 from course_project.inference import family_analysis, infer_field_candidates
 from course_project.io import load_bin, load_dat
-from course_project.models import AnalysisResult, ArtifactRef, InputMetadata
+from course_project.models import AnalysisResult, ArtifactRef, ArtifactType, InputMetadata
 
 
 class TrackDBaselineBackend:
@@ -183,7 +183,7 @@ class TrackDBaselineBackend:
         artifact_dir: Path,
         task_id: str,
         artifact_id: str,
-        artifact_type: str,
+        artifact_type: ArtifactType,
         filename: str,
         payload: Any,
         count: int,
@@ -196,7 +196,7 @@ class TrackDBaselineBackend:
         )
         return ArtifactRef(
             artifact_id=artifact_id,
-            type=artifact_type,  # type: ignore[arg-type]
+            type=artifact_type,
             format="json",
             ref=f"tasks/{task_id}/artifacts/{filename}",
             count=count,

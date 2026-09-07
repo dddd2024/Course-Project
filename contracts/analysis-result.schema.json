@@ -4,6 +4,101 @@
   "title": "AnalysisResult",
   "type": "object",
   "required": ["protocolVersion", "taskId", "status", "findings"],
+  "$defs": {
+    "location": {
+      "type": "object",
+      "required": ["inputId", "offset", "length"],
+      "properties": {
+        "inputId": {"type": "string", "minLength": 1},
+        "offset": {"type": "integer", "minimum": 0},
+        "length": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "scores": {
+      "type": "object",
+      "properties": {
+        "model": {"type": "number", "minimum": 0, "maximum": 1},
+        "evidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "verification": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["findingId", "claim", "status", "evidenceIds"],
+      "properties": {
+        "findingId": {"type": "string", "minLength": 1},
+        "claim": {"type": "string", "minLength": 1},
+        "status": {
+          "type": "string",
+          "enum": ["ACCEPTED", "REJECTED", "UNCERTAIN"]
+        },
+        "semanticType": {"type": "string"},
+        "evidenceIds": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "location": {"$ref": "#/$defs/location"},
+        "scores": {"$ref": "#/$defs/scores"}
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["evidenceId", "sourceComponent", "method", "featureFamily"],
+      "properties": {
+        "evidenceId": {"type": "string", "minLength": 1},
+        "sourceComponent": {"type": "string", "minLength": 1},
+        "method": {"type": "string", "minLength": 1},
+        "featureFamily": {"type": "string", "minLength": 1},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "observation": {"type": "object"},
+        "parentEvidenceIds": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "independenceGroup": {"type": ["string", "null"]},
+        "sampleIds": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["artifactId", "type", "format", "ref"],
+      "properties": {
+        "artifactId": {"type": "string", "minLength": 1},
+        "type": {
+          "type": "string",
+          "enum": [
+            "evidence",
+            "packets",
+            "messages",
+            "alignment",
+            "statistics",
+            "behavior",
+            "restored",
+            "schema",
+            "report"
+          ]
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "jsonl", "parquet", "csv", "text", "binary", "ksy"]
+        },
+        "ref": {"type": "string", "minLength": 1},
+        "count": {"type": "integer", "minimum": 0},
+        "metadata": {"type": "object"}
+      },
+      "additionalProperties": false
+    }
+  },
   "properties": {
     "protocolVersion": {"type": "integer", "const": 1},
     "taskId": {"type": "string", "minLength": 1},
@@ -11,47 +106,19 @@
       "type": "string",
       "enum": ["COMPLETED", "FAILED", "CANCELLED", "PARTIAL"]
     },
-    "inputId": {"type": "string"},
-    "resultRef": {"type": "string"},
+    "inputId": {"type": "string", "minLength": 1},
+    "resultRef": {"type": "string", "minLength": 1},
     "findings": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["findingId", "claim", "status", "evidenceIds"],
-        "properties": {
-          "findingId": {"type": "string"},
-          "claim": {"type": "string"},
-          "status": {
-            "type": "string",
-            "enum": ["ACCEPTED", "REJECTED", "UNCERTAIN"]
-          },
-          "semanticType": {"type": "string"},
-          "evidenceIds": {
-            "type": "array",
-            "items": {"type": "string"},
-            "uniqueItems": true
-          },
-          "location": {
-            "type": "object",
-            "properties": {
-              "inputId": {"type": "string"},
-              "offset": {"type": "integer", "minimum": 0},
-              "length": {"type": "integer", "minimum": 0}
-            },
-            "additionalProperties": false
-          },
-          "scores": {
-            "type": "object",
-            "properties": {
-              "model": {"type": "number", "minimum": 0, "maximum": 1},
-              "evidence": {"type": "number", "minimum": 0, "maximum": 1},
-              "verification": {"type": "number", "minimum": 0, "maximum": 1}
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": true
-      }
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "evidence": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidence"}
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
     },
     "metrics": {"type": "object"},
     "limitations": {"type": "array", "items": {"type": "string"}}

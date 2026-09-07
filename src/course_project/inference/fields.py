@@ -28,6 +28,7 @@ from course_project.io.records import ByteStream
 from course_project.models import FieldHypothesis, PacketCandidate
 
 Endian = Literal["big", "little"]
+_ENUM_MAX_CARDINALITY = 8
 _LENGTH_SUPPORT = 0.9
 _SEQUENCE_STEP_SUPPORT = 0.9
 _TIMESTAMP_MAX_DELTA = 1_000_000
@@ -76,6 +77,7 @@ def infer_fields(
         hypotheses.extend(
             _family_field_candidates(cluster_id, family, family_messages, family_packets)
         )
+    hypotheses.extend(_cross_family_candidates(messages, labels, aligned_packets))
     return hypotheses
 
 
@@ -145,7 +147,7 @@ def _family_field_candidates(
                 },
             )
 
-    _length_candidates(family, messages, add)
+    total_length_fields = _length_candidates(family, messages, add)
     _sequence_candidates(family, messages, add)
     _timestamp_candidates(family, messages, add)
 
@@ -165,20 +167,99 @@ def _family_field_candidates(
             },
         )
 
-    # variable-length tail beyond the common prefix
+    # variable-length tail beyond the common prefix; when an accepted
+    # length(total) field exists, its end is better evidence for the payload
+    # start than the family's minimum message length
     if family.has_variable_tail:
-        add(
-            "payload",
-            family.min_length,
-            None,
-            None,
-            0.8,
-            {
-                "min_length": family.min_length,
-                "max_length": family.max_length,
-            },
-        )
+        if total_length_fields:
+            derived_offset = min(
+                offset + size for offset, size, _ in total_length_fields
+            )
+            best_support = max(support for _, _, support in total_length_fields)
+            add(
+                "payload",
+                derived_offset,
+                None,
+                None,
+                round(best_support, 6),
+                {
+                    "derived_from_length": True,
+                    "length_offsets": sorted(
+                        {offset for offset, _, _ in total_length_fields}
+                    ),
+                    "max_length": family.max_length,
+                },
+                tag="derived",
+            )
+        else:
+            add(
+                "payload",
+                family.min_length,
+                None,
+                None,
+                0.8,
+                {
+                    "min_length": family.min_length,
+                    "max_length": family.max_length,
+                },
+            )
 
+    return out
+
+
+def _cross_family_candidates(
+    messages: list[bytes],
+    labels: list[int],
+    packets: list[PacketCandidate],
+) -> list[FieldHypothesis]:
+    """Enum candidates from comparing families instead of messages within one.
+
+    A byte column that is constant inside every family but differs across
+    multi-message families with small cardinality is the classic message-type
+    signal (``enum``). Candidates carry ``evidence["cross_family"] = True`` so
+    Track C can provenance-tag them separately.
+    """
+    min_len = min(len(m) for m in messages) if messages else 0
+    if min_len == 0:
+        return []
+
+    family_sizes: dict[int, int] = {}
+    for label in labels:
+        family_sizes[label] = family_sizes.get(label, 0) + 1
+    big_families = {label for label, size in family_sizes.items() if size >= 2}
+    if len(big_families) < 2:
+        return []
+
+    out: list[FieldHypothesis] = []
+    for offset in range(min_len):
+        by_family: dict[int, set[int]] = {}
+        for message, label in zip(messages, labels):
+            if label in big_families:
+                by_family.setdefault(label, set()).add(message[offset])
+        if not all(len(values) == 1 for values in by_family.values()):
+            continue
+        distinct = set().union(*by_family.values())
+        if not 2 <= len(distinct) <= _ENUM_MAX_CARDINALITY:
+            continue
+        out.append(
+            FieldHypothesis(
+                field_id=f"x-enum-cross-{offset}-1-x",
+                offset=offset,
+                size=1,
+                semantic_type="enum",
+                confidence=round(1.0 - (len(distinct) - 1) / 16.0, 6),
+                evidence={
+                    "cross_family": True,
+                    "cardinality": len(distinct),
+                    "distinct_values": [hex(v) for v in sorted(distinct)],
+                    "families": sorted(by_family),
+                    "support": sum(
+                        family_sizes[label] for label in by_family
+                    ),
+                    "sample_offsets": [p.start_offset + offset for p in packets],
+                },
+            )
+        )
     return out
 
 
@@ -186,11 +267,16 @@ def _length_candidates(
     family: MessageFamily,
     messages: list[bytes],
     add: Callable[..., None],
-) -> None:
+) -> list[tuple[int, int, float]]:
+    """Emit length candidates; return accepted ``(offset, size, support)``
+    triples for the ``total`` match so callers can derive the payload start."""
+    accepted: list[tuple[int, int, float]] = []
     for size in (1, 2, 4):
         if family.min_length < size:
             continue
         for endian in ("big", "little"):
+            if size == 1 and endian == "little":
+                continue  # endian is meaningless for a single byte
             for offset in range(family.min_length - size + 1):
                 pairs = []
                 for message in messages:
@@ -223,6 +309,7 @@ def _length_candidates(
                         },
                         tag="total",
                     )
+                    accepted.append((offset, size, support_total))
                 if support_after >= _LENGTH_SUPPORT:
                     add(
                         "length",
@@ -237,6 +324,7 @@ def _length_candidates(
                         },
                         tag="after",
                     )
+    return accepted
 
 
 def _sequence_candidates(
@@ -248,7 +336,11 @@ def _sequence_candidates(
         if family.min_length < size:
             continue
         for endian in ("big", "little"):
+            if size == 1 and endian == "little":
+                continue  # endian is meaningless for a single byte
             for offset in range(family.min_length - size + 1):
+                if _starts_or_ends_on_constant(family, offset, size):
+                    continue  # padded wide reading (e.g. zero bytes widening a seq)
                 values = _read_values(messages, offset, size, endian)
                 if len(values) < 2:
                     continue
@@ -282,6 +374,8 @@ def _timestamp_candidates(
         return
     for endian in ("big", "little"):
         for offset in range(family.min_length - size + 1):
+            if _starts_or_ends_on_constant(family, offset, size):
+                continue  # padded wide reading
             values = _read_values(messages, offset, size, endian)
             if len(values) < 2:
                 continue
@@ -309,6 +403,27 @@ def _timestamp_candidates(
                         "last": values[-1],
                     },
                 )
+
+
+def _starts_or_ends_on_constant(
+    family: MessageFamily, offset: int, size: int
+) -> bool:
+    """True when a numeric reading is padded by constant columns.
+
+    Zero-filled reserved bytes widen a 1-byte sequence into a plausible
+    2/4-byte one; skipping ranges whose first or last byte lies on a constant
+    column removes those degenerate readings.
+    """
+    for column in (offset, offset + size - 1):
+        if _region_kind(family, column) == "constant":
+            return True
+    return False
+
+
+def _region_kind(family: MessageFamily, offset: int) -> ColumnKind | None:
+    if 0 <= offset < len(family.regions):
+        return family.regions[offset].kind
+    return None
 
 
 def _read_values(

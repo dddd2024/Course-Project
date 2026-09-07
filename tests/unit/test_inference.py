@@ -97,7 +97,8 @@ def test_infer_fields_families() -> None:
     assert ("magic", 0) in keys
     assert ("enum", 8) in keys
     assert ("sequence", 8) in keys
-    assert ("payload", 19) in keys
+    assert ("payload", 11) in keys  # derived from the accepted length(total) field
+    assert ("payload", 19) not in keys  # raw tail candidate is suppressed
 
     length_h = [h for h in hypotheses if h.semantic_type == "length"]
     assert any(
@@ -107,6 +108,16 @@ def test_infer_fields_families() -> None:
         and h.evidence["match"] == "total"
         and h.confidence == pytest.approx(1.0)
         for h in length_h
+    )
+
+    # degenerate padded readings are filtered out
+    assert not any(
+        h.semantic_type == "sequence" and h.offset in (5, 7) for h in hypotheses
+    )
+    assert not any(h.semantic_type == "timestamp" for h in hypotheses)
+    assert not any(
+        h.semantic_type == "length" and h.size == 1 and h.endian == "little"
+        for h in hypotheses
     )
 
     ids = [h.field_id for h in hypotheses]
@@ -146,3 +157,32 @@ def test_pipeline_boundary_then_inference() -> None:
     keys = [(h.semantic_type, h.offset) for h in hypotheses]
     assert ("magic", 0) in keys
     assert all(h.offset >= 0 for h in hypotheses)
+
+
+def test_cross_family_enum_candidate() -> None:
+    messages = [
+        make_message(0x01, 1, b"A" * 8),
+        make_message(0x01, 2, b"A" * 8),
+        make_message(0x02, 1, b"A" * 8),
+        make_message(0x02, 2, b"A" * 8),
+    ]
+    data, packets = make_packets(messages)
+    hypotheses = infer_fields(load_raw(data, source_id="s"), packets)
+    cross_enums = [
+        h
+        for h in hypotheses
+        if h.semantic_type == "enum"
+        and h.offset == 4
+        and h.evidence.get("cross_family")
+    ]
+    assert len(cross_enums) == 1
+    assert cross_enums[0].evidence["cardinality"] == 2
+    assert cross_enums[0].evidence["families"] == [0, 1]
+    assert cross_enums[0].evidence["support"] == 4
+
+
+def test_cross_family_no_candidates_for_single_family() -> None:
+    messages = [make_message(0x01, i + 1, b"P" * 8) for i in range(3)]
+    data, packets = make_packets(messages)
+    hypotheses = infer_fields(load_raw(data, source_id="s"), packets)
+    assert not any(h.evidence.get("cross_family") for h in hypotheses)

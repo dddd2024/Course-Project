@@ -23,7 +23,8 @@ from course_project.models import PacketCandidate
 
 DEFAULT_WEIGHTS = {"prefix": 0.25, "length": 0.25, "entropy": 0.25, "field": 0.25}
 
-_VALLEY_EPS = 1e-9
+_VALLEY_DEPTH = 1.0  # bits: minimum entropy dip for a valley to count
+_VALLEY_SNAP_TOLERANCE = 16  # bytes: snap a valley to a nearby prefix occurrence
 _PEAK_PERIODICITY = 0.8
 
 
@@ -44,6 +45,7 @@ def generate_candidate_positions(
     ``max_candidates`` (earliest kept) for determinism.
     """
     positions: set[int] = set()
+    prefix_occurrences: list[int] = []
 
     prefix = repeated_prefix(data, max_len=prefix_max_len)
     if prefix:
@@ -53,6 +55,7 @@ def generate_candidate_positions(
             if idx == -1:
                 break
             positions.add(idx)
+            prefix_occurrences.append(idx)
             start = idx + 1
 
     if len(data) >= 4:
@@ -69,8 +72,14 @@ def generate_candidate_positions(
         left = series[i - 1][1]
         mid = series[i][1]
         right = series[i + 1][1]
-        if mid < left - _VALLEY_EPS and mid < right - _VALLEY_EPS:
-            positions.add(series[i][0])
+        if mid < left - _VALLEY_DEPTH and mid < right - _VALLEY_DEPTH:
+            valley = series[i][0]
+            if prefix_occurrences:
+                nearest = min(prefix_occurrences, key=lambda p: abs(p - valley))
+                if abs(nearest - valley) <= _VALLEY_SNAP_TOLERANCE:
+                    positions.add(nearest)
+                    continue
+            positions.add(valley)
 
     kept: list[int] = []
     for p in sorted(positions):

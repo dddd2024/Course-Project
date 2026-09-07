@@ -1,0 +1,36 @@
+# Default integration owner
+* @dddd2024
+
+# Shared contracts / architecture
+/contracts/ @dddd2024 @sunny1ce @zhaohongjun20-creator
+/docs/architecture.md @dddd2024 @hinaLove1 @sunny1ce @zhaohongjun20-creator
+/src/course_project/models.py @dddd2024 @sunny1ce
+
+# Track B — deterministic analysis / PRE
+/src/course_project/io/ @hinaLove1
+/src/course_project/features/ @hinaLove1
+/src/course_project/boundary/ @hinaLove1
+/src/course_project/inference/ @hinaLove1
+/src/course_project/behavior/ @hinaLove1
+
+# Track C — EvidenceGraph / LLM / verification
+/src/course_project/evidence/ @sunny1ce
+/src/course_project/llm/ @sunny1ce
+/src/course_project/verification/ @sunny1ce
+/experiments/ @sunny1ce @dddd2024
+
+# Track A — sidecar / export / CI
+/src/course_project/sidecar/ @dddd2024
+/src/course_project/exporters/ @dddd2024
+/.github/workflows/ @dddd2024
+
+# Track D — desktop application
+/apps/desktop/src/ @zhaohongjun20-creator
+/apps/desktop/src-tauri/ @zhaohongjun20-creator
+/examples/ @zhaohongjun20-creator @dddd2024
+
+# Documentation ownership
+/docs/team-division.md @dddd2024
+/docs/desktop-app-guide.md @zhaohongjun20-creator @dddd2024
+/docs/design-v2.md @sunny1ce @dddd2024
+/docs/research-roadmap.md @sunny1ce @dddd2024

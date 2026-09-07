@@ -1,46 +1,60 @@
-# Architecture V1
+# Architecture — V1 Delivery + V2 EvidenceGraph + Desktop
 
-本文档定义 V1 的模块边界和共享接口。多人开发时，模块内部可独立演进，但跨模块输入输出必须保持兼容。
+> Status: shared contract baseline for four-person development
 
-## 1. Package Boundary
+This document defines the current package boundaries and dependency direction. V1 remains the minimum runnable analysis path; V2 adds provenance-aware evidence and executable verification; the desktop application consumes the analyzer through versioned sidecar contracts.
+
+## 1. Repository Boundary
 
 ```text
+apps/desktop/              # React UI + Tauri/Rust shell
+contracts/                 # cross-language JSON schemas
+experiments/               # baselines and ablations
+prompts/                   # versioned Agent prompts
 src/course_project/
-├── io/            # input normalization
-├── features/      # byte/statistical features
-├── boundary/      # packet boundary candidates
-├── inference/     # clustering/alignment/field inference
-├── llm/           # semantic hypothesis generation
-├── verification/  # deterministic validation
-├── behavior/      # flow/behavior features & classifier
-├── exporters/     # JSON/Kaitai/parser export
-└── models.py      # shared data contracts
+├── io/                    # input normalization
+├── features/              # byte/statistical features
+├── boundary/              # packet/message boundary candidates
+├── inference/             # clustering/alignment/field inference
+├── evidence/              # evidence registry + provenance graph
+├── llm/                   # semantic hypothesis generation
+├── verification/          # executable/deterministic checks
+├── behavior/              # flow/behavior features & classifier
+├── exporters/             # JSON/Kaitai/parser export
+├── sidecar/               # desktop-facing analyzer protocol
+└── models.py              # shared Python contracts
 ```
 
-## 2. Dependency Direction
-
-允许的主依赖方向：
+## 2. Main Dependency Direction
 
 ```text
 io
  -> features
  -> boundary
  -> inference
+ -> evidence
  -> llm
  -> verification
  -> exporters
 
-io/features
+io/features/inference
  -> behavior
+
+verified/exported results
+ -> sidecar
+ -> contracts
+ -> Tauri/Rust
+ -> React UI
 ```
 
-规则：
-- 下游可依赖上游共享对象；
-- 上游不得反向 import 下游实现；
-- 第三方工具通过 adapter 使用，避免 Netzob/NFStream 对象泄漏到整个项目；
-- 所有跨模块对象优先使用 `models.py` 中的数据类或 JSON-compatible dict。
+Important rules:
+- upstream analysis modules do not import desktop code;
+- the desktop never imports Python internals directly;
+- third-party libraries remain behind adapters;
+- cross-language payloads must conform to versioned schemas in `contracts/`;
+- LLM output is a hypothesis source, not a protocol-fact authority.
 
-## 3. Shared Contracts
+## 3. V2 Shared Python Contracts
 
 ### PacketCandidate
 
@@ -55,17 +69,51 @@ PacketCandidate(
 )
 ```
 
-### FieldHypothesis
+### Evidence
 
 ```python
-FieldHypothesis(
-    field_id: str,
+Evidence(
+    evidence_id: str,
+    source_component: str,
+    method: str,
+    feature_family: str,
+    score: float,
+    observation: dict,
+    parent_evidence_ids: tuple[str, ...],
+    independence_group: str | None,
+    sample_ids: tuple[str, ...],
+)
+```
+
+### ProtocolHypothesis
+
+```python
+ProtocolHypothesis(
+    hypothesis_id: str,
     offset: int,
     size: int | None,
     semantic_type: str,
-    endian: str | None,
-    confidence: float,
-    evidence: dict,
+    interpretation: str,
+    parameters: dict,
+    model_confidence: float,
+    supporting_evidence_ids: tuple[str, ...],
+    competing_hypothesis_ids: tuple[str, ...],
+)
+```
+
+### ExecutableCheck
+
+```python
+ExecutableCheck(
+    check_id: str,
+    hypothesis_id: str,
+    check_type: str,
+    sample_count: int,
+    support_count: int,
+    violation_count: int,
+    score: float,
+    result: str,  # accepted / rejected / uncertain
+    evidence_ids: tuple[str, ...],
 )
 ```
 
@@ -82,6 +130,22 @@ VerificationResult(
 )
 ```
 
+### VerifiedField
+
+Only a verified/accepted hypothesis may be promoted to a schema-exportable field.
+
+```python
+VerifiedField(
+    field_id: str,
+    offset: int,
+    size: int | None,
+    semantic_type: str,
+    interpretation: str,
+    verification_score: float,
+    evidence_ids: tuple[str, ...],
+)
+```
+
 ### BehaviorPrediction
 
 ```python
@@ -93,45 +157,103 @@ BehaviorPrediction(
 )
 ```
 
-## 4. Adapter Contracts
+## 4. EvidenceGraph Rule
 
-第三方开源工具必须被放在 adapter 边界后面。例如：
+Evidence must retain provenance. If an LLM interpretation is produced from a Netzob alignment result, the LLM agreement is derived evidence and must not be counted as an independent second observation.
+
+Minimum evidence lifecycle:
 
 ```text
-Netzob -> inference/netzob_adapter.py -> project-native field/alignment result
-NFStream -> behavior/nfstream_adapter.py -> project-native flow feature dict
-Kaitai -> exporters/kaitai.py -> .ksy / generated parser artifact
+raw observation
+ -> evidence record
+ -> optional derived evidence
+ -> protocol hypothesis
+ -> executable checks
+ -> provenance-aware fusion
+ -> ACCEPTED / REJECTED / UNCERTAIN
 ```
 
-这样可以避免某个开源库安装失败或版本变化时整个项目被锁死。
+Accepted fields must retain links to the checks/evidence that justify them.
 
-## 5. Error Semantics
+## 5. Adapter Contracts
 
-模块不应把失败隐藏成空结果。建议统一区分：
+```text
+Scapy       -> io/scapy_adapter.py              -> project-native input records
+Netzob      -> inference/netzob_adapter.py       -> project-native alignment/field data
+BinaryInferno -> inference/binaryinferno_adapter.py -> project-native field candidates
+NFStream    -> behavior/nfstream_adapter.py      -> project-native flow features
+Kaitai      -> exporters/kaitai.py              -> schema/parser artifacts
+LLM provider -> llm/<provider>_adapter.py        -> structured hypotheses
+```
+
+Third-party objects must not cross these adapter boundaries.
+
+## 6. Desktop / Sidecar Boundary
+
+The desktop architecture follows `docs/desktop-app-guide.md`.
+
+```text
+React UI
+   |
+   | typed commands/events
+   v
+Tauri/Rust Core
+   |
+   | JSON Lines / stable result references
+   v
+Python Sidecar
+   |
+   v
+Analysis Engine
+```
+
+The sidecar must expose task-level operations rather than unrestricted shell access. Large binary payloads are referenced by controlled input IDs, offsets and result paths instead of being embedded in JSON messages.
+
+Versioned contracts live in:
+- `contracts/sidecar-message.schema.json`
+- `contracts/analysis-result.schema.json`
+- `contracts/agent-response.schema.json`
+
+## 7. Error Semantics
+
+Common machine-readable categories:
 - `invalid_input`
 - `insufficient_evidence`
 - `unsupported_format`
 - `dependency_unavailable`
 - `inference_failed`
 - `verification_failed`
+- `contract_version_mismatch`
+- `task_cancelled`
+- `sidecar_failed`
 
-LLM 返回无法解析、缺字段或不符合 schema 时，应标记为失败/不确定，不允许静默补全为 accepted。
+Do not convert failures into empty successful results.
 
-## 6. Confidence Policy
+## 8. Confidence Semantics
 
-所有重要推断结果都使用 `[0, 1]` 置信度，但不同模块的 score 含义必须在文档/代码中说明。V1 不要求全局校准，但禁止把模型主观 confidence 与确定性统计比例混为同一个指标。
-
-建议区分：
+Keep distinct:
 - `model_confidence`
 - `evidence_score`
 - `verification_score`
-- `final_confidence`
+- `final_confidence` (only when the fusion method is explicit)
 
-## 7. Schema Change Rule
+A deterministic support ratio and an LLM self-reported probability are not interchangeable.
 
-修改共享 contract 时：
-1. 先更新本文档；
-2. 更新 `models.py`；
-3. 在 PR 中列出受影响模块；
-4. 至少通知/请求 Integration Owner review；
-5. 同一 PR 内补充兼容性测试或迁移说明。
+## 9. Contract Change Rule
+
+For changes to `models.py`, `contracts/`, or sidecar protocol:
+1. update this document/schema first;
+2. add or update an example fixture;
+3. update producer and consumers;
+4. add compatibility/integration tests;
+5. request Track A review plus at least one affected track owner;
+6. document protocol/schema version changes in the PR.
+
+## 10. Four-Track Ownership Boundary
+
+- Track A (`@dddd2024`): shared contracts, sidecar, CI, integration/export.
+- Track B (`@hinaLove1`): deterministic binary/PRE/behavior feature producers.
+- Track C (`@sunny1ce`): evidence graph, LLM hypotheses, executable verification, experiments.
+- Track D (`@zhaohongjun20-creator`): React/Tauri desktop and presentation layer.
+
+Cross-track dependencies must go through shared contracts instead of importing another track's internal implementation.

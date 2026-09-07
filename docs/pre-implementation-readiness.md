@@ -21,48 +21,41 @@
 - [x] Python/Node/Rust development baseline is documented;
 - [x] dependency/license acceptance register exists;
 - [x] course delivery checklist exists;
-- [x] Python CI is green on supported versions before this repair; this repair must also pass PR/main CI before being considered complete.
+- [x] blocking CI includes Python 3.10/3.11, Windows integration and aggregate `merge-gate`.
 
 ### Repository-setting gate
 
-- [ ] `main` branch protection/ruleset enabled according to `docs/repository-settings.md`.
+- [ ] `main` ruleset matches the CI-only target in `docs/repository-settings.md`.
 
-This item must be verified in GitHub repository settings. Repository files alone cannot prevent a collaborator with write access from pushing directly to an unprotected branch.
+This remains a server-setting task. The current ruleset still has obsolete review requirements and lacks required status checks; repository files cannot correct those administrator settings by themselves.
 
 ### Deferred to the owning implementation PR
 
 These are intentionally **not blockers for starting parallel work**:
 
-- Track A implements the sidecar runtime skeleton against the already-frozen v1 schemas/fixtures;
-- Track B creates the actual React/Tauri scaffold, lockfiles and desktop CI in its first implementation slice;
-- Track D integrates the first optional PRE dependency only after version/license/environment verification;
+- Track A implements/integrates the sidecar runtime against the frozen schemas/fixtures;
+- Track B completes React/Tauri runtime integration, packaging and demo flow;
+- Track D integrates optional PRE dependencies only after version/license/environment verification;
 - Track C implements the mock/real LLM provider boundary behind project-native interfaces;
 - teacher-provided `.dat` evaluation data is profiled after receipt and is not required to fabricate a pre-start dataset;
-- Python dependency locking/constraints are added when the first real runtime/optional dependency set is accepted;
-- Windows/desktop CI expands when a runnable desktop scaffold exists.
+- Python dependency locking/constraints are added when the first real runtime/optional dependency set is accepted.
 
 ## Start protocol
 
 Each member starts by reading `AGENTS.md`, their Track entrypoint and current Issue, then creates a task-sized branch from current `main`.
 
-Recommended first slices:
-
-- Track A: sidecar runtime skeleton implementing the frozen command vocabulary + contract fixture consumption;
-- Track B: fixed-fixture React/Tauri contract spike + scaffold/desktop CI;
-- Track C: evidence/provenance model + length/sequence executable verifier skeleton;
-- Track D: `.dat` loader + deterministic byte statistics/boundary candidate interface using the normalized DTOs.
-
 ## No-go conditions
 
-Stop and resolve before merging if:
+These conditions must be fixed because they should make tests/CI fail or invalidate the implementation itself; they do not create a separate human approval gate:
 
 - a PR changes a shared contract without migration/fixture/test updates;
 - a Track invents a new sidecar method/config name instead of updating the shared contract first;
 - a Track passes third-party adapter objects across Track boundaries instead of project-native DTOs;
 - a result references evidence/artifacts that cannot be resolved;
-- CI becomes red;
-- a Track silently takes ownership of another Track's module;
+- blocking CI is red or incomplete;
 - teacher ground truth leaks into inference logic;
 - real credentials/private traffic are committed;
-- an open-source dependency is copied or vendored without version/license/notice review;
+- an open-source dependency is copied or vendored without version/license/notice verification;
 - an innovation claim cannot be tied to implemented, measurable behavior.
+
+Merge eligibility itself follows only the current-version CI rule in `AGENTS.md`.

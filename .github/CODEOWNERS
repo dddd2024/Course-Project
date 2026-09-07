@@ -17,6 +17,19 @@
 /docs/architecture.md @dddd2024 @hinaLove1 @sunny1ce @zhaohongjun20-creator
 /src/course_project/models.py @dddd2024 @sunny1ce
 
+# Startup / repository governance
+/.env.example @dddd2024 @sunny1ce
+/.python-version @dddd2024
+/.nvmrc @hinaLove1 @dddd2024
+/rust-toolchain.toml @hinaLove1 @dddd2024
+/pyproject.toml @dddd2024 @sunny1ce @zhaohongjun20-creator
+/THIRD_PARTY_NOTICES.md @dddd2024
+/docs/development-environment.md @dddd2024 @hinaLove1
+/docs/dependency-register.md @dddd2024 @zhaohongjun20-creator @sunny1ce
+/docs/repository-settings.md @dddd2024
+/docs/pre-implementation-readiness.md @dddd2024
+/docs/delivery-checklist.md @dddd2024 @hinaLove1
+
 # Track D — deterministic analysis / PRE
 /src/course_project/io/ @zhaohongjun20-creator
 /src/course_project/features/ @zhaohongjun20-creator
@@ -34,6 +47,7 @@
 /src/course_project/sidecar/ @dddd2024
 /src/course_project/exporters/ @dddd2024
 /.github/workflows/ @dddd2024
+/tests/test_contract_fixtures.py @dddd2024 @hinaLove1 @sunny1ce
 
 # Track B — desktop application
 /apps/desktop/src/ @hinaLove1

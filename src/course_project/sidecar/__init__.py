@@ -16,6 +16,7 @@ from course_project.sidecar.runtime import (
     SidecarError,
     SidecarRuntime,
 )
+from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 __all__ = [
     "ANALYSIS_MODES",
@@ -27,4 +28,5 @@ __all__ = [
     "MetadataOnlyBackend",
     "SidecarError",
     "SidecarRuntime",
+    "TrackDBaselineBackend",
 ]

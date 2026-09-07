@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TextIO
 
 from course_project.sidecar.runtime import PROTOCOL_VERSION, SidecarRuntime
+from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 
 def serve_stream(
@@ -69,7 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     roots = tuple(args.allow_root) if args.allow_root else None
-    runtime = SidecarRuntime(state_dir=args.state_dir, allowed_roots=roots)
+    runtime = SidecarRuntime(
+        state_dir=args.state_dir,
+        backend=TrackDBaselineBackend(state_dir=args.state_dir),
+        allowed_roots=roots,
+    )
     return serve_stream(runtime, sys.stdin, sys.stdout, sys.stderr)
 
 

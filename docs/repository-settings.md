@@ -1,77 +1,91 @@
 # Repository Settings Baseline
 
-This document records repository-level controls that cannot be enforced only by files in the repository.
+This document defines the repository-level merge policy for `main`.
 
-## `main` protection — required before parallel implementation
+## 1. Governance model
 
-Configure a branch protection rule or repository ruleset targeting `main` with these minimum settings:
+Use one simple rule for every pull request:
+
+> **Right reviewer + green CI + no unresolved blocker = mergeable.**
+
+These are the only three merge gates.
+
+### Gate 1 — one valid human approval
+
+Require at least one approving human review.
+
+Reviewer selection:
+- ordinary Track-internal PR: any other team member;
+- shared-interface or cross-Track PR: Track A (`@dddd2024`);
+- Track A-authored shared/cross-Track PR: one affected Track owner.
+
+Automated Codex/GitHub review is advisory. It may identify defects, but it does not create an additional approval requirement.
+
+### Gate 2 — full green CI for the current PR version
+
+Blocking checks are:
+- `test (3.10)`;
+- `test (3.11)`;
+- `windows-integration`;
+- `merge-gate`.
+
+`merge-gate` is the aggregate check and must succeed only when all blocking jobs succeed.
+
+If code changes after CI, rerun/recheck CI. PR authors do not need to copy SHAs or job results into the PR description; the merge actor/agent verifies the current state immediately before merging.
+
+### Gate 3 — no unresolved blocker
+
+Before merge:
+- no active `CHANGES_REQUESTED` review remains;
+- blocking review conversations are resolved;
+- the PR has no merge conflict.
+
+## 2. Recommended GitHub `main` ruleset
+
+Configure `main` with the smallest settings needed to enforce the three gates:
 
 - require a pull request before merging;
 - require at least one approving review;
-- require review from Code Owners when owned paths change;
 - dismiss stale approvals when new commits are pushed;
 - require conversation resolution before merge;
-- require the current CI checks to pass:
+- require these status checks:
   - `test (3.10)`;
   - `test (3.11)`;
   - `windows-integration`;
   - `merge-gate`;
-- require branches to be up to date with `main` before merging when GitHub settings permit;
 - block force pushes;
-- block branch deletion;
-- apply the rule to administrators as well during normal development, unless an emergency recovery procedure is explicitly documented.
+- block branch deletion.
 
-`merge-gate` is the final aggregate CI job. It depends on every blocking CI job and succeeds only when all of them report `success`. Whenever a new blocking CI job is introduced, it must also be added to `merge-gate.needs` in `.github/workflows/ci.yml` before that CI change may merge.
+A separate Code Owner approval is **not** required by default. Reviewer ownership is selected according to Gate 1 above. This keeps ordinary PRs lightweight while still routing shared-interface changes through Track A.
 
-Do not enable a required check name that has never been emitted successfully by Actions, because that can make the branch impossible to merge. When CI job names change, update the ruleset, `merge-gate`, and this document together.
+Do not enable a required check name until that check has emitted successfully on `main`.
 
-## CI platform baseline
+## 3. CI platform baseline
 
-The CI workflow intentionally has three layers:
+CI has three layers:
 
-1. Ubuntu Python matrix (`test (3.10)`, `test (3.11)`) for fast lint/unit/contract regression coverage.
-2. `windows-integration` on Python 3.11 / Node 22 / Rust stable for the target desktop environment. It validates the Sidecar CLI and full Python suite, performs `npm ci` + frontend build, and runs `cargo check --locked` for the Tauri shell.
-3. `merge-gate`, which has no independent product test responsibility; it aggregates the blocking jobs and fails closed unless every dependency succeeded.
+1. Ubuntu Python matrix: `test (3.10)` and `test (3.11)`;
+2. `windows-integration`: Python 3.11 + Node 22 + Rust/Tauri validation on the target desktop OS;
+3. `merge-gate`: final aggregate result.
 
-A full signed/packaged Tauri installer build is a release/demo gate, not a requirement for every small PR unless the team later decides otherwise.
+A signed/package installer build is a release/demo gate, not a requirement for every PR.
 
-## Merge policy
+## 4. Merge behavior
 
-Preferred merge method for task-sized branches: **squash merge**.
+Preferred method: **squash merge**.
 
-### Hard precondition: latest-head CI must be completely green
+Immediately before merge, the merge actor/agent checks the three gates. Exact commit/head synchronization is an implementation detail of that check, not a manual task for each author.
 
-A PR must **not** be merged while any blocking CI job for the PR's current head commit is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful.
+If `main` changes and the PR must be synchronized to obtain valid CI or remove a conflict, update the branch and rerun CI. Never rely on a green run from a previous code version.
 
-Before any human or AI agent performs a merge, it must fresh-read the PR head SHA and the CI/check state for that exact head. Merge is allowed only when:
+## 5. Permissions and secrets
 
-1. all currently defined blocking CI jobs for that exact head have completed with `success`;
-2. `merge-gate` has completed with `success` for that exact head;
-3. no newer commit has been pushed after the verified CI run;
-4. any separately required review/conversation/ownership conditions are also satisfied.
+All four collaborators may create branches and PRs, but ownership boundaries in `AGENTS.md` still apply.
 
-A previous green run for an older head SHA is not merge evidence. A partially green workflow is not merge evidence. `mergeable=true` alone is not merge evidence.
+Baseline CI requires no repository secret. Real model credentials remain local or in an approved secret store. Never expose credentials through fixtures, logs, screenshots, Actions output or demo recordings.
 
-If CI is red because a check is invalid, fix or intentionally change the check through a reviewed PR; never bypass or ignore it merely to merge. Demo deadlines do not waive this rule.
+## 6. Current server-truth note
 
-Reasons for squash merge:
-- keeps `main` readable during a short course schedule;
-- makes each PR a reversible unit;
-- preserves detailed work history in the PR discussion while avoiding dozens of AI-generated fixup commits on `main`.
+As of 2026-09-07, `main-protection` is active and already enforces a PR, one approval, stale-approval dismissal, review-thread resolution, deletion blocking and non-fast-forward blocking.
 
-## Permissions
-
-All four collaborators should be able to create branches and PRs. Shared/high-risk paths remain governed by `CODEOWNERS` and `AGENTS.md`; write access does not imply ownership of every module.
-
-## Secrets
-
-- no repository secret is required for baseline CI;
-- CI must use the mock/offline LLM path;
-- real model credentials stay in local `.env` or an approved secret store;
-- never expose credentials through fixtures, logs, screenshots, Actions output or the final demo recording.
-
-## Manual verification record
-
-Repository files cannot by themselves prevent an administrator from pressing Merge. After this CI PR lands, enable branch protection or a repository ruleset in GitHub so `main` requires the emitted `test (3.10)`, `test (3.11)`, `windows-integration`, and `merge-gate` checks. Then verify from the GitHub UI/API that `main` reports protection/ruleset enforcement and record that verification in Track A Issue `#12`.
-
-Current server-truth checkpoint (2026-09-07): repository ruleset `main-protection` exists and is `active`, targets the default branch, has no bypass actors, blocks deletion and non-fast-forward updates, requires pull requests with one approval, dismisses stale approvals on push, and requires review-thread resolution. It is **not yet fully compliant** with this baseline because Code Owner review is not required and required status checks are not yet configured. Keep the Track A protection acceptance item open until those remaining rules are enabled and re-verified after PR #26 lands.
+The remaining repository-settings task is to add the four required CI checks after they have emitted successfully on `main`. Code Owner review no longer needs to be enabled for the simplified governance model.

@@ -4,6 +4,12 @@
   "method": "analyze",
   "params": {
     "inputRef": "input-demo-001",
-    "mode": "baseline"
+    "mode": "baseline",
+    "stages": ["inspect", "features", "boundary", "inference", "verification", "export"],
+    "llmEnabled": false,
+    "verificationEnabled": true,
+    "behaviorEnabled": false,
+    "timeoutSeconds": 300,
+    "optionalDependencyPolicy": "degrade"
   }
 }

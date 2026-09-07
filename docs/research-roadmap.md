@@ -136,7 +136,7 @@ Required metrics:
 
 ## D0–D4 — Desktop Workbench
 
-Owner: `@hinaLove1`, contract/integration review by `@dddd2024`.
+Owner: `@hinaLove1`, contract/integration support from `@dddd2024`.
 
 Follow `docs/desktop-app-guide.md`:
 - D0 contract spike: fixed React -> Tauri -> Python -> React path;
@@ -146,6 +146,8 @@ Follow `docs/desktop-app-guide.md`:
 - D4 packaging/performance and clean-machine demo.
 
 Desktop work must consume stable sidecar contracts and must not duplicate/reimplement protocol inference in TypeScript/Rust unless profiling later proves a specific hotspot needs migration.
+
+Support/ownership labels do not add a human merge-approval requirement; merge eligibility follows the CI-only rule in `AGENTS.md`.
 
 ## Deterministic PRE / Behavior Producers
 

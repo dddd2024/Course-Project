@@ -56,6 +56,31 @@ def test_sidecar_request_uses_canonical_analyze_method() -> None:
     assert request["params"]["mode"] in {"baseline", "evidencegraph"}
 
 
+def test_sidecar_rejects_unknown_method_and_config_keys() -> None:
+    schema = load_json(CONTRACTS / "sidecar-message.schema.json")
+    validator = Draft202012Validator(schema)
+
+    unknown_method = {
+        "protocolVersion": 1,
+        "id": "task-bad-001",
+        "method": "run_analysis",
+        "params": {"inputRef": "input-1", "mode": "baseline"},
+    }
+    drifted_config = {
+        "protocolVersion": 1,
+        "id": "task-bad-002",
+        "method": "analyze",
+        "params": {
+            "inputRef": "input-1",
+            "mode": "baseline",
+            "enable_llm": True,
+        },
+    }
+
+    assert list(validator.iter_errors(unknown_method))
+    assert list(validator.iter_errors(drifted_config))
+
+
 def test_analysis_result_evidence_references_resolve() -> None:
     result = load_json(FIXTURES / "analysis-result.json")
     evidence_ids = {item["evidenceId"] for item in result["evidence"]}

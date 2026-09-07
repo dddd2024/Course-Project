@@ -35,6 +35,24 @@ ruff check src tests
 pytest -q
 ```
 
+## Environment doctor
+
+After installing the project, run:
+
+```bash
+course-project-doctor
+```
+
+The doctor checks the repository's canonical environment markers and desktop lockfiles, verifies the active Python major/minor version, checks the required Node/npm/Rust/Cargo commands, and runs a Sidecar CLI smoke check. It exits non-zero when a required baseline check fails.
+
+For machine-readable evidence:
+
+```bash
+course-project-doctor --json
+```
+
+The doctor reports the current OS as informational. Development may run on another OS, but the final desktop rehearsal remains a Windows 10/11 x64 gate.
+
 ## LLM configuration
 
 Copy `.env.example` to `.env` locally. The default provider is `mock` so CI and offline development never require a secret or external model.
@@ -59,18 +77,18 @@ See `docs/dependency-register.md`.
 
 ## Environment evidence in PRs and experiments
 
-For integration-sensitive PRs record at least:
+For integration-sensitive work, `course-project-doctor --json` is the preferred baseline snapshot. Raw command output may still be included when a specific toolchain problem needs investigation:
 
 ```text
 python --version
-node --version        # if desktop affected
-npm --version         # if desktop affected
-rustc --version       # if Tauri/Rust affected
-cargo --version       # if Tauri/Rust affected
+node --version
+npm --version
+rustc --version
+cargo --version
 ```
 
 Formal experiments additionally record git SHA, dataset identifier supplied by the course, random seed, model/provider configuration and dependency versions as required by `docs/testing-plan.md`.
 
 ## Clean-machine gate
 
-Before the final course demo, Track B + Track A must reproduce install/start on a clean Windows machine or clean Windows VM using only repository instructions plus locally supplied course test data and secrets.
+Before the final course demo, Track B + Track A must reproduce install/start on a clean Windows machine or clean Windows VM using only repository instructions plus locally supplied course test data and secrets. Run `course-project-doctor --json` on that machine and retain the output with the final demo/release evidence.

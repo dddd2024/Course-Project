@@ -20,3 +20,13 @@ The browser fallback keeps the D0 task lifecycle available, but file selection a
 5. Start the contract task to inspect task progress and failure states.
 
 The WebView receives only controlled metadata. Rust owns the dialog and Sidecar process, while the Python Sidecar remains the authority for input identity, hashing and range reads.
+
+## D2 result views
+
+Use **Load synthetic fixture** to exercise the result presentation before the full analyzer is connected. The preview is explicitly marked synthetic and renders the frozen AnalysisResult shape:
+
+- Findings keep status, score sources, evidenceIds and byte locations.
+- Evidence cards show provenance, parent evidence and observations.
+- Artifact cards expose controlled result-relative refs without inlining large tables.
+- Packet, alignment, statistics and behavior tabs remain artifact-backed until their producers are connected.
+- A finding location moves the Hex range to the referenced offset; it does not turn an uncertain claim into a fact.

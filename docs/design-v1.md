@@ -17,7 +17,7 @@
 8. 访问行为类型识别；
 9. 输出机器可读协议 schema、解析结果、置信度和证据。
 
-最终验收输入以 `.dat` 为核心，同时允许使用 PCAP 作为开发和对照数据来源。
+最终课程验收输入以老师提供的 `.dat` 为核心，同时允许使用 PCAP 作为开发和对照数据来源。synthetic 数据只用于工程测试、机制验证或必要消融，不替代老师提供的正式测试输入。
 
 ## 2. 明确边界与非目标
 
@@ -26,7 +26,7 @@
 - 推断未知二进制流中可能存在的数据包边界；
 - 发现固定字段、枚举字段、长度字段、序号、时间戳、校验字段和 payload 等候选；
 - 对高熵区域进行“可能加密/压缩”的统计判断；
-- 在持有测试密钥的自生成数据集上进行受控解密和还原验证；
+- 在持有授权测试密钥的受控工程样例，或老师明确允许的测试数据上进行解密和还原验证；
 - 对加密流量利用 packet size、direction、inter-arrival time、burst、flow ratio 等侧信息做行为建模；
 - 让 LLM 负责提出语义假设，但由确定性程序负责验证关键结论。
 
@@ -56,16 +56,18 @@ LLM Semantic Hypothesis
       v
 Deterministic Constraint Verifier
       |
-  +---+---+
-  |       |
-ACCEPT  REJECT/UNSURE
-  |       |
-  |       +------> revise hypothesis / try alternative interpretation
+  +---+----------------+
+  |        |           |
+ACCEPTED REJECTED   UNCERTAIN
+  |        |           |
+  |        +-----------+------> revise hypothesis / try alternative interpretation
   v
 Protocol Schema + Confidence + Evidence
 ```
 
 核心原则是：**模型可以提出假设，但模型本身无权把未经验证的假设升级为事实。**
+
+跨语言公开状态统一为 `ACCEPTED / REJECTED / UNCERTAIN`；Python 内部对应 `accepted / rejected / uncertain`。不再使用 `ACCEPT / REJECT / UNSURE` 作为正式枚举值。
 
 ## 4. 总体架构
 
@@ -126,13 +128,14 @@ Structured Restore      Behavior Type + Confidence
 
 ### 5.1 Input Normalization
 
-职责：把 `.dat` 和 PCAP 输入统一为内部 `ByteStream` / `MessageSample` 表示。
+职责：把 `.dat` 和 PCAP 输入统一为内部项目原生表示。
 
 V1 要求：
 - `.dat` 以原始 bytes 读取；
 - PCAP 可通过 Scapy 提取 transport payload；
-- 保留 source id、offset、direction、timestamp（如果可获得）；
-- 不在这一层做协议语义猜测。
+- 保留 source/input id、offset、direction、timestamp（如果可获得）；
+- 不在这一层做协议语义猜测；
+- 对外只暴露项目原生 DTO，不泄漏第三方库对象。
 
 ### 5.2 Statistical & Byte-Level Analyzer
 
@@ -172,11 +175,12 @@ BoundaryScore(x) =
 
 V1 可直接复用/参考 Netzob 的协议格式推断能力，并保留自研 adapter，使上层不依赖 Netzob 的内部对象模型。
 
-输出：
-- cluster id；
-- aligned messages；
+输出通过项目原生 DTO 表达：
+- message / family id；
+- alignment regions；
 - stable/variable regions；
-- alignment confidence。
+- alignment score / evidence；
+- normalized field candidates。
 
 ### 5.5 Field Inference
 
@@ -289,25 +293,25 @@ V1 计划：
 
 原则：开源项目用于成熟能力和 baseline，项目自己的核心价值集中在统一流水线、边界推断、证据化语义推断、验证、置信度和系统评测。
 
-## 7. V1 内部数据对象
+## 7. V1 / Shared Data Objects
 
-建议统一以下核心对象：
+真正的字段名以 `src/course_project/models.py` 与 `docs/architecture.md` 为准。V1/V2 共用以下项目原生对象：
 
 ### PacketCandidate
 - `start_offset`
 - `end_offset`
-- `boundary_confidence`
-- `boundary_evidence`
+- `confidence`
+- `evidence`
 - `direction`（可选）
 - `timestamp`（可选）
 
 ### FieldHypothesis
-- `name`
+- `field_id`
 - `offset`
 - `size`
 - `semantic_type`
 - `endian`
-- `model_confidence`
+- `confidence`
 - `evidence`
 
 ### VerificationResult
@@ -324,20 +328,37 @@ V1 计划：
 - `confidence`
 - `features`
 
-## 8. 测试数据设计
+D→C 的 message family、alignment、field candidate、behavior feature 等跨 Track 结果同样使用 `models.py` 中的项目原生 DTO；第三方对象不得跨 adapter 边界。
 
-至少建立三组自生成 ground-truth 数据：
+## 8. 测试数据策略
 
-### Dataset A — Plain Binary Protocol
-Header 与 payload 都为明文，用于验证分包、字段语义和数据还原。
+### 8.1 老师提供的数据——正式课程输入
 
-### Dataset B — Plain Header + Encrypted Payload
-Header 保留 magic/type/length/seq 等结构，payload 使用受控测试密钥加密。系统在不知道 schema 时推断结构；评测程序持有 ground truth 和 key。
+正式课程验收与最终 `.dat` 测试以老师提供的数据为准。收到后记录允许公开的 metadata，例如：
+- 文件大小与 SHA-256；
+- 收到日期/版本；
+- redistribution 权限；
+- 老师实际提供的标签、答案或 ground truth；
+- 项目所做 preprocessing。
 
-### Dataset C — Multiple Message Types + Encrypted Payload
-包含多种 message type、不同长度、不同访问行为，用于同时验证 clustering、field inference 和 behavior classification。
+如果老师没有提供某项 ground truth，则对应指标标记为 `not evaluable from provided ground truth`，不能自行编造答案。
 
-ground truth 与分析输入必须分离，避免算法直接读取答案。
+### 8.2 Synthetic fixtures——仅工程与机制验证
+
+项目可以建立极小 synthetic 数据，用于：
+- unit / integration test；
+- verifier 正反例；
+- 边界条件；
+- contract spike；
+- 必要的机制消融。
+
+原先的 Dataset A/B/C 思路保留为**可选 controlled research fixtures**，不再是开工前或 V1 完成的必备条件，也不得作为老师正式测试结果的替代物：
+
+- Dataset A：plain binary protocol；
+- Dataset B：plain header + controlled encrypted payload；
+- Dataset C：multiple message types + controlled encrypted payload。
+
+若生成这类数据，ground truth 必须与 inference 输入分离，记录 generator/version/schema/seed，并且 inference pipeline 不得读取答案。
 
 ## 9. 实验设计
 
@@ -353,6 +374,7 @@ ground truth 与分析输入必须分离，避免算法直接读取答案。
 
 ### 9.2 指标
 
+仅在相应 ground truth 实际存在时计算：
 - Packet Boundary Precision / Recall / F1；
 - Field Boundary F1；
 - Field Semantic Accuracy；
@@ -375,7 +397,7 @@ ground truth 与分析输入必须分离，避免算法直接读取答案。
 
 ## 10. 数据集切分原则
 
-流量分类不得简单随机拆同一 flow 的 packet 到 train/test。应至少按 flow 划分；有条件时按 capture session/day 划分，减少数据泄漏和伪相关。
+流量分类不得简单随机拆同一 flow 的 packet 到 train/test。应至少按 flow 划分；有条件时按 capture session/day 划分，减少数据泄漏和伪相关。老师数据不具备监督标签时，不虚构分类 accuracy。
 
 ## 11. V1 验收最小闭环
 
@@ -387,7 +409,7 @@ V1 最低可演示闭环：
 4. 对包进行 clustering/alignment；
 5. 推断 magic/type/length/seq/payload 等字段候选；
 6. LLM 提出字段语义；
-7. verifier 输出 ACCEPT/REJECT/UNSURE 与证据；
+7. verifier 输出 `ACCEPTED / REJECTED / UNCERTAIN` 与证据；
 8. 生成 JSON schema；
 9. 用 schema 重新解析 `.dat`；
 10. 对有方向/时序信息的数据输出 behavior type 与 confidence。
@@ -398,8 +420,9 @@ V1 最低可演示闭环：
 
 - 从 `.dat` 到结构化输出的端到端流程可重复运行；
 - 核心结果带 confidence 与 evidence；
-- 至少存在一组 ground-truth 自生成测试数据；
-- 至少完成一组 baseline 对比；
+- 老师提供的正式 `.dat` 在收到后能够无需修改源码直接接入；
+- synthetic fixtures 足以覆盖必要的 unit/contract/verifier 工程测试，但不被当作正式课程 benchmark；
+- 至少完成一组在现有 ground truth 条件下可成立的 baseline 对比，或明确记录无法计算的指标；
 - LLM 推断不绕过 verifier；
 - 文档中明确现代加密不可在无密钥条件下被系统“破解”；
 - 测试、设计、安装和使用说明能够支持另一名组员独立复现。
@@ -412,7 +435,7 @@ V1 完成后再考虑：
 - state-machine inference；
 - active learning / confidence-driven analysis；
 - NetMamba/YaTC 等深度流量表示；
-- Web UI；
+- 更丰富的桌面工作台与可视化；
 - 自动 Kaitai parser validation；
 - 更严格的跨数据集泛化实验。
 

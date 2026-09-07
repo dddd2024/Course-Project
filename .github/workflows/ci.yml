@@ -91,6 +91,9 @@ jobs:
       - name: Check Tauri Rust shell
         run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
 
+      - name: Test Tauri Sidecar bridge
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml sidecar_register_inspect_and_read_range_round_trip
+
   merge-gate:
     name: merge-gate
     if: ${{ always() }}

@@ -14,12 +14,49 @@ export interface TaskUpdate {
   error?: { code: string; message: string };
 }
 
+export interface InputMetadata {
+  inputRef: string;
+  kind: "dat" | "bin" | "pcap" | "pcapng" | "unknown";
+  sizeBytes: number;
+  sha256: string;
+  sourceName: string;
+  directionAvailable: boolean;
+  timestampAvailable: boolean;
+}
+
+export interface RangeData {
+  inputRef: string;
+  offset: number;
+  requestedLength: number;
+  actualLength: number;
+  encoding: "base64";
+  bytes: string;
+  eof: boolean;
+}
+
 const EVENT_NAME = "task-update";
 const hasTauriRuntime = () => "__TAURI_INTERNALS__" in window;
 const browserTimers = new Map<string, number[]>();
 
 function dispatchBrowserUpdate(update: TaskUpdate) {
   window.dispatchEvent(new CustomEvent<TaskUpdate>(EVENT_NAME, { detail: update }));
+}
+
+export function isDesktopRuntime() {
+  return hasTauriRuntime();
+}
+
+export async function selectInput(): Promise<InputMetadata | null> {
+  if (!hasTauriRuntime()) return null;
+  return invoke<InputMetadata | null>("select_input");
+}
+
+export async function readInputRange(inputRef: string, offset: number, length = 256): Promise<RangeData> {
+  return invoke<RangeData>("read_range", { inputRef, offset, length });
+}
+
+export async function inspectInput(inputRef: string): Promise<InputMetadata> {
+  return invoke<InputMetadata>("inspect_file", { inputRef });
 }
 
 export async function startTask(failureMode: boolean): Promise<string> {

@@ -14,8 +14,10 @@ This register separates **candidate technology choices** from **accepted project
 | BinaryInferno | field-inference research baseline/reference | optional | D/C | TBD | TBD | not integrated |
 | Kaitai Struct | `.ksy` schema/parser export backend | optional V1/V2 backend | A | emitted `ks-version: 0.10`; compiler version not pinned until compiler invocation lands | compiler license verification required before invocation | project-native `.ksy` exporter active; external compiler invocation not yet integrated |
 | scikit-learn | behavior baseline | optional | D/C | TBD | TBD | not integrated |
-| React | desktop UI | required when desktop scaffold lands | B | lockfile | upstream verification required | not scaffolded |
-| Tauri 2 | desktop shell | required when desktop scaffold lands | B | Cargo/package lockfiles | upstream verification required | not scaffolded |
+| React | desktop UI | required for desktop MVP | B | 18.3.1 (package-lock.json) | MIT | active; Vite build |
+| Tauri 2 | desktop shell | required for desktop MVP | B | 2.11.5 (Cargo.lock) | Apache-2.0 OR MIT | active; cargo check |
+| tauri-plugin-dialog | controlled file picker | required for desktop MVP | B | 2.7.3 (Cargo.lock) / Rust plugin | Apache-2.0 OR MIT | active; Rust-owned dialog smoke path |
+| serde_json | Rust JSONL sidecar envelope | required for desktop MVP | B | 1.0.151 (Cargo.lock) | MIT OR Apache-2.0 | active; sidecar proxy serialization |
 
 ## Acceptance gate for a new dependency
 

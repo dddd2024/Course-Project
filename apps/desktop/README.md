@@ -1,22 +1,22 @@
-# Desktop Contract Spike
+# Desktop D1: read-only binary workbench
 
-Owner: `@hinaLove1` (Track B)
+The desktop app is a Tauri 2 + React + TypeScript workbench for controlled binary inspection.
 
-This directory contains the D0 desktop contract spike for the local workbench defined in `docs/desktop-app-guide.md`.
+## Run locally
 
-Planned structure:
+From this directory:
 
-```text
-apps/desktop/
-├── src/          # React + TypeScript UI
-└── src-tauri/    # Tauri 2 + Rust shell
-```
+    npm install
+    npm run tauri dev
 
-Implementation order:
-1. D0 contract spike with fixed data;
-2. D1 read-only import/overview/hex view;
-3. D2 interactive inference/evidence views;
-4. D3 behavior and controlled restoration;
-5. D4 packaging and clean-machine demo.
+The browser fallback keeps the D0 task lifecycle available, but file selection and bounded byte reads require the Tauri desktop runtime.
 
-The desktop must consume versioned contracts from `contracts/` and must not duplicate protocol-inference logic in the UI.
+## D1 flow
+
+1. Select an authorized .dat, .bin, .pcap or .pcapng file in the Rust-owned dialog.
+2. The Rust shell forwards the canonical register_input JSONL request to the Python Sidecar.
+3. The Hex view requests at most 256 bytes per page through read_range.
+4. Use Prev/Next to move through ranges without loading the whole file.
+5. Start the contract task to inspect task progress and failure states.
+
+The WebView receives only controlled metadata. Rust owns the dialog and Sidecar process, while the Python Sidecar remains the authority for input identity, hashing and range reads.

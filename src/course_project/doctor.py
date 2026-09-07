@@ -7,9 +7,9 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Sequence
 
 
 @dataclass(frozen=True)
@@ -94,7 +94,7 @@ def _command_check(
     if returncode != 0:
         return CheckResult(name, "fail", expected, output or f"exit {returncode}", "command failed")
     if validator is not None and not validator(output):
-        return CheckResult(name, "fail", expected, output, "version does not match baseline")
+        return CheckResult(name, "fail", expected, output, "version mismatch with baseline")
     return CheckResult(name, "pass", expected, output)
 
 

@@ -124,15 +124,17 @@ LLM Reasoner       Non-LLM Inference
       +-------+-------+
       |       |       |
       v       v       v
-   ACCEPT   UNSURE   REJECT
+ ACCEPTED UNCERTAIN REJECTED
       |
       v
 Verified Protocol Schema
 ```
 
+Public/cross-language decision values are `ACCEPTED / REJECTED / UNCERTAIN`; Python internal values are `accepted / rejected / uncertain`. Legacy `ACCEPT / REJECT / UNSURE` spellings are not canonical enum values.
+
 ## 5. New core data model
 
-V2 should extend the existing shared models with the following concepts.
+V2 extends the shared models with project-native contracts. Exact field names are authoritative in `src/course_project/models.py` and `docs/architecture.md`.
 
 ### Evidence
 
@@ -142,8 +144,7 @@ Evidence
 - source_component
 - method
 - feature_family
-- target_hypothesis_id (optional)
-- value / observation
+- observation
 - score
 - parent_evidence_ids
 - independence_group
@@ -155,7 +156,7 @@ Evidence
 ```text
 ProtocolHypothesis
 - hypothesis_id
-- field_region
+- offset / size
 - semantic_type
 - interpretation
 - parameters
@@ -182,6 +183,10 @@ ExecutableCheck
 ### VerifiedField
 
 Only accepted hypotheses may be converted into `VerifiedField` objects for schema export.
+
+### D→C normalized intermediate DTOs
+
+Track D must not expose Netzob/BinaryInferno/Scapy/NFStream objects directly to Track C. Message families, alignments, normalized field candidates and behavior features are represented using the project-native DTOs defined in `models.py`.
 
 ## 6. Verification library
 
@@ -349,6 +354,8 @@ The behavior module should explicitly distinguish “classification performance�
 
 ### 12.3 Primary metrics
 
+Only compute metrics whose required ground truth actually exists:
+
 - Packet Boundary F1;
 - Field Boundary F1;
 - Field Semantic Accuracy;
@@ -361,11 +368,21 @@ The behavior module should explicitly distinguish “classification performance�
 - processing time;
 - LLM token/cost usage.
 
-## 13. Ground-truth dataset requirements
+Unavailable metrics must be reported as `not evaluable from provided ground truth`, not fabricated.
 
-The existing Dataset A/B/C plan remains valid, but V2 must record enough ground truth to evaluate evidence and executable checks.
+## 13. Evaluation data policy
 
-Each generated sample should preserve outside the analysis input:
+### 13.1 Teacher-provided `.dat` — authoritative course evaluation input
+
+The official course evaluation input is the `.dat` data supplied by the teacher. After receipt, record only permitted metadata such as dataset identifier/hash/version, file size, redistribution status, preprocessing, and the labels/ground truth actually provided.
+
+The inference pipeline must never read evaluation ground truth as an input feature.
+
+### 13.2 Optional controlled research fixtures
+
+The previous Dataset A/B/C concept remains useful only as optional controlled mechanism fixtures when a verifier, counterfactual test, or ablation needs known ground truth that the teacher data does not provide. These fixtures are not a pre-start requirement and must not be reported as teacher-data benchmark results.
+
+If created, preserve outside the inference input as applicable:
 
 - true packet boundaries;
 - true field boundaries;
@@ -373,10 +390,9 @@ Each generated sample should preserve outside the analysis input:
 - message type;
 - protocol/session state if available;
 - plaintext where appropriate;
-- encryption key only in the evaluation harness for controlled encrypted datasets;
-- behavior label.
-
-The inference pipeline must not read ground truth.
+- test key only in the controlled evaluation harness;
+- behavior label;
+- generator/version/schema/seed.
 
 ## 14. Acceptance criteria for V2 research prototype
 
@@ -386,12 +402,12 @@ V2 research implementation is considered minimally complete when:
 2. at least length and sequence hypotheses support competing executable interpretations;
 3. every accepted semantic hypothesis has a verification record;
 4. dependent evidence can be demonstrated and discounted/collapsed;
-5. at least one provisional schema/parser is executed over a corpus;
+5. at least one provisional schema/parser is executed over an eligible corpus;
 6. `ParseCoverage` is reported;
-7. `LLM-only`, `LLM+verification`, and full `EvidenceGraph-PRE` are compared;
+7. `LLM-only`, `LLM+verification`, and full `EvidenceGraph-PRE` are compared where the available data supports the comparison;
 8. one example shows an initially plausible but wrong hypothesis being rejected or downgraded;
 9. uncertainty/abstention is preserved rather than forcing a label;
-10. results can be reproduced from controlled datasets.
+10. results can be reproduced from the teacher dataset metadata/configuration and, where used, explicitly identified controlled research fixtures.
 
 ## 15. Implementation priority
 

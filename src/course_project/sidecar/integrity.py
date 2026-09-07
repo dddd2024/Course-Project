@@ -22,17 +22,6 @@ def validate_controlled_ref(ref: str) -> str:
     return ref
 
 
-def validate_task_local_ref(ref: str, *, task_id: str, label: str) -> str:
-    """Require a controlled ref to stay inside one task's result directory."""
-
-    validate_controlled_ref(ref)
-    path = PurePosixPath(ref)
-    expected_prefix = ("tasks", task_id)
-    if len(path.parts) < 3 or path.parts[:2] != expected_prefix:
-        raise ValueError(f"{label} must stay under tasks/{task_id}/")
-    return ref
-
-
 def _require_unique_nonempty(values: list[str], *, label: str) -> set[str]:
     if any(not value for value in values):
         raise ValueError(f"{label} must be non-empty")
@@ -94,11 +83,10 @@ def validate_analysis_result_integrity(result: AnalysisResult) -> None:
 
     evidence_ids = _validate_evidence_graph(result.evidence)
 
-    finding_ids = _require_unique_nonempty(
+    _require_unique_nonempty(
         [item.finding_id for item in result.findings],
         label="finding IDs",
     )
-    del finding_ids
 
     for finding in result.findings:
         if not finding.claim:
@@ -130,14 +118,7 @@ def validate_analysis_result_integrity(result: AnalysisResult) -> None:
         label="artifact IDs",
     )
     for artifact in result.artifacts:
-        validate_task_local_ref(
-            artifact.ref,
-            task_id=result.task_id,
-            label=f"artifact {artifact.artifact_id} ref",
-        )
+        validate_controlled_ref(artifact.ref)
 
     if result.result_ref is not None:
-        validate_task_local_ref(result.result_ref, task_id=result.task_id, label="resultRef")
-        expected = f"tasks/{result.task_id}/analysis-result.json"
-        if result.result_ref != expected:
-            raise ValueError(f"resultRef must equal {expected}")
+        validate_controlled_ref(result.result_ref)

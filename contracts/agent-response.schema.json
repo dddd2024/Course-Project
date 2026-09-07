@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://course-project.local/contracts/agent-response.schema.json",
+  "title": "AgentResponse",
+  "type": "object",
+  "required": ["answer", "findings", "limitations"],
+  "properties": {
+    "answer": {"type": "string"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["findingId", "claim", "status", "evidenceIds"],
+        "properties": {
+          "findingId": {"type": "string"},
+          "claim": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["ACCEPTED", "REJECTED", "UNCERTAIN"]
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": true
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "inputId": {"type": "string"},
+              "offset": {"type": "integer", "minimum": 0},
+              "length": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": false
+          },
+          "confidence": {
+            "type": "object",
+            "properties": {
+              "model": {"type": "number", "minimum": 0, "maximum": 1},
+              "evidence": {"type": "number", "minimum": 0, "maximum": 1},
+              "verification": {"type": "number", "minimum": 0, "maximum": 1}
+            },
+            "additionalProperties": false
+          },
+          "validation": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "suggestedActions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool", "label"],
+        "properties": {
+          "tool": {"type": "string"},
+          "label": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

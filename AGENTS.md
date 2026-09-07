@@ -130,3 +130,13 @@ A task is not done merely because code was written. A Track task is done when:
 - Track D: [`docs/tracks/track-d.md`](docs/tracks/track-d.md)
 
 The detailed four-person division remains in [`docs/team-division.md`](docs/team-division.md). CODEOWNERS remains the path-level review map, while tracking Issues remain the current execution truth.
+
+## 10. Tool compatibility
+
+`AGENTS.md` is the single source of truth. Thin compatibility files route common coding agents here without duplicating the ownership map:
+
+- GitHub Copilot: `.github/copilot-instructions.md`
+- Claude Code: `CLAUDE.md`
+- Gemini CLI: `GEMINI.md`
+
+Human handoff guidance and the recommended startup prompt are documented in [`docs/ai-collaboration.md`](docs/ai-collaboration.md). If a tool does not automatically read any of these files, explicitly tell it to read `AGENTS.md` first.

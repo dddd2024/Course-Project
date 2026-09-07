@@ -37,7 +37,14 @@ def _write_sample(path: Path) -> bytes:
 def _semantic_config() -> dict[str, Any]:
     return {
         "mode": "evidencegraph",
-        "stages": ["boundary", "inference", "evidence", "verification", "export"],
+        "stages": [
+            "boundary",
+            "inference",
+            "evidence",
+            "verification",
+            "behavior",
+            "export",
+        ],
         "llmEnabled": False,
         "verificationEnabled": True,
         "behaviorEnabled": True,

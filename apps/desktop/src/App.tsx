@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { AnalysisTabs, AnalysisViewContent } from "./AnalysisViews";
+import { demoAnalysisResult } from "./fixtures/demoAnalysisResult";
+import type { AnalysisViewName, ByteLocation, FindingReview, AnalysisResult } from "./analysisContracts";
 import {
   cancelTask,
   inspectInput,
@@ -127,6 +130,10 @@ export function App() {
   const [inputError, setInputError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [activeView, setActiveView] = useState<AnalysisViewName>("findings");
+  const [focusedLocation, setFocusedLocation] = useState<ByteLocation | null>(null);
+  const [findingReviews, setFindingReviews] = useState<Record<string, FindingReview>>({});
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -192,6 +199,45 @@ export function App() {
   async function runSpike() {
     setUpdate({ ...initialUpdate, message: "Starting contract spike." });
     setTaskId(await startTask(failureMode));
+  }
+
+  function loadFixture() {
+    setAnalysisResult(demoAnalysisResult);
+    setActiveView("findings");
+    setFocusedLocation(null);
+    setFindingReviews({});
+  }
+
+  function jumpToLocation(location: ByteLocation) {
+    setFocusedLocation(location);
+    setRangeOffset(Math.floor(location.offset / RANGE_SIZE) * RANGE_SIZE);
+  }
+
+  function updateFindingReview(findingId: string, review: FindingReview) {
+    setFindingReviews((current) => ({ ...current, [findingId]: review }));
+  }
+
+  function exportReview() {
+    if (!analysisResult) return;
+    const payload = {
+      protocolVersion: 1,
+      taskId: analysisResult.taskId,
+      sourceResultRef: analysisResult.resultRef,
+      sourceStatus: analysisResult.status,
+      reviews: analysisResult.findings.map((finding) => ({
+        findingId: finding.findingId,
+        sourceStatus: finding.status,
+        review: findingReviews[finding.findingId] || null,
+      })),
+      limitations: ["Local review export contains no raw bytes and is not an accepted protocol result."],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${analysisResult.taskId}-review.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   async function stopTask() {
@@ -270,6 +316,27 @@ export function App() {
               </dl>
             )}
           </section>
+          <section className="result-panel">
+            <div className="subheading">
+              <div><h3>Analysis result</h3><span>{analysisResult ? analysisResult.status + " / fixture preview" : "awaiting result"}</span></div>
+              <div className="result-actions">
+                <button className="secondary compact" onClick={loadFixture}>Load synthetic fixture</button>
+                <button className="secondary compact" disabled={!analysisResult} onClick={exportReview}>Export review JSON</button>
+              </div>
+            </div>
+            {analysisResult && <p className="review-summary">{Object.keys(findingReviews).length}/{analysisResult.findings.length} findings reviewed locally; analyzer status remains unchanged.</p>}
+            <AnalysisTabs active={activeView} onChange={setActiveView} hasResult={analysisResult !== null} />
+            {focusedLocation && (
+              <p className="focus-note">Hex focus: {focusedLocation.inputId} @ +{focusedLocation.offset} ({focusedLocation.length} bytes)</p>
+            )}
+            <AnalysisViewContent
+              view={activeView}
+              result={analysisResult}
+              onJump={jumpToLocation}
+              reviews={findingReviews}
+              onReviewChange={updateFindingReview}
+            />
+          </section>
           <HexView
             input={input}
             range={range}
@@ -291,9 +358,10 @@ export function App() {
             <p>{update.status === "COMPLETED" ? "The task completed. Analyzer findings will appear here with byte-offset evidence." : "No protocol claim is shown until the analyzer provides a finding and verification record."}</p>
           </div>
           <dl className="agent-facts">
-            <div><dt>Finding</dt><dd>None</dd></div>
-            <div><dt>Evidence</dt><dd>{input ? "Input metadata" : "None"}</dd></div>
-            <div><dt>Decision</dt><dd>UNCERTAIN</dd></div>
+            <div><dt>Finding</dt><dd>{analysisResult ? analysisResult.findings.length + " linked" : "None"}</dd></div>
+            <div><dt>Evidence</dt><dd>{analysisResult ? (analysisResult.evidence?.length || 0) + " records" : input ? "Input metadata" : "None"}</dd></div>
+            <div><dt>Decision</dt><dd>{analysisResult?.findings[0]?.status ?? "UNCERTAIN"}</dd></div>
+            <div><dt>Local review</dt><dd>{analysisResult ? Object.keys(findingReviews).length + " reviewed" : "None"}</dd></div>
           </dl>
         </aside>
       </section>

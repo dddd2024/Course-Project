@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from pathlib import PurePosixPath
 from typing import Any
 
 from course_project.models import AnalysisFinding, AnalysisResult, ArtifactRef, Evidence
+from course_project.sidecar.integrity import (
+    validate_analysis_result_integrity,
+    validate_controlled_ref,
+)
 
 _DECISION_TO_PUBLIC = {
     "accepted": "ACCEPTED",
@@ -23,23 +26,6 @@ def _check_score(value: float, label: str) -> float:
     if not 0.0 <= value <= 1.0:
         raise ValueError(f"{label} must be within [0, 1]")
     return value
-
-
-def validate_controlled_ref(ref: str) -> str:
-    """Reject absolute/traversing references before exposing them to the desktop."""
-
-    if not ref or "\\" in ref:
-        raise ValueError("controlled refs must be non-empty POSIX-style relative paths")
-    path = PurePosixPath(ref)
-    if (
-        not path.parts
-        or path == PurePosixPath(".")
-        or path.is_absolute()
-        or ".." in path.parts
-        or ":" in path.parts[0]
-    ):
-        raise ValueError("controlled refs must be normal relative paths without traversal")
-    return ref
 
 
 def evidence_to_dict(evidence: Evidence) -> dict[str, Any]:
@@ -104,19 +90,7 @@ def artifact_to_dict(artifact: ArtifactRef) -> dict[str, Any]:
 def analysis_result_to_dict(result: AnalysisResult) -> dict[str, Any]:
     """Convert project-native result DTOs into the frozen cross-language JSON shape."""
 
-    evidence_ids = [item.evidence_id for item in result.evidence]
-    if len(evidence_ids) != len(set(evidence_ids)):
-        raise ValueError("evidence IDs must be unique within an AnalysisResult")
-    available_evidence = set(evidence_ids)
-    for finding in result.findings:
-        missing = set(finding.evidence_ids) - available_evidence
-        if missing:
-            names = ", ".join(sorted(missing))
-            raise ValueError(f"finding {finding.finding_id} references missing evidence: {names}")
-
-    artifact_ids = [item.artifact_id for item in result.artifacts]
-    if len(artifact_ids) != len(set(artifact_ids)):
-        raise ValueError("artifact IDs must be unique within an AnalysisResult")
+    validate_analysis_result_integrity(result)
 
     payload: dict[str, Any] = {
         "protocolVersion": 1,

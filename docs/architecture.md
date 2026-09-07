@@ -54,110 +54,203 @@ Important rules:
 - cross-language payloads must conform to versioned schemas in `contracts/`;
 - LLM output is a hypothesis source, not a protocol-fact authority.
 
-## 3. V2 Shared Python Contracts
+## 3. Shared Python Contracts
 
-### PacketCandidate
+Exact definitions live in `src/course_project/models.py`. These objects are the project-native intermediate language between Tracks; third-party library objects must not cross Track boundaries.
 
-```python
-PacketCandidate(
-    start_offset: int,
-    end_offset: int,
-    confidence: float,
-    evidence: dict,
-    direction: str | None,
-    timestamp: float | None,
-)
+### 3.1 Input and deterministic/PRE DTOs
+
+`InputMetadata` records a registered input without embedding raw bytes in shared messages.
+
+```text
+InputMetadata
+- input_id
+- kind: dat | bin | pcap | pcapng | synthetic | unknown
+- size_bytes
+- sha256 (optional)
+- direction_available
+- timestamp_available
+- metadata
 ```
 
-### Evidence
+`PacketCandidate` remains the lightweight V1 boundary record.
 
-```python
-Evidence(
-    evidence_id: str,
-    source_component: str,
-    method: str,
-    feature_family: str,
-    score: float,
-    observation: dict,
-    parent_evidence_ids: tuple[str, ...],
-    independence_group: str | None,
-    sample_ids: tuple[str, ...],
-)
+```text
+PacketCandidate
+- start_offset
+- end_offset
+- confidence
+- evidence
+- direction (optional)
+- timestamp (optional)
 ```
 
-### ProtocolHypothesis
+`MessageCandidate` gives a stable message identifier and source byte range.
 
-```python
-ProtocolHypothesis(
-    hypothesis_id: str,
-    offset: int,
-    size: int | None,
-    semantic_type: str,
-    interpretation: str,
-    parameters: dict,
-    model_confidence: float,
-    supporting_evidence_ids: tuple[str, ...],
-    competing_hypothesis_ids: tuple[str, ...],
-)
+```text
+MessageCandidate
+- message_id
+- input_id
+- start_offset
+- end_offset
+- confidence
+- family_id (optional)
+- direction/timestamp (optional)
+- evidence_ids
 ```
 
-### ExecutableCheck
+`MessageFamily` is an adapter-neutral cluster of structurally similar messages.
 
-```python
-ExecutableCheck(
-    check_id: str,
-    hypothesis_id: str,
-    check_type: str,
-    sample_count: int,
-    support_count: int,
-    violation_count: int,
-    score: float,
-    result: str,  # accepted / rejected / uncertain
-    evidence_ids: tuple[str, ...],
-)
+```text
+MessageFamily
+- family_id
+- message_ids
+- confidence
+- features
+- evidence_ids
 ```
 
-### VerificationResult
+`AlignmentRegion` / `AlignmentResult` are the canonical D→C alignment representation.
 
-```python
-VerificationResult(
-    hypothesis_id: str,
-    status: str,  # accepted / rejected / uncertain
-    score: float,
-    support_count: int,
-    sample_count: int,
-    tests: dict,
-)
+```text
+AlignmentRegion
+- start_offset
+- end_offset
+- kind: stable | variable | unknown
+- score
+- evidence_ids
+
+AlignmentResult
+- family_id
+- message_ids
+- regions
+- score
+- evidence_ids
+- metadata
 ```
 
-### VerifiedField
+`FieldCandidate` is the deterministic/PRE candidate before Track C promotes it into a semantic protocol hypothesis.
 
-Only a verified/accepted hypothesis may be promoted to a schema-exportable field.
-
-```python
-VerifiedField(
-    field_id: str,
-    offset: int,
-    size: int | None,
-    semantic_type: str,
-    interpretation: str,
-    verification_score: float,
-    evidence_ids: tuple[str, ...],
-)
+```text
+FieldCandidate
+- candidate_id
+- family_id
+- offset
+- size
+- candidate_types
+- endian (optional)
+- score
+- evidence_ids
+- attributes
 ```
 
-### BehaviorPrediction
+`BehaviorFeatures` is the adapter-neutral feature record before behavior classification.
 
-```python
-BehaviorPrediction(
-    flow_id: str,
-    label: str,
-    confidence: float,
-    features: dict,
-)
+```text
+BehaviorFeatures
+- flow_id
+- values
+- sample_ids
+- evidence_ids
 ```
 
-## 4. EvidenceGraph Rule
+### 3.2 V1/V2 semantic and verification DTOs
+
+`FieldHypothesis` remains the V1-compatible semantic field candidate.
+
+```text
+FieldHypothesis
+- field_id
+- offset
+- size
+- semantic_type
+- endian
+- confidence
+- evidence
+```
+
+`Evidence`:
+
+```text
+Evidence
+- evidence_id
+- source_component
+- method
+- feature_family
+- score
+- observation
+- parent_evidence_ids
+- independence_group
+- sample_ids
+```
+
+`ProtocolHypothesis`:
+
+```text
+ProtocolHypothesis
+- hypothesis_id
+- offset
+- size
+- semantic_type
+- interpretation
+- parameters
+- model_confidence
+- supporting_evidence_ids
+- competing_hypothesis_ids
+```
+
+`ExecutableCheck`:
+
+```text
+ExecutableCheck
+- check_id
+- hypothesis_id
+- check_type
+- sample_count
+- support_count
+- violation_count
+- score
+- result: accepted | rejected | uncertain
+- evidence_ids
+```
+
+`VerificationResult`:
+
+```text
+VerificationResult
+- hypothesis_id
+- status: accepted | rejected | uncertain
+- score
+- support_count
+- sample_count
+- tests
+```
+
+`VerifiedField` is schema-exportable only after accepted verification.
+
+`BehaviorPrediction` remains the final behavior classification output.
+
+## 4. Decision Status Contract
+
+There is one conceptual three-way decision model:
+
+```text
+ACCEPTED
+REJECTED
+UNCERTAIN
+```
+
+Mapping by layer:
+
+| Layer | Accepted | Rejected | Uncertain |
+|---|---|---|---|
+| Python internal | `accepted` | `rejected` | `uncertain` |
+| JSON / TypeScript / Rust | `ACCEPTED` | `REJECTED` | `UNCERTAIN` |
+| Human-facing docs/UI | ACCEPTED | REJECTED | UNCERTAIN |
+
+Legacy `ACCEPT`, `REJECT`, and `UNSURE` spellings must not be introduced as enum values.
+
+## 5. EvidenceGraph Rule
 
 Evidence must retain provenance. If an LLM interpretation is produced from a Netzob alignment result, the LLM agreement is derived evidence and must not be counted as an independent second observation.
 
@@ -175,22 +268,20 @@ raw observation
 
 Accepted fields must retain links to the checks/evidence that justify them.
 
-## 5. Adapter Contracts
+## 6. Adapter Contracts
 
 ```text
-Scapy       -> io/scapy_adapter.py              -> project-native input records
-Netzob      -> inference/netzob_adapter.py       -> project-native alignment/field data
-BinaryInferno -> inference/binaryinferno_adapter.py -> project-native field candidates
-NFStream    -> behavior/nfstream_adapter.py      -> project-native flow features
-Kaitai      -> exporters/kaitai.py               -> schema/parser artifacts
-LLM provider -> llm/<provider>_adapter.py        -> structured hypotheses
+Scapy         -> io/scapy_adapter.py                    -> project-native input/message records
+Netzob        -> inference/netzob_adapter.py             -> MessageFamily / AlignmentResult / FieldCandidate
+BinaryInferno -> inference/binaryinferno_adapter.py      -> FieldCandidate / Evidence
+NFStream      -> behavior/nfstream_adapter.py            -> BehaviorFeatures
+Kaitai        -> exporters/kaitai.py                     -> schema/parser artifacts
+LLM provider  -> llm/<provider>_adapter.py               -> ProtocolHypothesis
 ```
 
-Third-party objects must not cross these adapter boundaries.
+Third-party objects must not cross these adapter boundaries. Optional dependency failure is represented explicitly as `dependency_unavailable` and must not crash unrelated stages.
 
-## 6. Desktop / Sidecar Boundary
-
-The desktop architecture follows `docs/desktop-app-guide.md`.
+## 7. Desktop / Sidecar Boundary
 
 ```text
 React UI
@@ -207,49 +298,110 @@ Python Sidecar
 Analysis Engine
 ```
 
-The sidecar must expose task-level operations rather than unrestricted shell access. Large binary payloads are referenced by controlled input IDs, offsets and result paths instead of being embedded in JSON messages.
+The sidecar exposes task-level operations rather than unrestricted shell access. Large binary payloads are referenced by controlled input IDs, offsets and result paths instead of being embedded in JSON messages.
+
+### 7.1 Canonical sidecar methods
+
+Protocol version 1 reserves this method vocabulary:
+
+- `register_input` — register a controlled file/input reference and return an `inputId`;
+- `inspect_file` — obtain deterministic metadata/overview for one input;
+- `analyze` — start configured analysis stages;
+- `cancel_task` — cancel a known task;
+- `get_result` — retrieve/reference the result of a known task;
+- `read_range` — request a bounded byte range for Hex/offset UI use.
+
+Do not invent synonyms such as `run_analysis` or pass arbitrary shell commands.
+
+### 7.2 Canonical analysis configuration
+
+The `analyze` request uses stable names for:
+
+```text
+inputRef
+mode: baseline | evidencegraph
+stages[]
+llmEnabled
+verificationEnabled
+behaviorEnabled
+timeoutSeconds
+optionalDependencyPolicy: degrade | fail
+```
+
+A Track that needs a new shared option changes the schema/fixture first.
+
+### 7.3 Task and event rules
+
+- stdout contains protocol JSON only; diagnostics go to stderr;
+- every message contains `protocolVersion` and a correlated task/message `id`;
+- progress uses `event=progress`, a stage and `progress` in `[0,1]`;
+- errors use stable machine-readable error codes;
+- result messages return `resultRef`, not a large result document inline;
+- cancellation, timeout and sidecar failure remain explicit states.
 
 Versioned contracts live in:
-- `contracts/sidecar-message.schema.json`
-- `contracts/analysis-result.schema.json`
-- `contracts/agent-response.schema.json`
+- `contracts/sidecar-message.schema.json`;
+- `contracts/analysis-result.schema.json`;
+- `contracts/agent-response.schema.json`.
 
-## 7. Error Semantics
+## 8. Analysis Result and Artifact Manifest
+
+`AnalysisResult` is the task-level summary. It contains findings plus small evidence records and references to potentially large artifacts.
+
+Each finding can reference `evidenceIds` and a byte location. Evidence records carry provenance sufficient for the UI/reviewer to understand what produced the claim.
+
+Large or structured views are advertised through `artifacts[]` entries:
+
+```text
+ArtifactRef
+- artifactId
+- type: evidence | packets | messages | alignment | statistics | behavior | restored | schema | report
+- format: json | jsonl | parquet | csv | text | binary | ksy
+- ref
+- count (optional)
+- metadata (optional)
+```
+
+This allows Track B to render Hex/alignment/statistics/behavior/evidence views without embedding large tables in the sidecar protocol. Artifact refs are controlled result-relative references, not arbitrary shell/file paths supplied by the WebView.
+
+## 9. Error Semantics
 
 Common machine-readable categories:
-- `invalid_input`
-- `insufficient_evidence`
-- `unsupported_format`
-- `dependency_unavailable`
-- `inference_failed`
-- `verification_failed`
-- `contract_version_mismatch`
-- `task_cancelled`
-- `sidecar_failed`
+- `invalid_input`;
+- `insufficient_evidence`;
+- `unsupported_format`;
+- `dependency_unavailable`;
+- `inference_failed`;
+- `verification_failed`;
+- `contract_version_mismatch`;
+- `task_cancelled`;
+- `sidecar_failed`.
 
 Do not convert failures into empty successful results.
 
-## 8. Confidence Semantics
+## 10. Confidence Semantics
 
 Keep distinct:
-- `model_confidence`
-- `evidence_score`
-- `verification_score`
-- `final_confidence` (only when the fusion method is explicit)
+- `model_confidence`;
+- `evidence_score`;
+- `verification_score`;
+- `final_confidence` only when the fusion method is explicit.
 
 A deterministic support ratio and an LLM self-reported probability are not interchangeable.
 
-## 9. Contract Change Rule
+## 11. Contract Change Rule
 
-For changes to `models.py`, `contracts/`, or sidecar protocol:
-1. update this document/schema first;
-2. add or update an example fixture;
-3. update producer and consumers;
-4. add compatibility/integration tests;
-5. request Track A review plus at least one affected track owner;
-6. document protocol/schema version changes in the PR.
+For changes to `models.py`, `contracts/`, shared sidecar methods/config, or artifact semantics:
 
-## 10. Four-Track Ownership Boundary
+1. describe the old and new shape/behavior;
+2. update schema and golden fixture first;
+3. update `docs/architecture.md` when the semantic boundary changes;
+4. update producer and consumers;
+5. add compatibility/integration tests;
+6. request Track A review plus at least one affected Track owner;
+7. intentionally change `protocolVersion` when the change is incompatible.
+
+## 12. Four-Track Ownership Boundary
 
 - Track A (`@dddd2024`): shared contracts, sidecar, CI, integration/export.
 - Track B (`@hinaLove1`): React/Tauri desktop and presentation layer.
@@ -258,4 +410,4 @@ For changes to `models.py`, `contracts/`, or sidecar protocol:
 
 Track B and Track D work packages were swapped on 2026-09-07; the account-to-track mapping did not change.
 
-Cross-track dependencies must go through shared contracts instead of importing another track's internal implementation.
+Cross-track dependencies must go through shared contracts instead of importing another Track's internal implementation.

@@ -4,10 +4,11 @@ import base64
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import RLock
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 
 from course_project.models import AnalysisResult, InputMetadata
 from course_project.sidecar.serialization import analysis_result_to_dict
@@ -91,11 +92,7 @@ class AnalysisBackend(Protocol):
 
 
 class MetadataOnlyBackend:
-    """Safe default used until the real analysis orchestrator is connected.
-
-    It deliberately returns PARTIAL with no protocol claims. This keeps the sidecar
-    runnable for Track B integration without pretending that Track D/C analysis exists.
-    """
+    """Safe default until the real analysis orchestrator is connected."""
 
     def analyze(
         self,
@@ -106,15 +103,16 @@ class MetadataOnlyBackend:
         config: Mapping[str, Any],
     ) -> AnalysisResult:
         del input_path
+        limitation = (
+            "No Track D/C analysis backend is connected; this result validates only the Track A "
+            "sidecar/integration contract."
+        )
         return AnalysisResult(
             task_id=task_id,
             status="partial",
             input_id=input_metadata.input_id,
             metrics={"inputSizeBytes": input_metadata.size_bytes, "mode": config["mode"]},
-            limitations=(
-                "No Track D/C analysis backend is connected; this result validates only the "
-                "Track A sidecar/integration contract.",
-            ),
+            limitations=(limitation,),
         )
 
 
@@ -147,10 +145,9 @@ class InputRegistry:
 
         sha256 = _sha256_file(path)
         input_ref = f"input-{sha256[:16]}"
-        kind = _resolve_kind(path, kind_hint)
         metadata = InputMetadata(
             input_id=input_ref,
-            kind=kind,
+            kind=_resolve_kind(path, kind_hint),
             size_bytes=path.stat().st_size,
             sha256=sha256,
             metadata={"sourceName": path.name},
@@ -176,7 +173,6 @@ class InputRegistry:
         with record.path.open("rb") as handle:
             handle.seek(offset)
             chunk = handle.read(length)
-        end_offset = offset + len(chunk)
         return {
             "inputRef": input_ref,
             "offset": offset,
@@ -184,12 +180,12 @@ class InputRegistry:
             "actualLength": len(chunk),
             "encoding": "base64",
             "bytes": base64.b64encode(chunk).decode("ascii"),
-            "eof": end_offset >= record.metadata.size_bytes,
+            "eof": offset + len(chunk) >= record.metadata.size_bytes,
         }
 
 
 class ResultStore:
-    """Owns controlled result-relative refs exposed to the desktop."""
+    """Own controlled result-relative refs exposed to the desktop."""
 
     def __init__(self, root: Path) -> None:
         self.root = root.expanduser().resolve()
@@ -252,17 +248,6 @@ class SidecarRuntime:
             raise SidecarError("sidecar_failed", "unreachable sidecar method dispatch")
         except SidecarError as exc:
             return [_error_message(message_id, exc)]
-        except Exception as exc:  # fail closed at the protocol boundary
-            return [
-                _error_message(
-                    message_id,
-                    SidecarError(
-                        "sidecar_failed",
-                        "unexpected sidecar failure",
-                        details={"exceptionType": type(exc).__name__},
-                    ),
-                )
-            ]
 
     def _register_input(self, message_id: str, params: Mapping[str, Any]) -> dict[str, Any]:
         record = self.inputs.register(params["sourceRef"], params.get("kindHint"))
@@ -292,12 +277,7 @@ class SidecarRuntime:
                         details={"taskId": task_id},
                     )
                 return self._existing_task_messages(task_id, existing)
-            task = TaskRecord(
-                task_id=task_id,
-                input_ref=input_ref,
-                status="RUNNING",
-                config=config,
-            )
+            task = TaskRecord(task_id=task_id, input_ref=input_ref, status="RUNNING", config=config)
             self._tasks[task_id] = task
 
         messages = [
@@ -311,51 +291,11 @@ class SidecarRuntime:
                 input_path=record.path,
                 config=config,
             )
-            if result.task_id != task_id:
-                raise SidecarError(
-                    "sidecar_failed",
-                    "analysis backend returned a mismatched task id",
-                    details={"expectedTaskId": task_id, "actualTaskId": result.task_id},
-                )
-            if result.input_id not in {None, input_ref}:
-                raise SidecarError(
-                    "sidecar_failed",
-                    "analysis backend returned a mismatched input id",
-                    details={"expectedInputRef": input_ref, "actualInputId": result.input_id},
-                )
-            result.input_id = input_ref
-
-            with self._lock:
-                if task.status == "CANCELLED":
-                    cancelled = AnalysisResult(
-                        task_id=task_id,
-                        status="cancelled",
-                        input_id=input_ref,
-                        limitations=("Task was cancelled before its result was published.",),
-                    )
-                    ref = self.results.write_analysis_result(cancelled)
-                    task.result_ref = ref
-                    messages.append(_status_message(task_id, "task_status", _task_payload(task)))
-                    messages.append(_result_message(task_id, ref))
-                    return messages
-
-            ref = self.results.write_analysis_result(result)
-            with self._lock:
-                task.result_ref = ref
-                task.status = result.status.upper()
-            messages.extend(
-                [
-                    _progress_message(task_id, "analysis", 1.0),
-                    _status_message(task_id, "task_status", _task_payload(task)),
-                    _result_message(task_id, ref),
-                ]
-            )
-            return messages
         except SidecarError:
             with self._lock:
                 task.status = "FAILED"
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - third-party adapter boundary must fail closed
             with self._lock:
                 task.status = "FAILED"
             raise SidecarError(
@@ -363,6 +303,33 @@ class SidecarRuntime:
                 "analysis backend failed",
                 details={"exceptionType": type(exc).__name__},
             ) from exc
+
+        _validate_backend_result(result, task_id=task_id, input_ref=input_ref)
+        result.input_id = input_ref
+
+        with self._lock:
+            cancelled = task.status == "CANCELLED"
+        if cancelled:
+            result = AnalysisResult(
+                task_id=task_id,
+                status="cancelled",
+                input_id=input_ref,
+                limitations=("Task was cancelled before its result was published.",),
+            )
+
+        ref = self.results.write_analysis_result(result)
+        with self._lock:
+            task.result_ref = ref
+            task.status = result.status.upper()
+
+        messages.extend(
+            [
+                _progress_message(task_id, "analysis", 1.0),
+                _status_message(task_id, "task_status", _task_payload(task)),
+                _result_message(task_id, ref),
+            ]
+        )
+        return messages
 
     def _existing_task_messages(self, message_id: str, task: TaskRecord) -> list[dict[str, Any]]:
         messages = [_status_message(message_id, "task_status", _task_payload(task))]
@@ -375,11 +342,7 @@ class SidecarRuntime:
         with self._lock:
             task = self._tasks.get(task_id)
         if task is None:
-            raise SidecarError(
-                "invalid_input",
-                "unknown taskId",
-                details={"taskId": task_id},
-            )
+            raise SidecarError("invalid_input", "unknown taskId", details={"taskId": task_id})
         if task.result_ref is None:
             return [_status_message(message_id, "task_status", _task_payload(task))]
         return [_result_message(message_id, task.result_ref)]
@@ -389,19 +352,28 @@ class SidecarRuntime:
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
-                raise SidecarError(
-                    "invalid_input",
-                    "unknown taskId",
-                    details={"taskId": task_id},
-                )
+                raise SidecarError("invalid_input", "unknown taskId", details={"taskId": task_id})
             if task.status in {"QUEUED", "RUNNING"}:
                 task.status = "CANCELLED"
         return _status_message(message_id, "task_status", _task_payload(task))
 
 
+def _validate_backend_result(result: AnalysisResult, *, task_id: str, input_ref: str) -> None:
+    if result.task_id != task_id:
+        raise SidecarError(
+            "sidecar_failed",
+            "analysis backend returned a mismatched task id",
+            details={"expectedTaskId": task_id, "actualTaskId": result.task_id},
+        )
+    if result.input_id not in {None, input_ref}:
+        raise SidecarError(
+            "sidecar_failed",
+            "analysis backend returned a mismatched input id",
+            details={"expectedInputRef": input_ref, "actualInputId": result.input_id},
+        )
+
+
 def _validate_request(message: Mapping[str, Any]) -> dict[str, Any]:
-    if not isinstance(message, Mapping):
-        raise SidecarError("invalid_input", "sidecar request must be a JSON object")
     if message.get("protocolVersion") != PROTOCOL_VERSION:
         raise SidecarError(
             "contract_version_mismatch",
@@ -413,11 +385,7 @@ def _validate_request(message: Mapping[str, Any]) -> dict[str, Any]:
         raise SidecarError("invalid_input", "sidecar request id must be a non-empty string")
     method = message.get("method")
     if method not in SIDE_CAR_METHODS:
-        raise SidecarError(
-            "invalid_input",
-            "unknown sidecar method",
-            details={"method": method},
-        )
+        raise SidecarError("invalid_input", "unknown sidecar method", details={"method": method})
     params = message.get("params")
     if not isinstance(params, Mapping):
         raise SidecarError("invalid_input", "sidecar params must be an object")
@@ -486,12 +454,7 @@ def _validate_read_range_params(params: Mapping[str, Any]) -> None:
     length = params["length"]
     if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
         raise SidecarError("invalid_input", "offset must be a non-negative integer")
-    if (
-        isinstance(length, bool)
-        or not isinstance(length, int)
-        or length < 1
-        or length > MAX_READ_RANGE
-    ):
+    if isinstance(length, bool) or not isinstance(length, int) or not 1 <= length <= MAX_READ_RANGE:
         raise SidecarError(
             "invalid_input",
             f"length must be an integer within [1, {MAX_READ_RANGE}]",

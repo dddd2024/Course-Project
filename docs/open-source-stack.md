@@ -2,6 +2,8 @@
 
 V1 采用“成熟组件做底座 + 项目自研统一推断/验证层”的策略，避免重复实现通用能力。
 
+> Integration authority: candidate names in this document are **not automatically approved dependencies**. Before merge, exact version/commit, upstream license, environment constraints, adapter boundary and smoke/fallback behavior must be recorded in `docs/dependency-register.md`. Vendored material additionally updates `THIRD_PARTY_NOTICES.md`.
+
 ## 1. Core Candidates
 
 ### Scapy
@@ -12,7 +14,7 @@ V1 采用“成熟组件做底座 + 项目自研统一推断/验证层”的策�
 ### NFStream
 用途：flow 聚合与统计特征提取，用于行为分析。
 
-项目边界：通过 adapter 输出项目统一的 feature dict。
+项目边界：通过 adapter 输出项目统一的 feature dict / project-native record。
 
 ### Netzob
 用途：protocol reverse engineering、message format inference、alignment、结构推断 baseline。
@@ -30,7 +32,7 @@ V1 采用“成熟组件做底座 + 项目自研统一推断/验证层”的策�
 项目边界：作为 export/validation 后端。
 
 ### scikit-learn
-用途：RandomForest 等行为分类 baseline。
+用途：RandomForest 等行为分类 baseline；只有在老师数据/补充受控数据实际支持监督分类时启用。
 
 ## 2. Optional Research Baselines
 
@@ -50,8 +52,8 @@ V1 采用“成熟组件做底座 + 项目自研统一推断/验证层”的策�
 - packet-boundary candidate scoring；
 - 统一 message/field schema；
 - LLM evidence prompt 与结构化 hypothesis；
-- deterministic verifier；
-- confidence/evidence aggregation；
+- deterministic/executable verifier；
+- provenance-aware evidence aggregation；
 - 统一 orchestration；
 - baseline/proposed/ablation 实验；
 - demo 与数据还原闭环。
@@ -59,13 +61,18 @@ V1 采用“成熟组件做底座 + 项目自研统一推断/验证层”的策�
 ## 4. Integration Policy
 
 每个第三方组件必须满足：
-1. 明确 license 和版本；
+1. 在 `docs/dependency-register.md` 明确 upstream、version/commit、license 和 owner；
 2. 通过 adapter 接入；
 3. 依赖不可用时给出 `dependency_unavailable`，不能让整个 pipeline 无提示崩溃；
 4. README/文档标明哪些结果来自第三方、哪些属于项目自研；
 5. 不复制大段第三方源代码后删除 attribution；
-6. 实验中把第三方组件作为 baseline 时，记录版本、参数和数据预处理方式。
+6. 实验中作为 baseline 时记录版本、参数和数据预处理方式；
+7. 如果复制/再分发第三方源代码、模型、数据或示例，更新 `THIRD_PARTY_NOTICES.md`。
 
 ## 5. Dependency Strategy
 
-V1 的 `pyproject.toml` 暂不锁定这些重量级依赖，因为 Netzob、NFStream、深度模型可能存在 Python/OS 兼容约束。各 WP 先在独立环境验证版本，集成后再统一形成 `requirements`/lock file。
+核心 Python 工程使用 Python 3.11.x 作为 canonical local line，CI 同时检查 3.10/3.11。重量级/系统相关依赖不预先塞进基础 `dependencies`：各 Track 先验证实际版本/OS/Python 约束，再通过独立 PR 锁定。
+
+桌面端由 Track B 的首个 scaffold PR 生成 Node/Rust lockfiles，并同时增加适合当前 scaffold 的 desktop CI。不要在没有可运行 scaffold 时人为制造虚假的 lockfile。
+
+老师提供的正式 `.dat` 测试文件不属于依赖管理；其本地版本/hash/允许使用范围按 `docs/testing-plan.md` 记录。

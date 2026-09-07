@@ -15,7 +15,7 @@ Map the current human operator to exactly one track:
 | `@sunny1ce` | C | `#14` plus research umbrella `#9` | EvidenceGraph-PRE, LLM reasoning, executable verification, experiments |
 | `@zhaohongjun20-creator` | D | `#15` | binary analysis, packet boundaries, protocol inference, behavior features |
 
-Track B and Track D work packages were swapped on 2026-09-07. The mapping above is authoritative.
+Track B and Track D work packages were swapped on 2026-09-07. The mapping above is authoritative. All four accounts have collaboration access.
 
 If the operator identity is not known, **do not guess**. Ask the human for the GitHub account or Track letter before making non-trivial edits.
 
@@ -30,6 +30,13 @@ Before implementation, read in this order:
 5. the design document(s) named by the Track entrypoint;
 6. the existing code/tests in the owned paths.
 
+Also read the following when relevant:
+
+- environment/build/dependency work: `docs/development-environment.md` and `docs/dependency-register.md`;
+- shared contract work: `contracts/README.md` and `contracts/fixtures/`;
+- final integration/demo work: `docs/delivery-checklist.md`;
+- repository governance: `docs/repository-settings.md` and `docs/pre-implementation-readiness.md`.
+
 For Track C also read `docs/design-v2.md` and `docs/research-roadmap.md`. For Track B also read `docs/desktop-app-guide.md`. Track D should read both `docs/design-v1.md` and the V2 evidence interface sections because its outputs feed Track C.
 
 ## 3. Authority and conflict rule
@@ -39,7 +46,7 @@ When instructions disagree, use this order:
 1. explicit current human request;
 2. current GitHub tracking Issue / accepted project decision;
 3. this file and the matching Track entrypoint;
-4. `docs/architecture.md` and versioned contracts;
+4. `docs/architecture.md`, versioned contracts and repository readiness rules;
 5. V1/V2 design and roadmap documents;
 6. README and older historical notes.
 
@@ -61,35 +68,46 @@ When cross-track work is required, keep it minimal and preserve the owning Track
 
 The following are shared contracts, not private implementation details:
 
-- `contracts/`;
+- `contracts/` and its golden fixtures;
 - `src/course_project/models.py`;
 - `docs/architecture.md`;
 - `src/course_project/sidecar/` protocol surface;
 - `.github/workflows/`;
-- root dependency/build configuration.
+- root dependency/build/environment configuration.
 
 For changes to a shared interface:
 
 1. describe old and new contract;
-2. update schema/fixture/documentation first where applicable;
+2. update schema + golden fixture + documentation first where applicable;
 3. update producer and consumers;
 4. add compatibility/integration tests;
 5. request Track A review plus at least one affected consumer/producer owner.
 
 Do not let third-party library objects leak across project-native contracts.
 
-## 6. Project safety and scientific boundaries
+## 6. Environment, LLM and dependency rules
 
-This project is for coursework, controlled datasets, and authorized laboratory traffic only.
+- Canonical local baseline is defined by `.python-version`, `.nvmrc`, `rust-toolchain.toml` and `docs/development-environment.md`.
+- CI/offline development must work without a real model credential; `.env.example` defaults to `COURSE_PROJECT_LLM_PROVIDER=mock`.
+- Never make baseline CI depend on a paid/cloud LLM call.
+- Before introducing a third-party runtime/research dependency, update `docs/dependency-register.md` with exact upstream/version/license/environment/adapter/fallback information.
+- If third-party source, data, model assets or substantial examples are copied or redistributed, update `THIRD_PARTY_NOTICES.md` before merge.
+- Missing optional analyzers should surface a clear `dependency_unavailable`/degraded state rather than crash unrelated pipeline stages.
+
+## 7. Project safety, data and scientific boundaries
+
+This project is for coursework, teacher-provided evaluation data, controlled datasets, and authorized laboratory traffic only.
 
 - Do not add features aimed at unauthorized access, credential theft, persistence, destructive behavior, or unrestricted shell execution.
 - Do not claim that modern correctly implemented cryptography can be recovered without keys.
 - LLM output is a hypothesis source, never protocol ground truth.
 - Accepted protocol-semantic claims must retain evidence and verification records.
 - The inference pipeline must not read evaluation ground truth.
-- Do not commit private traffic, credentials, test keys, restored sensitive plaintext, or secrets.
+- Teacher-provided raw `.dat` / `.bin` files remain local unless redistribution is explicitly allowed.
+- Do not commit private traffic, credentials, test keys, prohibited teacher data, restored sensitive plaintext, or secrets.
+- Synthetic contract/unit fixtures may be committed but must not be presented as formal course benchmark results.
 
-## 7. Working protocol for every AI task
+## 8. Working protocol for every AI task
 
 Before coding, state internally or in the task record:
 
@@ -97,6 +115,7 @@ Before coding, state internally or in the task record:
 - tracking Issue;
 - owned paths being changed;
 - shared interfaces affected, if any;
+- dependency/environment changes, if any;
 - acceptance criteria to satisfy.
 
 Then:
@@ -107,22 +126,23 @@ Then:
 4. add/update tests and fixtures;
 5. run relevant local checks;
 6. open a PR linked to the Issue;
-7. report evidence, known limitations, and interface changes in the PR.
+7. report evidence, known limitations, environment/dependency changes and interface changes in the PR.
 
 Do not use one long-lived personal branch for unrelated work.
 
-## 8. Definition of done
+## 9. Definition of done
 
 A task is not done merely because code was written. A Track task is done when:
 
 - the stated Issue acceptance criterion is met;
 - tests/fixtures cover the changed behavior;
 - shared contracts remain compatible or are explicitly migrated;
+- dependency/version/license records are updated when applicable;
 - CI is green;
 - docs/examples are updated when behavior or usage changed;
 - the PR makes ownership and limitations clear.
 
-## 9. Track entrypoints
+## 10. Track entrypoints
 
 - Track A: [`docs/tracks/track-a.md`](docs/tracks/track-a.md)
 - Track B: [`docs/tracks/track-b.md`](docs/tracks/track-b.md)
@@ -131,7 +151,7 @@ A task is not done merely because code was written. A Track task is done when:
 
 The detailed four-person division remains in [`docs/team-division.md`](docs/team-division.md). CODEOWNERS remains the path-level review map, while tracking Issues remain the current execution truth.
 
-## 10. Tool compatibility
+## 11. Tool compatibility
 
 `AGENTS.md` is the single source of truth. Thin compatibility files route common coding agents here without duplicating the ownership map:
 

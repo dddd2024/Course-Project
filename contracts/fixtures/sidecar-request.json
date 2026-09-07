@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "id": "task-demo-001",
+  "method": "analyze",
+  "params": {
+    "inputRef": "input-demo-001",
+    "mode": "baseline"
+  }
+}

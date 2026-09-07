@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "id": "task-demo-001",
+  "event": "progress",
+  "stage": "boundary_inference",
+  "progress": 0.35
+}

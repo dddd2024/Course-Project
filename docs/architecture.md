@@ -21,7 +21,7 @@ src/course_project/
 ├── verification/          # executable/deterministic checks
 ├── behavior/              # flow/behavior features & classifier
 ├── exporters/             # JSON/Kaitai/parser export
-├── sidecar/               # desktop-facing analyzer protocol
+├── sidecar/               # desktop-facing analyzer protocol/runtime
 └── models.py              # shared Python contracts
 ```
 
@@ -230,6 +230,47 @@ VerificationResult
 
 `BehaviorPrediction` remains the final behavior classification output.
 
+### 3.3 Task result DTOs
+
+Track A owns the project-native result representation that is serialized into `analysis-result.schema.json`:
+
+```text
+ByteLocation
+- input_id
+- offset
+- length
+
+AnalysisFinding
+- finding_id
+- claim
+- status: accepted | rejected | uncertain
+- evidence_ids
+- semantic_type (optional)
+- location (optional)
+- scores: model/evidence/verification only
+
+ArtifactRef
+- artifact_id
+- type
+- format
+- ref
+- count (optional)
+- metadata
+
+AnalysisResult
+- task_id
+- status: completed | failed | cancelled | partial
+- input_id
+- result_ref
+- findings
+- evidence
+- artifacts
+- metrics
+- limitations
+```
+
+The serializer maps internal snake_case/lowercase status values to the frozen camelCase/uppercase JSON contract and rejects unresolved evidence references, duplicate evidence/artifact IDs, invalid scores and unsafe result refs.
+
 ## 4. Decision Status Contract
 
 There is one conceptual three-way decision model:
@@ -295,7 +336,10 @@ Tauri/Rust Core
 Python Sidecar
    |
    v
-Analysis Engine
+Analysis Backend interface
+   |
+   +--> Track D deterministic/PRE producers
+   +--> Track C evidence/verification producers
 ```
 
 The sidecar exposes task-level operations rather than unrestricted shell access. Large binary payloads are referenced by controlled input IDs, offsets and result paths instead of being embedded in JSON messages.
@@ -304,7 +348,7 @@ The sidecar exposes task-level operations rather than unrestricted shell access.
 
 Protocol version 1 reserves this method vocabulary:
 
-- `register_input` — register a controlled file/input reference and return an `inputId`;
+- `register_input` — register a controlled file/input reference and return an `inputRef`;
 - `inspect_file` — obtain deterministic metadata/overview for one input;
 - `analyze` — start configured analysis stages;
 - `cancel_task` — cancel a known task;
@@ -330,11 +374,15 @@ optionalDependencyPolicy: degrade | fail
 
 A Track that needs a new shared option changes the schema/fixture first.
 
-### 7.3 Task and event rules
+### 7.3 Task, status and event rules
 
 - stdout contains protocol JSON only; diagnostics go to stderr;
 - every message contains `protocolVersion` and a correlated task/message `id`;
 - progress uses `event=progress`, a stage and `progress` in `[0,1]`;
+- immediate responses use `event=status`, a canonical status stage and a stage-specific `data` object;
+- `registered` and `inspected` expose only controlled metadata (`inputRef`, kind, size, SHA-256, basename and capability flags), not arbitrary raw paths;
+- `range` returns at most 1 MiB of Base64 data with offset/length/EOF metadata;
+- `task_status` uses `QUEUED | RUNNING | COMPLETED | PARTIAL | FAILED | CANCELLED`;
 - errors use stable machine-readable error codes;
 - result messages return `resultRef`, not a large result document inline;
 - cancellation, timeout and sidecar failure remain explicit states.
@@ -343,6 +391,20 @@ Versioned contracts live in:
 - `contracts/sidecar-message.schema.json`;
 - `contracts/analysis-result.schema.json`;
 - `contracts/agent-response.schema.json`.
+
+### 7.4 Runtime implementation
+
+The in-process runtime is `course_project.sidecar.runtime.SidecarRuntime`; JSONL stdio hosting is `course_project.sidecar.cli` and is available through `python -m course_project.sidecar` or the `course-project-sidecar` console script.
+
+Input registration computes SHA-256 and creates a stable `input-<digest-prefix>` handle. The raw source path remains sidecar-internal. Optional configured roots can restrict which local files may be registered.
+
+Task result files are stored below a controlled state root and exposed only through POSIX-style relative `resultRef` values such as:
+
+```text
+tasks/<task-id>/analysis-result.json
+```
+
+The default `MetadataOnlyBackend` deliberately returns `PARTIAL` with no protocol findings until the Track D/C orchestrator is injected. This gives Track B a real process/protocol to integrate against without falsely presenting mock analysis as scientific output.
 
 ## 8. Analysis Result and Artifact Manifest
 
@@ -363,6 +425,8 @@ ArtifactRef
 ```
 
 This allows Track B to render Hex/alignment/statistics/behavior/evidence views without embedding large tables in the sidecar protocol. Artifact refs are controlled result-relative references, not arbitrary shell/file paths supplied by the WebView.
+
+Track A's JSON protocol exporter accepts `VerifiedField` objects only and writes deterministic project-native schema output; Track C therefore does not need to expose verifier internals to the exporter.
 
 ## 9. Error Semantics
 

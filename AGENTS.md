@@ -117,7 +117,7 @@ Who should approve:
 - shared-interface or cross-Track PR: Track A (`@dddd2024`);
 - Track A-authored shared/cross-Track PR: one affected Track owner, because the author cannot self-approve.
 
-Extra affected-owner review may be requested when useful, but it is advisory unless the PR explicitly changes that owner's contract surface.
+Extra affected-owner review may be requested when useful, but it is advisory and does not add another merge approval requirement.
 
 Automated Codex/GitHub review is advisory. It can discover real defects, but it is not an additional approval layer. Valid blocking findings must still be fixed or explicitly resolved before merge.
 

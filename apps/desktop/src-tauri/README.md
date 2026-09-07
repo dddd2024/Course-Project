@@ -1,6 +1,6 @@
 # Tauri / Rust Shell
 
-Owner: `@zhaohongjun20-creator`
+Owner: `@hinaLove1` (Track B)
 
 Future Tauri 2 application code lives here.
 

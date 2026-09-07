@@ -10,13 +10,15 @@ This roadmap converts the EvidenceGraph-PRE direction into implementation and ex
 |---|---|---|
 | R0 delivery/integration | `@dddd2024` | all |
 | R1 evidence/provenance | `@sunny1ce` | `@dddd2024` |
-| R2 competing hypotheses | `@sunny1ce` | `@hinaLove1` |
-| R3 executable verification | `@sunny1ce` | `@hinaLove1` |
-| R4 schema execution loop | `@dddd2024` | `@sunny1ce`, `@zhaohongjun20-creator` |
+| R2 competing hypotheses | `@sunny1ce` | `@zhaohongjun20-creator` |
+| R3 executable verification | `@sunny1ce` | `@zhaohongjun20-creator` |
+| R4 schema execution loop | `@dddd2024` | `@sunny1ce`, `@hinaLove1` |
 | R5 provenance fusion/abstention | `@sunny1ce` | `@dddd2024` |
-| R6 experiments | `@sunny1ce` | `@hinaLove1`, `@dddd2024` |
-| D0–D4 desktop workbench | `@zhaohongjun20-creator` | `@dddd2024` |
-| deterministic PRE/binary producers | `@hinaLove1` | `@sunny1ce` |
+| R6 experiments | `@sunny1ce` | `@zhaohongjun20-creator`, `@dddd2024` |
+| D0–D4 desktop workbench | `@hinaLove1` | `@dddd2024` |
+| deterministic PRE/binary producers | `@zhaohongjun20-creator` | `@sunny1ce` |
+
+Track B and Track D work packages were swapped on 2026-09-07. Account-to-track letters remain unchanged.
 
 ## R0 — Preserve V1 Delivery Path
 
@@ -41,7 +43,7 @@ Acceptance:
 
 ## R2 — Competing Protocol Hypotheses
 
-Owner: `@sunny1ce`, with candidate inputs from `@hinaLove1`.
+Owner: `@sunny1ce`, with candidate inputs from `@zhaohongjun20-creator`.
 
 Deliverables:
 - `ProtocolHypothesis` model;
@@ -56,7 +58,7 @@ Acceptance:
 
 ## R3 — Executable Verification Library
 
-Owner: `@sunny1ce`, deterministic producer support from `@hinaLove1`.
+Owner: `@sunny1ce`, deterministic producer support from `@zhaohongjun20-creator`.
 
 Priority checks:
 1. length;
@@ -104,7 +106,7 @@ Acceptance:
 
 ## R6 — Experiments
 
-Owner: `@sunny1ce`; baseline data/outputs from `@hinaLove1`; integration/reproducibility support from `@dddd2024`.
+Owner: `@sunny1ce`; baseline data/outputs from `@zhaohongjun20-creator`; integration/reproducibility support from `@dddd2024`.
 
 Required comparisons:
 - heuristic baseline;
@@ -134,7 +136,7 @@ Required metrics:
 
 ## D0–D4 — Desktop Workbench
 
-Owner: `@zhaohongjun20-creator`, contract/integration review by `@dddd2024`.
+Owner: `@hinaLove1`, contract/integration review by `@dddd2024`.
 
 Follow `docs/desktop-app-guide.md`:
 - D0 contract spike: fixed React -> Tauri -> Python -> React path;
@@ -147,7 +149,7 @@ Desktop work must consume stable sidecar contracts and must not duplicate/reimpl
 
 ## Deterministic PRE / Behavior Producers
 
-Owner: `@hinaLove1`.
+Owner: `@zhaohongjun20-creator`.
 
 This cross-cutting stream supplies R1–R6 with reproducible non-LLM evidence:
 - input normalization;

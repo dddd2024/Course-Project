@@ -1,6 +1,6 @@
 # Desktop App Skeleton
 
-Owner: `@zhaohongjun20-creator`
+Owner: `@hinaLove1` (Track B)
 
 This directory will contain the local desktop workbench defined in `docs/desktop-app-guide.md`.
 

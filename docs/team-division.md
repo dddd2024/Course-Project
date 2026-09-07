@@ -2,16 +2,18 @@
 
 > Status: active collaboration baseline
 
-The project is now organized around four ownership tracks. The goal is to minimize overlapping edits while covering the V1 runnable path, EvidenceGraph-PRE research work, and the new desktop application design.
+The project is organized around four ownership tracks. The goal is to minimize overlapping edits while covering the V1 runnable path, EvidenceGraph-PRE research work, and the desktop application design.
 
 ## 1. Team
 
 | Track | GitHub account | Current status | Approx. workload | Primary ownership |
 |---|---|---|---:|---|
 | A | `@dddd2024` | repository owner | 25% | integration, architecture, contracts, sidecar, CI, export, E2E |
-| B | `@hinaLove1` | collaborator (write) | 25% | binary analysis, packet boundaries, PRE, behavior features |
+| B | `@hinaLove1` | collaborator (write) | 25% | React/Tauri desktop, visualization, packaging, demo |
 | C | `@sunny1ce` | invitation pending when recorded | 25% | EvidenceGraph-PRE, LLM, verification, experiments |
-| D | `@zhaohongjun20-creator` | invitation pending when recorded | 25% | React/Tauri desktop, visualization, packaging, demo |
+| D | `@zhaohongjun20-creator` | invitation pending when recorded | 25% | binary analysis, packet boundaries, PRE, behavior features |
+
+Track B and Track D responsibilities were swapped on 2026-09-07. The GitHub accounts remain attached to their original Track letters; only the work packages changed.
 
 The 25/25/25/25 split is an initial planning baseline, not a final grading claim. Final workload percentages should be based on actual Issues, PRs, commits, tests, experiments, documentation and demo ownership.
 
@@ -37,25 +39,24 @@ Responsibilities:
 
 Tracking issue: `#12`.
 
-## 3. Track B — Binary Analysis / Protocol Inference / Behavior Features
+## 3. Track B — Desktop App / Visualization / Packaging / Demo
 
 Owner: `@hinaLove1`
 
 Primary paths:
-- `src/course_project/io/`
-- `src/course_project/features/`
-- `src/course_project/boundary/`
-- `src/course_project/inference/`
-- `src/course_project/behavior/`
+- `apps/desktop/src/`
+- `apps/desktop/src-tauri/`
+- desktop-facing portions of `contracts/`
+- `examples/`
 
 Responsibilities:
-- `.dat` / PCAP normalization;
-- entropy, local entropy, byte frequency, n-gram and repeated-pattern features;
-- packet/message boundary candidates;
-- clustering, alignment, stable/variable regions;
-- Netzob/BinaryInferno adapters and normalized field candidates;
-- flow/behavior features such as size, direction, timing, burst and up/down ratio;
-- deterministic/baseline outputs consumed by Track C.
+- React + TypeScript UI;
+- Tauri 2 / Rust application shell;
+- controlled file grants and task lifecycle;
+- Python sidecar launch/progress/error/result integration;
+- overview, hex, alignment, statistics, behavior and evidence views;
+- finding-to-byte-offset navigation;
+- packaging and reproducible final demo.
 
 Tracking issue: `#13`.
 
@@ -81,24 +82,25 @@ Responsibilities:
 
 Tracking issue: `#14` and research umbrella `#9`.
 
-## 5. Track D — Desktop App / Visualization / Packaging / Demo
+## 5. Track D — Binary Analysis / Protocol Inference / Behavior Features
 
 Owner: `@zhaohongjun20-creator`
 
 Primary paths:
-- `apps/desktop/src/`
-- `apps/desktop/src-tauri/`
-- desktop-facing portions of `contracts/`
-- `examples/`
+- `src/course_project/io/`
+- `src/course_project/features/`
+- `src/course_project/boundary/`
+- `src/course_project/inference/`
+- `src/course_project/behavior/`
 
 Responsibilities:
-- React + TypeScript UI;
-- Tauri 2 / Rust application shell;
-- controlled file grants and task lifecycle;
-- Python sidecar launch/progress/error/result integration;
-- overview, hex, alignment, statistics, behavior and evidence views;
-- finding-to-byte-offset navigation;
-- packaging and reproducible final demo.
+- `.dat` / PCAP normalization;
+- entropy, local entropy, byte frequency, n-gram and repeated-pattern features;
+- packet/message boundary candidates;
+- clustering, alignment, stable/variable regions;
+- Netzob/BinaryInferno adapters and normalized field candidates;
+- flow/behavior features such as size, direction, timing, burst and up/down ratio;
+- deterministic/baseline outputs consumed by Track C.
 
 Tracking issue: `#15`.
 
@@ -140,11 +142,11 @@ Do not use one long-lived branch per member for all work. Use task-sized branche
 The original WP issues remain useful as task-level history:
 
 - `#1` architecture/contracts -> Track A
-- `#2` binary features/boundaries -> Track B
-- `#3` clustering/alignment/field inference -> Track B
+- `#2` binary features/boundaries -> Track D
+- `#3` clustering/alignment/field inference -> Track D
 - `#4` LLM/verifier -> Track C
-- `#5` behavior/ML -> Track B with experiment support from Track C
-- `#6` schema/datasets/demo -> Track A + Track D
+- `#5` behavior/ML -> Track D with experiment support from Track C
+- `#6` schema/datasets/demo -> Track A + Track B
 - `#7` V1 project tracking -> all tracks
 - `#9` EvidenceGraph-PRE research tracking -> Track C, reviewed by Track A
 - `#11` four-person skeleton migration -> Track A

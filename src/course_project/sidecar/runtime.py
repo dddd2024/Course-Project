@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import re
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -143,12 +144,21 @@ class InputRegistry:
                 details={"sourceName": path.name},
             )
 
-        sha256 = _sha256_file(path)
+        try:
+            sha256 = _sha256_file(path)
+            size_bytes = path.stat().st_size
+        except OSError as exc:
+            raise SidecarError(
+                "invalid_input",
+                "sourceRef could not be read during registration",
+                details={"sourceName": path.name},
+            ) from exc
+
         input_ref = f"input-{sha256[:16]}"
         metadata = InputMetadata(
             input_id=input_ref,
             kind=_resolve_kind(path, kind_hint),
-            size_bytes=path.stat().st_size,
+            size_bytes=size_bytes,
             sha256=sha256,
             metadata={"sourceName": path.name},
         )
@@ -166,13 +176,54 @@ class InputRegistry:
                 "unknown inputRef",
                 details={"inputRef": input_ref},
             )
+        self._require_source_available(record)
         return record
+
+    def _require_source_available(self, record: RegisteredInput) -> None:
+        try:
+            current = record.path.stat()
+        except OSError as exc:
+            raise SidecarError(
+                "invalid_input",
+                "registered source file is no longer available",
+                details={
+                    "inputRef": record.metadata.input_id,
+                    "sourceName": record.source_name,
+                },
+            ) from exc
+        if not stat.S_ISREG(current.st_mode):
+            raise SidecarError(
+                "invalid_input",
+                "registered source file is no longer available",
+                details={
+                    "inputRef": record.metadata.input_id,
+                    "sourceName": record.source_name,
+                },
+            )
+        if current.st_size != record.metadata.size_bytes:
+            raise SidecarError(
+                "invalid_input",
+                "registered source file size changed since registration",
+                details={
+                    "inputRef": record.metadata.input_id,
+                    "sourceName": record.source_name,
+                    "expectedSizeBytes": record.metadata.size_bytes,
+                    "actualSizeBytes": current.st_size,
+                },
+            )
 
     def read_range(self, input_ref: str, offset: int, length: int) -> dict[str, Any]:
         record = self.get(input_ref)
-        with record.path.open("rb") as handle:
-            handle.seek(offset)
-            chunk = handle.read(length)
+        try:
+            with record.path.open("rb") as handle:
+                handle.seek(offset)
+                chunk = handle.read(length)
+        except OSError as exc:
+            raise SidecarError(
+                "invalid_input",
+                "registered source file is no longer readable",
+                details={"inputRef": input_ref, "sourceName": record.source_name},
+            ) from exc
         return {
             "inputRef": input_ref,
             "offset": offset,
@@ -197,11 +248,18 @@ class ResultStore:
         result.result_ref = ref
         payload = analysis_result_to_dict(result)
         target = self.root / ref
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise SidecarError(
+                "sidecar_failed",
+                "failed to persist analysis result",
+                details={"taskId": result.task_id},
+            ) from exc
         return ref
 
     def resolve(self, ref: str) -> Path:

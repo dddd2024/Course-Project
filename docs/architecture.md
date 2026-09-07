@@ -182,7 +182,7 @@ Scapy       -> io/scapy_adapter.py              -> project-native input records
 Netzob      -> inference/netzob_adapter.py       -> project-native alignment/field data
 BinaryInferno -> inference/binaryinferno_adapter.py -> project-native field candidates
 NFStream    -> behavior/nfstream_adapter.py      -> project-native flow features
-Kaitai      -> exporters/kaitai.py              -> schema/parser artifacts
+Kaitai      -> exporters/kaitai.py               -> schema/parser artifacts
 LLM provider -> llm/<provider>_adapter.py        -> structured hypotheses
 ```
 
@@ -252,8 +252,10 @@ For changes to `models.py`, `contracts/`, or sidecar protocol:
 ## 10. Four-Track Ownership Boundary
 
 - Track A (`@dddd2024`): shared contracts, sidecar, CI, integration/export.
-- Track B (`@hinaLove1`): deterministic binary/PRE/behavior feature producers.
+- Track B (`@hinaLove1`): React/Tauri desktop and presentation layer.
 - Track C (`@sunny1ce`): evidence graph, LLM hypotheses, executable verification, experiments.
-- Track D (`@zhaohongjun20-creator`): React/Tauri desktop and presentation layer.
+- Track D (`@zhaohongjun20-creator`): deterministic binary/PRE/behavior feature producers.
+
+Track B and Track D work packages were swapped on 2026-09-07; the account-to-track mapping did not change.
 
 Cross-track dependencies must go through shared contracts instead of importing another track's internal implementation.

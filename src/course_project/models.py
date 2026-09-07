@@ -7,6 +7,19 @@ DecisionStatus = Literal["accepted", "rejected", "uncertain"]
 PublicDecisionStatus = Literal["ACCEPTED", "REJECTED", "UNCERTAIN"]
 InputKind = Literal["dat", "bin", "pcap", "pcapng", "synthetic", "unknown"]
 RegionKind = Literal["stable", "variable", "unknown"]
+AnalysisTaskStatus = Literal["completed", "failed", "cancelled", "partial"]
+ArtifactType = Literal[
+    "evidence",
+    "packets",
+    "messages",
+    "alignment",
+    "statistics",
+    "behavior",
+    "restored",
+    "schema",
+    "report",
+]
+ArtifactFormat = Literal["json", "jsonl", "parquet", "csv", "text", "binary", "ksy"]
 
 
 @dataclass(slots=True)
@@ -189,3 +202,52 @@ class BehaviorPrediction:
     label: Literal["QUERY", "DOWNLOAD", "UPLOAD", "HEARTBEAT", "STREAM", "UNKNOWN"]
     confidence: float
     features: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ByteLocation:
+    """Byte range used by findings to navigate back to the registered input."""
+
+    input_id: str
+    offset: int
+    length: int
+
+
+@dataclass(slots=True)
+class AnalysisFinding:
+    """Small evidence-linked conclusion suitable for the task-level result summary."""
+
+    finding_id: str
+    claim: str
+    status: DecisionStatus
+    evidence_ids: tuple[str, ...] = ()
+    semantic_type: str | None = None
+    location: ByteLocation | None = None
+    scores: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class ArtifactRef:
+    """Controlled result-relative reference to a potentially large artifact."""
+
+    artifact_id: str
+    type: ArtifactType
+    format: ArtifactFormat
+    ref: str
+    count: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class AnalysisResult:
+    """Project-native task result serialized through analysis-result.schema.json."""
+
+    task_id: str
+    status: AnalysisTaskStatus
+    findings: tuple[AnalysisFinding, ...] = ()
+    input_id: str | None = None
+    result_ref: str | None = None
+    evidence: tuple[Evidence, ...] = ()
+    artifacts: tuple[ArtifactRef, ...] = ()
+    metrics: dict[str, Any] = field(default_factory=dict)
+    limitations: tuple[str, ...] = ()

@@ -410,7 +410,7 @@ The default `MetadataOnlyBackend` deliberately returns `PARTIAL` with no protoco
 
 `AnalysisResult` is the task-level summary. It contains findings plus small evidence records and references to potentially large artifacts.
 
-Each finding can reference `evidenceIds` and a byte location. Evidence records carry provenance sufficient for the UI/reviewer to understand what produced the claim.
+Each finding can reference `evidenceIds` and a byte location. Evidence records carry provenance sufficient for the UI/user to understand what produced the claim.
 
 Large or structured views are advertised through `artifacts[]` entries:
 
@@ -462,8 +462,10 @@ For changes to `models.py`, `contracts/`, shared sidecar methods/config, or arti
 3. update `docs/architecture.md` when the semantic boundary changes;
 4. update producer and consumers;
 5. add compatibility/integration tests;
-6. obtain the single required human review selected by `AGENTS.md`;
-7. intentionally change `protocolVersion` when the change is incompatible.
+6. intentionally change `protocolVersion` when the change is incompatible;
+7. require full current-version CI success before merge.
+
+No human approval is part of the contract-change merge gate.
 
 ## 12. Four-Track Ownership Boundary
 

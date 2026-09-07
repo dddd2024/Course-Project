@@ -40,10 +40,13 @@ The V1 delivery path remains the minimum runnable course demo. V2 adds **Evidenc
 
 ```text
 .
+├── AGENTS.md                     # first entrypoint for AI coding agents
 ├── apps/
 │   └── desktop/                 # React + TypeScript UI and Tauri/Rust shell
 ├── contracts/                   # cross-language JSON schemas / protocol contracts
-├── docs/                        # V1/V2 design, research, desktop, team and testing docs
+├── docs/
+│   ├── tracks/                  # per-person AI/human task entrypoints
+│   └── ...                      # V1/V2 design, research, desktop, team and testing docs
 ├── experiments/                 # baselines, ablations and reproducibility notes
 ├── prompts/                     # versioned Agent prompts when introduced
 ├── src/course_project/
@@ -77,6 +80,17 @@ Track B and Track D responsibilities were swapped on 2026-09-07; account ownersh
 
 At the time this skeleton was updated, `@sunny1ce` and `@zhaohongjun20-creator` still had pending collaborator invitations, so automatic GitHub assignment/review requests may not activate until they accept.
 
+## AI Agent Entry Point
+
+AI coding agents must start with [`AGENTS.md`](AGENTS.md), identify the human operator's GitHub account/Track, then read the matching Track file and current tracking Issue before editing code.
+
+- Track A / `@dddd2024`: [`docs/tracks/track-a.md`](docs/tracks/track-a.md), Issue `#12`
+- Track B / `@hinaLove1`: [`docs/tracks/track-b.md`](docs/tracks/track-b.md), Issue `#13`
+- Track C / `@sunny1ce`: [`docs/tracks/track-c.md`](docs/tracks/track-c.md), Issue `#14` + research `#9`
+- Track D / `@zhaohongjun20-creator`: [`docs/tracks/track-d.md`](docs/tracks/track-d.md), Issue `#15`
+
+An AI agent may inspect the whole repository, but should not silently take over another Track or change shared contracts merely for convenience. Shared-interface changes follow the review/migration rules in `AGENTS.md` and `docs/architecture.md`.
+
 ## Design Documents
 
 - [`docs/design-v1.md`](docs/design-v1.md) — minimum runnable analysis baseline.
@@ -100,4 +114,4 @@ At the time this skeleton was updated, `@sunny1ce` and `@zhaohongjun20-creator` 
 
 ## Current Status
 
-**Phase: four-person V2 + desktop skeleton established; implementation work can proceed in parallel.**
+**Phase: four-person V2 + desktop skeleton established; AI/human Track entrypoints define parallel implementation ownership.**

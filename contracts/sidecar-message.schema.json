@@ -7,26 +7,160 @@
   "properties": {
     "protocolVersion": {"type": "integer", "const": 1},
     "id": {"type": "string", "minLength": 1},
-    "method": {"type": "string"},
+    "method": {
+      "type": "string",
+      "enum": ["register_input", "inspect_file", "analyze", "cancel_task", "get_result", "read_range"]
+    },
     "params": {"type": "object"},
     "event": {"type": "string", "enum": ["progress", "status"]},
-    "stage": {"type": "string"},
+    "stage": {"type": "string", "minLength": 1},
     "progress": {"type": "number", "minimum": 0, "maximum": 1},
-    "resultRef": {"type": "string"},
+    "resultRef": {"type": "string", "minLength": 1},
     "error": {
       "type": "object",
       "required": ["code", "message"],
       "properties": {
-        "code": {"type": "string"},
-        "message": {"type": "string"},
+        "code": {
+          "type": "string",
+          "enum": [
+            "invalid_input",
+            "insufficient_evidence",
+            "unsupported_format",
+            "dependency_unavailable",
+            "inference_failed",
+            "verification_failed",
+            "contract_version_mismatch",
+            "task_cancelled",
+            "sidecar_failed"
+          ]
+        },
+        "message": {"type": "string", "minLength": 1},
         "details": {"type": "object"}
       },
       "additionalProperties": false
     }
   },
+  "$defs": {
+    "inputRefParams": {
+      "type": "object",
+      "required": ["inputRef"],
+      "properties": {
+        "inputRef": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "registerInputParams": {
+      "type": "object",
+      "required": ["sourceRef"],
+      "properties": {
+        "sourceRef": {"type": "string", "minLength": 1},
+        "kindHint": {
+          "type": "string",
+          "enum": ["dat", "bin", "pcap", "pcapng", "unknown"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "analysisParams": {
+      "type": "object",
+      "required": ["inputRef", "mode"],
+      "properties": {
+        "inputRef": {"type": "string", "minLength": 1},
+        "mode": {"type": "string", "enum": ["baseline", "evidencegraph"]},
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "inspect",
+              "features",
+              "boundary",
+              "inference",
+              "evidence",
+              "llm",
+              "verification",
+              "behavior",
+              "export"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "llmEnabled": {"type": "boolean"},
+        "verificationEnabled": {"type": "boolean"},
+        "behaviorEnabled": {"type": "boolean"},
+        "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+        "optionalDependencyPolicy": {"type": "string", "enum": ["degrade", "fail"]}
+      },
+      "additionalProperties": false
+    },
+    "taskParams": {
+      "type": "object",
+      "required": ["taskId"],
+      "properties": {
+        "taskId": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "readRangeParams": {
+      "type": "object",
+      "required": ["inputRef", "offset", "length"],
+      "properties": {
+        "inputRef": {"type": "string", "minLength": 1},
+        "offset": {"type": "integer", "minimum": 0},
+        "length": {"type": "integer", "minimum": 1, "maximum": 1048576}
+      },
+      "additionalProperties": false
+    }
+  },
   "oneOf": [
-    {"required": ["method"]},
-    {"required": ["event"]},
+    {
+      "required": ["method", "params"],
+      "properties": {
+        "method": {"const": "register_input"},
+        "params": {"$ref": "#/$defs/registerInputParams"}
+      }
+    },
+    {
+      "required": ["method", "params"],
+      "properties": {
+        "method": {"const": "inspect_file"},
+        "params": {"$ref": "#/$defs/inputRefParams"}
+      }
+    },
+    {
+      "required": ["method", "params"],
+      "properties": {
+        "method": {"const": "analyze"},
+        "params": {"$ref": "#/$defs/analysisParams"}
+      }
+    },
+    {
+      "required": ["method", "params"],
+      "properties": {
+        "method": {"const": "cancel_task"},
+        "params": {"$ref": "#/$defs/taskParams"}
+      }
+    },
+    {
+      "required": ["method", "params"],
+      "properties": {
+        "method": {"const": "get_result"},
+        "params": {"$ref": "#/$defs/taskParams"}
+      }
+    },
+    {
+      "required": ["method", "params"],
+      "properties": {
+        "method": {"const": "read_range"},
+        "params": {"$ref": "#/$defs/readRangeParams"}
+      }
+    },
+    {
+      "required": ["event"],
+      "properties": {
+        "event": {"enum": ["progress", "status"]}
+      }
+    },
     {"required": ["resultRef"]},
     {"required": ["error"]}
   ],

@@ -50,23 +50,49 @@ Canonical `analyze` config names:
 - `timeoutSeconds`;
 - `optionalDependencyPolicy`.
 
-The schema in `contracts/sidecar-message.schema.json` is authoritative.
+Canonical response/event stages:
+
+- `registered` — controlled input metadata;
+- `inspected` — controlled input metadata;
+- `range` — bounded Base64 byte range;
+- `task_status` — task lifecycle status;
+- progress events use `event=progress`, `stage`, and `progress` in `[0,1]`;
+- final/partial results use a controlled `resultRef`.
+
+Task lifecycle values are:
+
+```text
+QUEUED / RUNNING / COMPLETED / PARTIAL / FAILED / CANCELLED
+```
+
+The schema in `contracts/sidecar-message.schema.json` is authoritative. `read_range` is capped at 1 MiB and no arbitrary shell command or arbitrary WebView-supplied result path crosses the boundary.
 
 ## 4. Analysis result linkage
 
-`AnalysisResult` uses three layers:
+The project-native Python result DTOs are:
+
+- `ByteLocation`;
+- `AnalysisFinding`;
+- `ArtifactRef`;
+- `AnalysisResult`.
+
+`AnalysisResult` serializes into three externally visible layers:
 
 1. `findings[]` — user-facing claims, statuses, byte locations and `evidenceIds`;
 2. `evidence[]` — small provenance records that explain claims;
 3. `artifacts[]` — controlled references to larger messages/alignment/statistics/behavior/restored/schema/report outputs.
 
-Large binary/table payloads are not embedded into sidecar JSON.
+Large binary/table payloads are not embedded into sidecar JSON. Result/artifact refs are POSIX-style controlled relative paths beneath the Sidecar state root.
 
-## 5. Evaluation data
+## 5. Export boundary
+
+Track A's protocol JSON exporter consumes `VerifiedField` objects only. Track C should provide accepted verified fields through the shared model rather than exposing verifier implementation internals to exporters.
+
+## 6. Evaluation data
 
 Teacher-provided `.dat` is the authoritative course evaluation input. Synthetic data may be used for unit/integration/verifier/mechanism experiments and must be explicitly labeled as synthetic. It is not a substitute for teacher-data benchmark results.
 
-## 6. Change process
+## 7. Change process
 
 A breaking or semantic change to any item above requires:
 

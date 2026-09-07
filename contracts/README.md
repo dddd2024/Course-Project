@@ -5,19 +5,11 @@ Owner: Track A (`@dddd2024`), reviewed by affected producers/consumers.
 These schemas are the contract boundary between the Python analyzer, Tauri/Rust core and React/TypeScript UI.
 
 Current schemas:
-- `sidecar-message.schema.json` — versioned request/progress/result/error envelopes and the canonical v1 command vocabulary;
+- `sidecar-message.schema.json` — versioned request/progress/status/result/error envelopes and the canonical v1 command vocabulary;
 - `analysis-result.schema.json` — task-level analysis result, findings, evidence records and artifact manifest;
 - `agent-response.schema.json` — human-readable answer plus structured evidence-linked findings.
 
-Golden fixtures in `contracts/fixtures/`:
-- `sidecar-register-input.json`;
-- `sidecar-request.json` (`analyze`);
-- `sidecar-read-range.json`;
-- `sidecar-progress.json`;
-- `sidecar-result.json`;
-- `sidecar-error.json`;
-- `analysis-result.json`;
-- `agent-response.json`.
+Golden fixtures in `contracts/fixtures/` include request examples plus runtime response examples for registration, inspection, bounded byte-range reads, task status/progress, result refs and errors. `analysis-result.json` and `agent-response.json` remain the structured result examples.
 
 These fixtures are synthetic contract examples, not teacher-supplied evaluation data. They exist so Track A/B/C/D and CI can agree on message shape before the real analyzer and desktop application are complete.
 
@@ -42,6 +34,26 @@ The canonical `analyze` configuration uses:
 - `behaviorEnabled`;
 - `timeoutSeconds`;
 - `optionalDependencyPolicy: degrade | fail`.
+
+## Sidecar v1 response vocabulary
+
+Protocol messages are newline-delimited JSON. Every response keeps the request/task `id` and `protocolVersion=1`.
+
+Immediate status responses use `event="status"`, a canonical `stage`, and a stage-specific `data` object:
+
+- `registered` / `inspected` → `inputRef`, kind, size, SHA-256, source file name and capability flags;
+- `range` → bounded Base64 bytes plus offset/length/EOF metadata;
+- `task_status` → `taskId`, task status and optional `resultRef`.
+
+Long-running work uses `event="progress"`, `stage`, and `progress` in `[0,1]`. Completed/partial task results are returned by controlled `resultRef` rather than embedding the entire result in stdout.
+
+The task-status vocabulary is:
+
+```text
+QUEUED / RUNNING / COMPLETED / PARTIAL / FAILED / CANCELLED
+```
+
+`read_range` is capped at 1 MiB per request. The response payload is Base64 because stdout is JSON-only; large analysis tables/artifacts still use controlled result refs rather than Base64 embedding.
 
 ## Decision status
 
@@ -69,6 +81,17 @@ Supported artifact types:
 - `report`.
 
 Every artifact includes `artifactId`, `type`, `format`, and a controlled result `ref`; optional `count`/`metadata` may be included.
+
+## Runtime implementation
+
+The Python implementation lives in `src/course_project/sidecar/` and can be launched with either:
+
+```text
+python -m course_project.sidecar
+course-project-sidecar
+```
+
+The default backend intentionally emits a `PARTIAL` result with no protocol claims until the real Track D/C analysis orchestrator is injected. This makes Track B integration testable without presenting mock protocol conclusions as actual analysis.
 
 ## Contract rules
 

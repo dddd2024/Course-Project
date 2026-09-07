@@ -69,9 +69,11 @@ The V1 delivery path remains the minimum runnable course demo. V2 adds **Evidenc
 | Track | Owner | Primary responsibility |
 |---|---|---|
 | A | `@dddd2024` | integration, contracts, sidecar, CI, export, end-to-end |
-| B | `@hinaLove1` | binary analysis, boundaries, protocol inference, behavior features |
+| B | `@hinaLove1` | React/Tauri desktop, visualization, packaging and demo |
 | C | `@sunny1ce` | EvidenceGraph-PRE, LLM reasoning, executable verification, experiments |
-| D | `@zhaohongjun20-creator` | React/Tauri desktop, visualization, packaging and demo |
+| D | `@zhaohongjun20-creator` | binary analysis, boundaries, protocol inference, behavior features |
+
+Track B and Track D responsibilities were swapped on 2026-09-07; account ownership remains unchanged.
 
 At the time this skeleton was updated, `@sunny1ce` and `@zhaohongjun20-creator` still had pending collaborator invitations, so automatic GitHub assignment/review requests may not activate until they accept.
 

@@ -1,7 +1,14 @@
 from course_project.models import (
+    AlignmentRegion,
+    AlignmentResult,
+    BehaviorFeatures,
     Evidence,
     ExecutableCheck,
+    FieldCandidate,
     FieldHypothesis,
+    InputMetadata,
+    MessageCandidate,
+    MessageFamily,
     PacketCandidate,
     ProtocolHypothesis,
     VerificationResult,
@@ -30,6 +37,48 @@ def test_shared_models_smoke() -> None:
     assert packet.end_offset > packet.start_offset
     assert hypothesis.semantic_type == "length"
     assert result.status == "accepted"
+
+
+def test_cross_track_normalized_dtos_smoke() -> None:
+    input_meta = InputMetadata(input_id="input-1", kind="dat", size_bytes=64)
+    message = MessageCandidate(
+        message_id="msg-1",
+        input_id=input_meta.input_id,
+        start_offset=0,
+        end_offset=16,
+        confidence=0.9,
+        family_id="family-1",
+    )
+    family = MessageFamily(
+        family_id="family-1",
+        message_ids=(message.message_id,),
+        confidence=0.88,
+    )
+    region = AlignmentRegion(start_offset=0, end_offset=4, kind="stable", score=0.95)
+    alignment = AlignmentResult(
+        family_id=family.family_id,
+        message_ids=family.message_ids,
+        regions=(region,),
+        score=0.91,
+    )
+    candidate = FieldCandidate(
+        candidate_id="field-candidate-1",
+        family_id=family.family_id,
+        offset=2,
+        size=2,
+        candidate_types=("length", "sequence"),
+        endian="big",
+        score=0.8,
+    )
+    behavior = BehaviorFeatures(
+        flow_id="flow-1",
+        values={"packet_count": 5, "up_down_ratio": 1.5},
+        sample_ids=(message.message_id,),
+    )
+
+    assert alignment.regions[0].kind == "stable"
+    assert candidate.candidate_types == ("length", "sequence")
+    assert behavior.values["packet_count"] == 5
 
 
 def test_v2_evidence_contract_smoke() -> None:

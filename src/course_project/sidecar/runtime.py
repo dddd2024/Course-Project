@@ -322,8 +322,20 @@ class SidecarRuntime:
     def _analyze(self, task_id: str, params: Mapping[str, Any]) -> list[dict[str, Any]]:
         _validate_task_id(task_id)
         input_ref = params["inputRef"]
-        record = self.inputs.get(input_ref)
         config = dict(params)
+
+        with self._lock:
+            existing = self._tasks.get(task_id)
+            if existing is not None:
+                if existing.input_ref != input_ref or existing.config != config:
+                    raise SidecarError(
+                        "invalid_input",
+                        "task id is already bound to a different analyze request",
+                        details={"taskId": task_id},
+                    )
+                return self._existing_task_messages(task_id, existing)
+
+        record = self.inputs.get(input_ref)
 
         with self._lock:
             existing = self._tasks.get(task_id)
@@ -362,20 +374,27 @@ class SidecarRuntime:
                 details={"exceptionType": type(exc).__name__},
             ) from exc
 
-        _validate_backend_result(result, task_id=task_id, input_ref=input_ref)
-        result.input_id = input_ref
+        try:
+            _validate_backend_result(result, task_id=task_id, input_ref=input_ref)
+            result.input_id = input_ref
 
-        with self._lock:
-            cancelled = task.status == "CANCELLED"
-        if cancelled:
-            result = AnalysisResult(
-                task_id=task_id,
-                status="cancelled",
-                input_id=input_ref,
-                limitations=("Task was cancelled before its result was published.",),
-            )
+            with self._lock:
+                cancelled = task.status == "CANCELLED"
+            if cancelled:
+                result = AnalysisResult(
+                    task_id=task_id,
+                    status="cancelled",
+                    input_id=input_ref,
+                    limitations=("Task was cancelled before its result was published.",),
+                )
 
-        ref = self.results.write_analysis_result(result)
+            ref = self.results.write_analysis_result(result)
+        except SidecarError:
+            with self._lock:
+                task.result_ref = None
+                task.status = "FAILED"
+            raise
+
         with self._lock:
             task.result_ref = ref
             task.status = result.status.upper()

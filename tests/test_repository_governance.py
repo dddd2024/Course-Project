@@ -24,9 +24,9 @@ def test_authoritative_merge_policy_is_ci_only() -> None:
     assert "## Merge Gate — CI Only" in pr_template
     assert "human approval" in pr_template.lower()
     assert "not merge requirements" in pr_template.lower()
-    assert "required approving reviews: 0" in settings
-    assert "review-thread resolution: disabled" in settings
-    assert "Code Owner review: disabled" in settings
+    assert "ruleset `main-protection` is intentionally **disabled**" in settings
+    assert "must not re-enable" in settings.lower()
+    assert "ci-optional" in settings.lower()
     assert "merge promptly" in settings.lower()
 
 
@@ -52,6 +52,15 @@ def test_old_review_gates_do_not_reappear_in_authoritative_docs() -> None:
         content = _read(path).lower()
         for phrase in forbidden:
             assert phrase not in content, f"obsolete review gate found in {path}: {phrase}"
+
+
+def test_disabled_ruleset_is_not_a_ci_bypass() -> None:
+    settings = _read("docs/repository-settings.md").lower()
+
+    assert "enforcement: **disabled**" in settings
+    assert "does not authorize bypassing the pr workflow" in settings
+    assert "all four blocking checks" in settings
+    assert "synthetic merge result" in settings
 
 
 def test_ci_keeps_all_blocking_jobs_and_aggregate_gate() -> None:

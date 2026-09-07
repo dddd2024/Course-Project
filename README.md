@@ -70,6 +70,7 @@ Kaitai/Parser Export  QUERY / DOWNLOAD / UPLOAD /
 
 - [`docs/design-v1.md`](docs/design-v1.md) — first complete design baseline.
 - [`docs/architecture.md`](docs/architecture.md) — component boundaries and data contracts.
+- [`docs/desktop-app-guide.md`](docs/desktop-app-guide.md) — Tauri-style desktop architecture, Agent UX, sidecar contract, and phased delivery guidance.
 - [`docs/team-division.md`](docs/team-division.md) — multi-person work packages and collaboration rules.
 - [`docs/open-source-stack.md`](docs/open-source-stack.md) — planned use of Netzob, BinaryInferno, Kaitai Struct, Scapy, NFStream, and ML baselines.
 - [`docs/testing-plan.md`](docs/testing-plan.md) — evaluation datasets, baselines, metrics, and ablations.

@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import type { AnalysisResult } from "./analysisContracts";
 
 export type TaskStatus = "CREATED" | "INSPECTING" | "ANALYZING" | "VERIFYING" | "COMPLETED" | "CANCELLED" | "FAILED";
 
@@ -59,9 +60,9 @@ export async function inspectInput(inputRef: string): Promise<InputMetadata> {
   return invoke<InputMetadata>("inspect_file", { inputRef });
 }
 
-export async function startTask(failureMode: boolean): Promise<string> {
+export async function startTask(failureMode: boolean, inputRef?: string): Promise<string> {
   if (hasTauriRuntime()) {
-    return invoke<string>("start_contract_spike", { failureMode });
+    return invoke<string>("start_contract_spike", { failureMode, inputRef });
   }
 
   const id = `browser-${Date.now()}`;
@@ -94,6 +95,10 @@ export async function startTask(failureMode: boolean): Promise<string> {
   browserTimers.set(id, timers);
 
   return id;
+}
+
+export async function getAnalysisResult(taskId: string): Promise<AnalysisResult> {
+  return invoke<AnalysisResult>("get_analysis_result", { taskId });
 }
 
 export async function cancelTask(id: string): Promise<void> {

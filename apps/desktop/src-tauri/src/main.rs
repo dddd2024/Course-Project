@@ -2,8 +2,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
+    fs,
     io::{BufRead, BufReader, Write},
-    path::Path,
+    path::{Component, Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -133,6 +134,95 @@ impl SidecarClient {
         })
     }
 
+    fn request_messages_with_id(
+        &mut self,
+        request_id: &str,
+        method: &str,
+        params: Value,
+    ) -> Result<Vec<Value>, String> {
+        let message =
+            json!({"protocolVersion": 1, "id": request_id, "method": method, "params": params});
+        serde_json::to_writer(&mut self.stdin, &message)
+            .map_err(|error| format!("cannot encode sidecar request: {error}"))?;
+        self.stdin
+            .write_all(b"\n")
+            .map_err(|error| format!("cannot write sidecar request: {error}"))?;
+        self.stdin
+            .flush()
+            .map_err(|error| format!("cannot flush sidecar request: {error}"))?;
+
+        let mut responses = Vec::new();
+        loop {
+            let mut line = String::new();
+            let count = self
+                .stdout
+                .read_line(&mut line)
+                .map_err(|error| format!("cannot read sidecar response: {error}"))?;
+            if count == 0 {
+                return Err("Python sidecar exited without a response".to_string());
+            }
+            let response: Value = serde_json::from_str(&line)
+                .map_err(|error| format!("invalid sidecar JSON response: {error}"))?;
+            if let Some(error) = response.get("error") {
+                let code = error
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .unwrap_or("sidecar_failed");
+                let message = error
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("sidecar request failed");
+                return Err(format!("{code}: {message}"));
+            }
+            let terminal = response.get("resultRef").and_then(Value::as_str).is_some();
+            responses.push(response);
+            if terminal {
+                return Ok(responses);
+            }
+        }
+    }
+
+    fn request_result_ref(&mut self, task_id: &str) -> Result<String, String> {
+        let id = format!("desktop-{}", self.next_id);
+        self.next_id += 1;
+        let message = json!({"protocolVersion": 1, "id": id, "method": "get_result", "params": {"taskId": task_id}});
+        serde_json::to_writer(&mut self.stdin, &message)
+            .map_err(|error| format!("cannot encode sidecar request: {error}"))?;
+        self.stdin
+            .write_all(b"\n")
+            .map_err(|error| format!("cannot write sidecar request: {error}"))?;
+        self.stdin
+            .flush()
+            .map_err(|error| format!("cannot flush sidecar request: {error}"))?;
+
+        let mut line = String::new();
+        let count = self
+            .stdout
+            .read_line(&mut line)
+            .map_err(|error| format!("cannot read sidecar response: {error}"))?;
+        if count == 0 {
+            return Err("Python sidecar exited without a response".to_string());
+        }
+        let response: Value = serde_json::from_str(&line)
+            .map_err(|error| format!("invalid sidecar JSON response: {error}"))?;
+        if let Some(error) = response.get("error") {
+            let code = error
+                .get("code")
+                .and_then(Value::as_str)
+                .unwrap_or("sidecar_failed");
+            let message = error
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("sidecar request failed");
+            return Err(format!("{code}: {message}"));
+        }
+        response
+            .get("resultRef")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| "analysis result is not ready".to_string())
+    }
+
     fn request<T: DeserializeOwned>(&mut self, method: &str, params: Value) -> Result<T, String> {
         let id = format!("desktop-{}", self.next_id);
         self.next_id += 1;
@@ -255,11 +345,159 @@ fn emit_update(app: &AppHandle, update: TaskUpdate) {
     let _ = app.emit(TASK_EVENT, update);
 }
 
+fn result_state_root() -> Result<PathBuf, String> {
+    let configured = std::env::var("COURSE_PROJECT_STATE_DIR")
+        .unwrap_or_else(|_| ".course-project-state".to_string());
+    let path = PathBuf::from(configured);
+    let absolute = if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("cannot resolve sidecar state directory: {error}"))?
+            .join(path)
+    };
+    absolute
+        .canonicalize()
+        .map_err(|error| format!("cannot access sidecar state directory: {error}"))
+}
+
+fn read_controlled_result(result_ref: &str) -> Result<Value, String> {
+    let relative = Path::new(result_ref);
+    if result_ref.is_empty()
+        || relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err("sidecar returned an unsafe result reference".to_string());
+    }
+    let root = result_state_root()?;
+    let target = root
+        .join(relative)
+        .canonicalize()
+        .map_err(|error| format!("cannot read controlled analysis result: {error}"))?;
+    if !target.starts_with(&root) {
+        return Err("sidecar result escapes the controlled state directory".to_string());
+    }
+    let content = fs::read_to_string(target)
+        .map_err(|error| format!("cannot read controlled analysis result: {error}"))?;
+    serde_json::from_str(&content).map_err(|error| format!("invalid analysis result JSON: {error}"))
+}
+
+fn run_sidecar_analysis(
+    app: &AppHandle,
+    state: &AppState,
+    task_id: &str,
+    input_ref: &str,
+) -> Result<(), String> {
+    let params = json!({
+        "inputRef": input_ref,
+        "mode": "baseline",
+        "stages": ["inspect", "features", "boundary", "inference", "evidence", "verification", "behavior"],
+        "llmEnabled": false,
+        "verificationEnabled": true,
+        "behaviorEnabled": true,
+        "timeoutSeconds": 300,
+        "optionalDependencyPolicy": "degrade"
+    });
+    let messages = {
+        let mut guard = state
+            .sidecar
+            .lock()
+            .map_err(|_| "sidecar state is unavailable".to_string())?;
+        if guard.is_none() {
+            *guard = Some(SidecarClient::spawn()?);
+        }
+        let result = guard
+            .as_mut()
+            .expect("sidecar initialized")
+            .request_messages_with_id(task_id, "analyze", params);
+        if result.is_err() {
+            *guard = None;
+        }
+        result?
+    };
+
+    emit_update(
+        app,
+        TaskUpdate {
+            protocol_version: 1,
+            id: task_id.to_string(),
+            event: "progress".to_string(),
+            status: "ANALYZING".to_string(),
+            stage: "analysis".to_string(),
+            progress: 0.0,
+            message: "Sidecar analysis started".to_string(),
+            error: None,
+        },
+    );
+    for message in messages {
+        if let Some(progress) = message.get("progress").and_then(Value::as_f64) {
+            let stage = message
+                .get("stage")
+                .and_then(Value::as_str)
+                .unwrap_or("analysis");
+            emit_update(
+                app,
+                TaskUpdate {
+                    protocol_version: 1,
+                    id: task_id.to_string(),
+                    event: "progress".to_string(),
+                    status: "ANALYZING".to_string(),
+                    stage: stage.to_string(),
+                    progress: progress as f32,
+                    message: format!("Sidecar stage: {stage}"),
+                    error: None,
+                },
+            );
+        }
+        if message.get("resultRef").and_then(Value::as_str).is_some() {
+            emit_update(
+                app,
+                TaskUpdate {
+                    protocol_version: 1,
+                    id: task_id.to_string(),
+                    event: "status".to_string(),
+                    status: "COMPLETED".to_string(),
+                    stage: "completed".to_string(),
+                    progress: 1.0,
+                    message: "Sidecar analysis result is ready".to_string(),
+                    error: None,
+                },
+            );
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_analysis_result(task_id: String, state: State<'_, AppState>) -> Result<Value, String> {
+    let result_ref = {
+        let mut guard = state
+            .sidecar
+            .lock()
+            .map_err(|_| "sidecar state is unavailable".to_string())?;
+        if guard.is_none() {
+            *guard = Some(SidecarClient::spawn()?);
+        }
+        let result = guard
+            .as_mut()
+            .expect("sidecar initialized")
+            .request_result_ref(&task_id);
+        if result.is_err() {
+            *guard = None;
+        }
+        result?
+    };
+    read_controlled_result(&result_ref)
+}
+
 #[tauri::command]
 fn start_contract_spike(
     app: AppHandle,
     state: State<'_, AppState>,
     failure_mode: bool,
+    input_ref: Option<String>,
 ) -> Result<String, String> {
     let id = format!("contract-{}", state.next_id.fetch_add(1, Ordering::SeqCst));
     state
@@ -271,6 +509,28 @@ fn start_contract_spike(
     let task_state = state.inner().clone();
     let task_id = id.clone();
     tauri::async_runtime::spawn(async move {
+        if let Some(input_ref) = input_ref {
+            if let Err(error) = run_sidecar_analysis(&app, &task_state, &task_id, &input_ref) {
+                emit_update(
+                    &app,
+                    TaskUpdate {
+                        protocol_version: 1,
+                        id: task_id.clone(),
+                        event: "status".to_string(),
+                        status: "FAILED".to_string(),
+                        stage: "analysis".to_string(),
+                        progress: 0.0,
+                        message: "Sidecar analysis failed".to_string(),
+                        error: Some(TaskError {
+                            code: "sidecar_failed".to_string(),
+                            message: error,
+                        }),
+                    },
+                );
+            }
+            return;
+        }
+
         let stages = [
             (
                 "INSPECTING",
@@ -390,6 +650,73 @@ mod tests {
     };
 
     #[test]
+    fn sidecar_analyze_and_get_result_round_trip() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("course-project-sidecar-analyze-{suffix}"));
+        fs::create_dir_all(&root).expect("temp state root should be writable");
+        let sample = root.join("sample.dat");
+        fs::write(&sample, b"header\0payload").expect("sample should be writable");
+
+        let mut client = SidecarClient::spawn().expect("Python sidecar should start");
+        let registered: serde_json::Value = client
+            .request(
+                "register_input",
+                json!({"sourceRef": sample.to_string_lossy().replace('\\', "/")}),
+            )
+            .expect("register_input should return metadata");
+        let input_ref = registered["inputRef"]
+            .as_str()
+            .expect("metadata should include inputRef")
+            .to_string();
+        let task_id = format!("desktop-test-{suffix}");
+        let messages = client
+            .request_messages_with_id(
+                &task_id,
+                "analyze",
+                json!({
+                    "inputRef": input_ref,
+                    "mode": "baseline",
+                    "stages": ["inspect", "features"],
+                    "llmEnabled": false,
+                    "verificationEnabled": true,
+                    "behaviorEnabled": false,
+                    "timeoutSeconds": 30,
+                    "optionalDependencyPolicy": "degrade"
+                }),
+            )
+            .expect("analyze should return task messages and a result ref");
+        let result_ref = messages
+            .iter()
+            .find_map(|message| message.get("resultRef").and_then(|value| value.as_str()))
+            .expect("analyze should return resultRef")
+            .to_string();
+        assert!(result_ref.starts_with("tasks/"));
+        assert_eq!(
+            client
+                .request_result_ref(&task_id)
+                .expect("get_result should return ref"),
+            result_ref
+        );
+        let _ = fs::remove_dir_all(root);
+        let state_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .map(|path| {
+                path.join(".course-project-state")
+                    .join("tasks")
+                    .join(task_id)
+            });
+        if let Some(state_root) = state_root {
+            let _ = fs::remove_dir_all(state_root);
+        }
+    }
+
+    #[test]
     fn sidecar_register_inspect_and_read_range_round_trip() {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -436,6 +763,7 @@ fn main() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             start_contract_spike,
+            get_analysis_result,
             cancel_contract_spike,
             select_input,
             inspect_file,

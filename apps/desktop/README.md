@@ -17,9 +17,9 @@ The browser fallback keeps the D0 task lifecycle available, but file selection a
 2. The Rust shell forwards the canonical register_input JSONL request to the Python Sidecar.
 3. The Hex view requests at most 256 bytes per page through read_range.
 4. Use Prev/Next to move through ranges without loading the whole file.
-5. Start the contract task to inspect task progress and failure states.
+5. Start the contract task to inspect task progress and failure states. In the Tauri runtime, a registered input runs the canonical Sidecar `analyze` request; the completed task exposes a controlled `resultRef` and loads the result back into React through `get_analysis_result`.
 
-The WebView receives only controlled metadata. Rust owns the dialog and Sidecar process, while the Python Sidecar remains the authority for input identity, hashing and range reads.
+The WebView receives only controlled metadata and validated result JSON. Rust owns the dialog and Sidecar process, while the Python Sidecar remains the authority for input identity, hashing, range reads and analysis result references. Result files are resolved only beneath the configured Sidecar state directory.
 
 ## D2 result views
 

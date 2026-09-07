@@ -2,65 +2,60 @@
 
 This document defines the repository-level merge policy for `main`.
 
-## 1. Governance model
+## 1. Single merge rule
 
-Use one simple rule for every pull request:
+> **Current-version CI fully green = mergeable.**
 
-> **Right reviewer + green CI + no unresolved blocker = mergeable.**
+There is no required human approval, Code Owner approval, review-thread resolution, or `CHANGES_REQUESTED` gate.
 
-These are the only three merge gates.
+The only governance gate is CI validity for the version that would actually merge into current `main`.
 
-### Gate 1 — one valid human approval
+## 2. Blocking CI checks
 
-Require at least one approving human review.
+The blocking checks are:
 
-Reviewer selection:
-- ordinary Track-internal PR: any other team member;
-- shared-interface or cross-Track PR: Track A (`@dddd2024`);
-- Track A-authored shared/cross-Track PR: one affected Track owner.
-
-Automated Codex/GitHub review is advisory. It may identify defects, but it does not create an additional approval requirement.
-
-### Gate 2 — full green CI for the current PR version
-
-Blocking checks are:
 - `test (3.10)`;
 - `test (3.11)`;
 - `windows-integration`;
 - `merge-gate`.
 
-`merge-gate` is the aggregate check and must succeed only when all blocking jobs succeed.
+`merge-gate` is the final aggregate job and must depend on every blocking CI job. Whenever a new blocking job is introduced, it must also be added to `merge-gate.needs` in the same change.
 
-If code changes after CI, rerun/recheck CI. PR authors do not need to copy SHAs or job results into the PR description; the merge actor/agent verifies the current state immediately before merging.
+A PR may merge only when:
 
-### Gate 3 — no unresolved blocker
+1. it has no merge conflict;
+2. its current head is the version being evaluated;
+3. it is synchronized with current `main` whenever `main` changed after the last valid evaluation;
+4. all four blocking checks above have completed with `success` for that current version;
+5. no blocking job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful.
 
-Before merge:
-- no active `CHANGES_REQUESTED` review remains;
-- blocking review conversations are resolved;
-- the PR has no merge conflict.
+A green run for an older head or an outdated base is not merge evidence. If the head or relevant base changes, synchronize and rerun CI.
 
-## 2. Recommended GitHub `main` ruleset
+## 3. Required GitHub `main` ruleset
 
-Configure `main` with the smallest settings needed to enforce the three gates:
+Target configuration:
 
 - require a pull request before merging;
-- require at least one approving review;
-- dismiss stale approvals when new commits are pushed;
-- require conversation resolution before merge;
+- **required approving reviews: 0**;
+- **Code Owner review: disabled**;
+- **review-thread resolution: disabled**;
+- **extra approval for unattributed changes: disabled**;
+- do not make `CHANGES_REQUESTED` a merge gate;
 - require these status checks:
   - `test (3.10)`;
   - `test (3.11)`;
   - `windows-integration`;
   - `merge-gate`;
-- block force pushes;
-- block branch deletion.
+- require the tested branch/merge result to be up to date with `main` when GitHub exposes that option;
+- block force pushes/non-fast-forward updates;
+- block branch deletion;
+- no bypass actors during normal development.
 
-A separate Code Owner approval is **not** required by default. Reviewer ownership is selected according to Gate 1 above. This keeps ordinary PRs lightweight while still routing shared-interface changes through Track A.
+The pull-request requirement is retained so task-sized branches and CI remain visible and attributable; it does **not** imply a review requirement.
 
-Do not enable a required check name until that check has emitted successfully on `main`.
+`.github/CODEOWNERS` is not needed under this policy because ownership lives in `AGENTS.md` and is not an approval mechanism.
 
-## 3. CI platform baseline
+## 4. CI platform baseline
 
 CI has three layers:
 
@@ -70,22 +65,32 @@ CI has three layers:
 
 A signed/package installer build is a release/demo gate, not a requirement for every PR.
 
-## 4. Merge behavior
+## 5. Merge behavior
 
 Preferred method: **squash merge**.
 
-Immediately before merge, the merge actor/agent checks the three gates. Exact commit/head synchronization is an implementation detail of that check, not a manual task for each author.
+Immediately before merge, the human or AI merge actor fresh-reads the PR head/base state and the blocking CI results. No manual review-state check is required.
 
-If `main` changes and the PR must be synchronized to obtain valid CI or remove a conflict, update the branch and rerun CI. Never rely on a green run from a previous code version.
+PR authors do not need to copy SHAs or job results into PR descriptions. Exact-head/base validity is handled by the merge actor/agent.
 
-## 5. Permissions and secrets
+## 6. Permissions and secrets
 
-All four collaborators may create branches and PRs, but ownership boundaries in `AGENTS.md` still apply.
+All four collaborators may create branches and PRs. Ownership boundaries in `AGENTS.md` define responsibility but do not add merge approvals.
 
 Baseline CI requires no repository secret. Real model credentials remain local or in an approved secret store. Never expose credentials through fixtures, logs, screenshots, Actions output or demo recordings.
 
-## 6. Current server-truth note
+## 7. Current server-truth gap
 
-As of 2026-09-07, `main-protection` is active and already enforces a PR, one approval, stale-approval dismissal, review-thread resolution, deletion blocking and non-fast-forward blocking.
+Server truth checked on 2026-09-07: ruleset `main-protection` is active, targets the default branch, has no bypass actors, blocks deletion/non-fast-forward updates, but currently still requires **one approval** and **review-thread resolution**, and does **not** yet require the four CI status checks.
 
-The remaining repository-settings task is to add the four required CI checks after they have emitted successfully on `main`. Code Owner review no longer needs to be enabled for the simplified governance model.
+Therefore the server configuration is not yet aligned with this CI-only policy. Required manual ruleset correction:
+
+1. set required approving reviews to `0`;
+2. disable review-thread resolution;
+3. keep Code Owner review disabled;
+4. disable extra approval for unattributed changes if the UI exposes it;
+5. add the four required status checks;
+6. enable up-to-date/strict status checks if available;
+7. keep deletion/non-fast-forward protection and no bypass actors.
+
+Until that server change is made, GitHub itself may continue blocking merges for obsolete review reasons even when CI is green.

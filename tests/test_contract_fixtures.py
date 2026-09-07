@@ -16,6 +16,10 @@ CASES = [
     ("sidecar-message.schema.json", "sidecar-progress.json"),
     ("sidecar-message.schema.json", "sidecar-result.json"),
     ("sidecar-message.schema.json", "sidecar-error.json"),
+    ("sidecar-message.schema.json", "sidecar-register-input-result.json"),
+    ("sidecar-message.schema.json", "sidecar-inspect-result.json"),
+    ("sidecar-message.schema.json", "sidecar-read-range-result.json"),
+    ("sidecar-message.schema.json", "sidecar-task-status.json"),
     ("analysis-result.schema.json", "analysis-result.json"),
     ("agent-response.schema.json", "agent-response.json"),
 ]
@@ -79,6 +83,19 @@ def test_sidecar_rejects_unknown_method_and_config_keys() -> None:
 
     assert list(validator.iter_errors(unknown_method))
     assert list(validator.iter_errors(drifted_config))
+
+
+def test_sidecar_status_payloads_are_stage_specific() -> None:
+    schema = load_json(CONTRACTS / "sidecar-message.schema.json")
+    validator = Draft202012Validator(schema)
+    wrong_payload = {
+        "protocolVersion": 1,
+        "id": "bad-range-001",
+        "event": "status",
+        "stage": "range",
+        "data": {"inputRef": "input-1"},
+    }
+    assert list(validator.iter_errors(wrong_payload))
 
 
 def test_analysis_result_evidence_references_resolve() -> None:

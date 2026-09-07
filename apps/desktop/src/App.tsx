@@ -4,6 +4,7 @@ import { demoAnalysisResult } from "./fixtures/demoAnalysisResult";
 import type { AnalysisViewName, ByteLocation, FindingReview, AnalysisResult } from "./analysisContracts";
 import {
   cancelTask,
+  getAnalysisResult,
   inspectInput,
   isDesktopRuntime,
   readInputRange,
@@ -130,6 +131,7 @@ export function App() {
   const [inputError, setInputError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [activeView, setActiveView] = useState<AnalysisViewName>("findings");
   const [focusedLocation, setFocusedLocation] = useState<ByteLocation | null>(null);
@@ -162,6 +164,18 @@ export function App() {
       .finally(() => { if (active) setLoadingRange(false); });
     return () => { active = false; };
   }, [input, rangeOffset]);
+
+  useEffect(() => {
+    if (!taskId || update.status !== "COMPLETED" || !isDesktopRuntime()) return;
+    let active = true;
+    setAnalysisError(null);
+    void getAnalysisResult(taskId)
+      .then((next) => { if (active) setAnalysisResult(next); })
+      .catch((error: unknown) => {
+        if (active) setAnalysisError(error instanceof Error ? error.message : String(error));
+      });
+    return () => { active = false; };
+  }, [taskId, update.status]);
 
   useEffect(() => {
     if (!input) return;
@@ -197,8 +211,11 @@ export function App() {
   }
 
   async function runSpike() {
-    setUpdate({ ...initialUpdate, message: "Starting contract spike." });
-    setTaskId(await startTask(failureMode));
+    setAnalysisResult(null);
+    setAnalysisError(null);
+    setFindingReviews({});
+    setUpdate({ ...initialUpdate, message: input ? "Starting Sidecar analysis." : "Starting contract spike." });
+    setTaskId(await startTask(failureMode, input?.inputRef));
   }
 
   function loadFixture() {
@@ -304,6 +321,7 @@ export function App() {
           <section className="overview-panel">
             <div className="subheading"><h3>Overview</h3><span>deterministic scan</span></div>
             {overviewError && <p className="error">{overviewError}</p>}
+            {analysisError && <p className="error">Result load failed: {analysisError}</p>}
             {!input && <p className="range-state">Select an input to calculate byte-level statistics.</p>}
             {input && overview && (
               <dl className="overview-grid">
@@ -318,7 +336,7 @@ export function App() {
           </section>
           <section className="result-panel">
             <div className="subheading">
-              <div><h3>Analysis result</h3><span>{analysisResult ? analysisResult.status + " / fixture preview" : "awaiting result"}</span></div>
+              <div><h3>Analysis result</h3><span>{analysisResult ? (isDesktopRuntime() ? analysisResult.status + " / Sidecar result" : analysisResult.status + " / fixture preview") : update.status === "COMPLETED" ? "loading result" : "awaiting result"}</span></div>
               <div className="result-actions">
                 <button className="secondary compact" onClick={loadFixture}>Load synthetic fixture</button>
                 <button className="secondary compact" disabled={!analysisResult} onClick={exportReview}>Export review JSON</button>

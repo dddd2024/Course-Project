@@ -73,7 +73,9 @@ Do not depend directly on Track D's Netzob, BinaryInferno, NFStream, Scapy or ot
 
 - deterministic packet/PRE producer internals in Track D;
 - desktop UI/Tauri code in Track B;
-- shared contracts/sidecar/CI without Track A review.
+- shared contracts/sidecar/CI without following the shared-contract migration/tests in `AGENTS.md`.
+
+Ownership limits implementation responsibility; it does not create a human approval gate.
 
 ## First implementation sequence
 
@@ -86,4 +88,4 @@ Do not depend directly on Track D's Netzob, BinaryInferno, NFStream, Scapy or ot
 
 ## Completion standard
 
-A research feature is complete only when it has deterministic tests or explicitly identified controlled evaluation evidence, preserves provenance, reports failures/uncertainty explicitly, and contributes evidence to a baseline or ablation rather than existing only as an architectural claim.
+A research feature is complete only when it has deterministic tests or explicitly identified controlled evaluation evidence, preserves provenance, reports failures/uncertainty explicitly, contributes evidence to a baseline or ablation rather than existing only as an architectural claim, and the current-version CI is fully green.

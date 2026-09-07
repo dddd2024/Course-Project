@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "id": "task-demo-001",
+  "error": {
+    "code": "dependency_unavailable",
+    "message": "Optional analyzer is not available in this environment.",
+    "details": {
+      "dependency": "netzob"
+    }
+  }
+}

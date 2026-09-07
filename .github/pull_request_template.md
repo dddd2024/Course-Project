@@ -57,6 +57,18 @@ For research/experiment PRs include git SHA, data identifier/hash, ground-truth 
 
 <!-- What is not solved yet? What may break? Which outputs remain UNCERTAIN? -->
 
+## Merge Gate Evidence
+
+<!-- Fill this from the latest PR head immediately before merge. Older-head CI does not count. -->
+
+- Head SHA checked:
+- [ ] `test (3.10)` = success
+- [ ] `test (3.11)` = success
+- [ ] `windows-integration` = success
+- [ ] `merge-gate` = success
+- [ ] No newer commit was pushed after those checks
+- [ ] Required reviews / conversations are satisfied
+
 ## Checklist
 
 - [ ] Started from current `main` and follows `AGENTS.md` / owned Track scope
@@ -66,5 +78,6 @@ For research/experiment PRs include git SHA, data identifier/hash, ground-truth 
 - [ ] LLM-derived protocol claims are not marked accepted without verifier evidence
 - [ ] Optional dependencies fail clearly instead of crashing unrelated pipeline stages
 - [ ] Documentation updated for user-visible behavior, environment, dependencies, or shared contracts
-- [ ] CI is green
+- [ ] All blocking CI jobs are complete and green for the current head SHA
+- [ ] `merge-gate` is green for the current head SHA
 - [ ] Another team member can reproduce the main result when this PR claims integration/demo readiness

@@ -20,7 +20,7 @@ from typing import Literal
 
 from course_project.inference.alignment import (
     ColumnKind,
-    MessageFamily,
+    FamilyProfile,
     align_family,
 )
 from course_project.inference.clustering import cluster_messages
@@ -83,7 +83,7 @@ def infer_fields(
 
 def _family_field_candidates(
     cluster_id: int,
-    family: MessageFamily,
+    family: FamilyProfile,
     messages: list[bytes],
     packets: list[PacketCandidate],
 ) -> list[FieldHypothesis]:
@@ -264,7 +264,7 @@ def _cross_family_candidates(
 
 
 def _length_candidates(
-    family: MessageFamily,
+    family: FamilyProfile,
     messages: list[bytes],
     add: Callable[..., None],
 ) -> list[tuple[int, int, float]]:
@@ -328,7 +328,7 @@ def _length_candidates(
 
 
 def _sequence_candidates(
-    family: MessageFamily,
+    family: FamilyProfile,
     messages: list[bytes],
     add: Callable[..., None],
 ) -> None:
@@ -365,7 +365,7 @@ def _sequence_candidates(
 
 
 def _timestamp_candidates(
-    family: MessageFamily,
+    family: FamilyProfile,
     messages: list[bytes],
     add: Callable[..., None],
 ) -> None:
@@ -406,7 +406,7 @@ def _timestamp_candidates(
 
 
 def _starts_or_ends_on_constant(
-    family: MessageFamily, offset: int, size: int
+    family: FamilyProfile, offset: int, size: int
 ) -> bool:
     """True when a numeric reading is padded by constant columns.
 
@@ -420,7 +420,7 @@ def _starts_or_ends_on_constant(
     return False
 
 
-def _region_kind(family: MessageFamily, offset: int) -> ColumnKind | None:
+def _region_kind(family: FamilyProfile, offset: int) -> ColumnKind | None:
     if 0 <= offset < len(family.regions):
         return family.regions[offset].kind
     return None
@@ -436,7 +436,7 @@ def _read_values(
     return values
 
 
-def _kind_runs(family: MessageFamily, kind: ColumnKind) -> list[tuple[int, int]]:
+def _kind_runs(family: FamilyProfile, kind: ColumnKind) -> list[tuple[int, int]]:
     """Contiguous ``(start_offset, length)`` runs of regions with the given kind."""
     runs: list[tuple[int, int]] = []
     start: int | None = None

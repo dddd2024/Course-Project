@@ -19,8 +19,12 @@ _ENUM_MAX_CARDINALITY = 8
 
 
 @dataclass(frozen=True, slots=True)
-class AlignmentRegion:
-    """Column profile at one byte offset across the aligned messages."""
+class ColumnProfile:
+    """Column profile at one byte offset across the aligned messages.
+
+    Internal Track D type. The public D->C boundary converts these into the
+    frozen ``models.AlignmentRegion`` DTOs (see ``inference.public``).
+    """
 
     offset: int
     kind: ColumnKind
@@ -29,18 +33,22 @@ class AlignmentRegion:
 
 
 @dataclass(frozen=True, slots=True)
-class MessageFamily:
-    """Cluster alignment summary: stable/variable regions and length range."""
+class FamilyProfile:
+    """Cluster alignment summary: stable/variable regions and length range.
+
+    Internal Track D type. Not to be confused with the frozen
+    ``models.MessageFamily`` DTO; the public boundary maps profiles to DTOs.
+    """
 
     cluster_id: int
     message_count: int
     min_length: int
     max_length: int
-    regions: tuple[AlignmentRegion, ...]
+    regions: tuple[ColumnProfile, ...]
     has_variable_tail: bool
 
 
-def align_family(messages: list[bytes], *, cluster_id: int = 0) -> MessageFamily:
+def align_family(messages: list[bytes], *, cluster_id: int = 0) -> FamilyProfile:
     """Align the messages of one family column by column."""
     if not messages:
         raise ValueError("cannot align an empty family")
@@ -57,14 +65,14 @@ def align_family(messages: list[bytes], *, cluster_id: int = 0) -> MessageFamily
         else:
             kind = "variable"
         regions.append(
-            AlignmentRegion(
+            ColumnProfile(
                 offset=offset,
                 kind=kind,
                 cardinality=cardinality,
                 distinct_values=tuple(values),
             )
         )
-    return MessageFamily(
+    return FamilyProfile(
         cluster_id=cluster_id,
         message_count=len(messages),
         min_length=min_len,

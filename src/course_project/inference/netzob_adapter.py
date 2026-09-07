@@ -1,8 +1,8 @@
 """Netzob PRE baseline adapter (Track D).
 
 Netzob is an optional third-party baseline backend: its alignment/split output
-is converted at this adapter boundary into project-native
-:class:`FieldHypothesis` candidates, and nothing else in the codebase imports
+is converted at this adapter boundary into pre-semantic
+:class:`FieldCandidate` DTOs, and nothing else in the codebase imports
 Netzob. When the library is missing, callers get an explicit
 ``dependency_unavailable`` result instead of a crash (see
 ``docs/architecture.md`` section 7 and ``docs/open-source-stack.md``).
@@ -23,7 +23,7 @@ from importlib.util import find_spec
 from typing import Literal
 
 from course_project.io.records import ByteStream
-from course_project.models import FieldHypothesis, PacketCandidate
+from course_project.models import FieldCandidate, PacketCandidate
 
 _ENUM_MAX_CARDINALITY = 8
 
@@ -36,7 +36,7 @@ class PREBaselineResult:
     status: Literal["ok", "unavailable", "failed"]
     error_category: str | None = None
     detail: str | None = None
-    field_hypotheses: tuple[FieldHypothesis, ...] = ()
+    field_candidates: tuple[FieldCandidate, ...] = ()
 
 
 def is_netzob_available() -> bool:
@@ -79,7 +79,7 @@ def run_netzob_baseline(
 
     try:
         per_message_segments = _call_netzob_split(messages)
-        hypotheses = convert_field_segments(
+        candidates = convert_field_segments(
             messages,
             aligned_packets,
             per_message_segments,
@@ -96,7 +96,7 @@ def run_netzob_baseline(
             detail=f"{type(exc).__name__}: {exc}",
         )
     return PREBaselineResult(
-        backend="netzob", status="ok", field_hypotheses=tuple(hypotheses)
+        backend="netzob", status="ok", field_candidates=tuple(candidates)
     )
 
 
@@ -107,19 +107,20 @@ def convert_field_segments(
     *,
     backend: str = "netzob",
     min_support: int = 2,
-) -> list[FieldHypothesis]:
-    """Convert third-party per-message field segments into project-native
-    :class:`FieldHypothesis` candidates.
+) -> list[FieldCandidate]:
+    """Convert third-party per-message field segments into pre-semantic
+    :class:`FieldCandidate` DTOs.
 
     ``per_message_segments[i]`` lists the field byte-segments the backend
     produced for ``messages[i]`` (e.g. Netzob ``getCells`` rows). Field ``k``
     is matched by column index; messages whose row lacks column ``k`` reduce
     that candidate's support (index misalignment for skipped columns is a
-    documented V1 limitation, visible via ``evidence["support"]``).
+    documented V1 limitation, visible via ``attributes["support"]``).
 
-    ``offset``/``size`` are relative to the message start;
-    ``evidence["sample_offsets"]`` carries absolute stream positions and
-    ``evidence["backend"]`` tags the provenance for Track C.
+    Heuristic labels go into ``candidate_types`` — semantic promotion is
+    Track C's job. ``offset``/``size`` are relative to the message start;
+    ``attributes["sample_offsets"]`` carries absolute stream positions and
+    ``attributes["backend"]`` tags the provenance.
     """
     if min_support < 1:
         raise ValueError("min_support must be >= 1")
@@ -132,7 +133,7 @@ def convert_field_segments(
         raise ValueError("packets and messages must have the same length")
 
     max_fields = max((len(row) for row in per_message_segments), default=0)
-    hypotheses: list[FieldHypothesis] = []
+    candidates: list[FieldCandidate] = []
     for field_index in range(max_fields):
         contributors = [
             (i, row[field_index])
@@ -152,7 +153,7 @@ def convert_field_segments(
         if len(sizes) > 1:
             semantic = "unknown"
             size: int | None = None
-            confidence = 0.5
+            score = 0.5
             extra = {"variable_sizes": sorted(sizes)}
         else:
             size = sizes.pop()
@@ -161,31 +162,33 @@ def convert_field_segments(
                 semantic = (
                     "magic" if (field_index == 0 and offset == 0) else "constant"
                 )
-                confidence = 1.0
+                score = 1.0
                 extra = {"value": values[0].hex()}
             elif cardinality <= _ENUM_MAX_CARDINALITY:
                 semantic = "enum"
-                confidence = 1.0 - (cardinality - 1) / 16.0
+                score = 1.0 - (cardinality - 1) / 16.0
                 extra = {
                     "cardinality": cardinality,
                     "distinct_values": [value.hex() for value in sorted(set(values))],
                 }
             else:
                 semantic = "unknown"
-                confidence = 0.5
+                score = 0.5
                 extra = {"cardinality": cardinality}
 
-        hypotheses.append(
-            FieldHypothesis(
-                field_id=(
+        candidates.append(
+            FieldCandidate(
+                candidate_id=(
                     f"{backend}-f{field_index}-{offset}-"
                     f"{size if size is not None else 'v'}"
                 ),
+                family_id=None,
                 offset=offset,
                 size=size,
-                semantic_type=semantic,
-                confidence=round(confidence, 6),
-                evidence={
+                candidate_types=(semantic,),
+                endian=None,
+                score=round(score, 6),
+                attributes={
                     "backend": backend,
                     "field_index": field_index,
                     "support": len(contributors),
@@ -199,7 +202,7 @@ def convert_field_segments(
                 },
             )
         )
-    return hypotheses
+    return candidates
 
 
 def _call_netzob_split(messages: list[bytes]) -> list[list[bytes]]:

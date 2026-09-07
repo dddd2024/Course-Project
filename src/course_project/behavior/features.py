@@ -16,7 +16,7 @@ from statistics import mean, pstdev
 from typing import Any
 
 from course_project.behavior.records import FlowPacket, normalize_direction
-from course_project.models import PacketCandidate
+from course_project.models import BehaviorFeatures, PacketCandidate
 
 
 def from_packet_candidates(packets: list[PacketCandidate]) -> list[FlowPacket]:
@@ -29,6 +29,29 @@ def from_packet_candidates(packets: list[PacketCandidate]) -> list[FlowPacket]:
         )
         for packet in packets
     ]
+
+
+def extract_behavior_features(
+    packets: list[FlowPacket], *, flow_id: str = "flow-0"
+) -> BehaviorFeatures:
+    """Public D->C boundary: frozen BehaviorFeatures DTO.
+
+    ``values`` carries the scalar feature vector consumed by the rule
+    classifier and by Track C's evaluation path; sequence-shaped features
+    (packet sizes, directions, bursts) stay in the internal
+    ``extract_features`` record.
+    """
+    features = extract_features(packets, flow_id=flow_id)
+    values = {
+        key: value
+        for key, value in features.items()
+        if isinstance(value, (int, float, str, bool)) or value is None
+    }
+    return BehaviorFeatures(
+        flow_id=flow_id,
+        values=values,
+        sample_ids=tuple(f"{flow_id}-p{i}" for i in range(len(packets))),
+    )
 
 
 def extract_features(

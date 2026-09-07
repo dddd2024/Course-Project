@@ -10,6 +10,7 @@ from course_project.boundary.detector import (
     detect_boundaries,
     generate_candidate_positions,
 )
+from course_project.boundary.messages import to_message_candidates
 from course_project.boundary.scoring import (
     entropy_transition_score,
     field_stability_score,
@@ -25,5 +26,6 @@ __all__ = [
     "generate_candidate_positions",
     "length_consistency_score",
     "prefix_repeat_score",
+    "to_message_candidates",
     "weighted_score",
 ]

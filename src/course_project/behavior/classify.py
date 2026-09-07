@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from course_project.behavior.features import extract_features
+from course_project.behavior.features import extract_behavior_features
 from course_project.behavior.records import FlowPacket
 from course_project.models import BehaviorPrediction
 
@@ -25,14 +25,14 @@ _CONFIDENCE_FLOOR = 0.5
 def predict_behavior(
     packets: list[FlowPacket], *, flow_id: str = "flow-0"
 ) -> BehaviorPrediction:
-    """Extract flow features and apply the deterministic rule classifier."""
-    features = extract_features(packets, flow_id=flow_id)
-    label, confidence = classify(features)
+    """Extract frozen BehaviorFeatures and apply the deterministic rule classifier."""
+    behavior_features = extract_behavior_features(packets, flow_id=flow_id)
+    label, confidence = classify(behavior_features.values)
     return BehaviorPrediction(
         flow_id=flow_id,
         label=label,
         confidence=round(confidence, 6),
-        features=features,
+        features=dict(behavior_features.values),
     )
 
 

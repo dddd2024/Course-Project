@@ -6,9 +6,9 @@ from course_project.boundary import detect_boundaries
 from course_project.inference import (
     align_family,
     cluster_messages,
-    infer_fields,
     message_similarity,
 )
+from course_project.inference.fields import infer_fields
 from course_project.io import load_raw
 from course_project.models import PacketCandidate
 

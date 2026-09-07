@@ -53,9 +53,9 @@ from pathlib import Path
 
 from course_project.behavior import FlowPacket, predict_behavior
 from course_project.boundary import detect_boundaries
-from course_project.inference import infer_fields
+from course_project.inference import infer_field_candidates
 from course_project.io import load_dat
-from course_project.models import FieldHypothesis, PacketCandidate
+from course_project.models import FieldCandidate, PacketCandidate
 
 RUNNER_NAME = "examples/run_trackd_baseline.py"
 
@@ -75,10 +75,10 @@ def _boundary_metrics(gt: dict, packets: list[PacketCandidate]) -> dict:
     }
 
 
-def _hypothesis_matches(hypothesis: FieldHypothesis, field: dict) -> bool:
-    semantic = hypothesis.semantic_type
-    offset = hypothesis.offset
-    span_end = offset + (hypothesis.size if hypothesis.size is not None else 1)
+def _candidate_matches(candidate: FieldCandidate, field: dict) -> bool:
+    semantic = candidate.candidate_types[0] if candidate.candidate_types else "unknown"
+    offset = candidate.offset
+    span_end = offset + (candidate.size if candidate.size is not None else 1)
     f_start = field["offset"]
     f_semantic = field["semantic_type"]
 
@@ -89,7 +89,7 @@ def _hypothesis_matches(hypothesis: FieldHypothesis, field: dict) -> bool:
     if semantic == "length":
         if f_semantic != "length" or offset != f_start:
             return False
-        return not (field.get("endian") and hypothesis.endian != field["endian"])
+        return not (field.get("endian") and candidate.endian != field["endian"])
     if semantic == "magic":
         if f_semantic == "magic":
             return offset == f_start
@@ -105,27 +105,27 @@ def _hypothesis_matches(hypothesis: FieldHypothesis, field: dict) -> bool:
     return False
 
 
-def _field_metrics(gt: dict, hypotheses: list[FieldHypothesis]) -> dict:
+def _field_metrics(gt: dict, candidates: list[FieldCandidate]) -> dict:
     total_fields = len(gt["schema"])
     matched = sum(
         1
         for field in gt["schema"]
-        if any(_hypothesis_matches(h, field) for h in hypotheses)
+        if any(_candidate_matches(c, field) for c in candidates)
     )
     false_count = sum(
         1
-        for h in hypotheses
-        if not any(_hypothesis_matches(h, field) for field in gt["schema"])
+        for c in candidates
+        if not any(_candidate_matches(c, field) for field in gt["schema"])
     )
-    total_hypotheses = len(hypotheses)
+    total_candidates = len(candidates)
     return {
         "field_semantic_accuracy": round(matched / total_fields, 6)
         if total_fields
         else 0.0,
-        "false_hypothesis_rate": round(false_count / total_hypotheses, 6)
-        if total_hypotheses
+        "false_hypothesis_rate": round(false_count / total_candidates, 6)
+        if total_candidates
         else 0.0,
-        "hypothesis_count": total_hypotheses,
+        "candidate_count": total_candidates,
     }
 
 
@@ -138,9 +138,9 @@ def _run_analysis(data_path: Path, gt: dict) -> tuple[dict, float]:
     stream = load_dat(data_path, source_id=gt["dataset_id"])
     t0 = time.perf_counter()
     packets = detect_boundaries(stream)
-    hypotheses = infer_fields(stream, packets)
+    candidates = infer_field_candidates(stream, packets)
     elapsed = time.perf_counter() - t0
-    metrics = {**_boundary_metrics(gt, packets), **_field_metrics(gt, hypotheses)}
+    metrics = {**_boundary_metrics(gt, packets), **_field_metrics(gt, candidates)}
     return metrics, elapsed
 
 

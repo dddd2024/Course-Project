@@ -39,6 +39,7 @@ Thumbs.db
 *.pid
 *.sqlite
 *.sqlite3
+.course-project-state/
 
 # Secrets and local configuration
 .env

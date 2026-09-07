@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "id": "range-demo-001",
+  "event": "status",
+  "stage": "range",
+  "data": {
+    "inputRef": "input-0123456789abcdef",
+    "offset": 0,
+    "requestedLength": 4,
+    "actualLength": 4,
+    "encoding": "base64",
+    "bytes": "AAECAw==",
+    "eof": false
+  }
+}

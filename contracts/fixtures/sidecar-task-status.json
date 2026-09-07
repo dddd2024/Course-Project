@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "id": "task-demo-001",
+  "event": "status",
+  "stage": "task_status",
+  "data": {
+    "taskId": "task-demo-001",
+    "status": "PARTIAL",
+    "resultRef": "tasks/task-demo-001/analysis-result.json"
+  }
+}

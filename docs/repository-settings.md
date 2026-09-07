@@ -73,6 +73,8 @@ Immediately before merge, the human or AI merge actor fresh-reads the PR head/ba
 
 PR authors do not need to copy SHAs or job results into PR descriptions. Exact-head/base validity is handled by the merge actor/agent.
 
+When the CI-only conditions are satisfied, the merge actor should merge promptly. A green PR must not remain open merely waiting for a reviewer, owner acknowledgement, or discussion resolution.
+
 ## 6. Permissions and secrets
 
 All four collaborators may create branches and PRs. Ownership boundaries in `AGENTS.md` define responsibility but do not add merge approvals.
@@ -93,4 +95,4 @@ Therefore the server configuration is not yet aligned with this CI-only policy. 
 6. enable up-to-date/strict status checks if available;
 7. keep deletion/non-fast-forward protection and no bypass actors.
 
-Until that server change is made, GitHub itself may continue blocking merges for obsolete review reasons even when CI is green.
+Until that server change is made, GitHub itself may continue blocking merges for obsolete review reasons even when CI is green. This is the only remaining governance mismatch; repository files and CI policy must not reintroduce a human-review requirement to compensate for it.

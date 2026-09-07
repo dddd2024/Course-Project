@@ -391,9 +391,8 @@ dependencies = [
 name = "course-project-desktop"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "serde",
- "sha2",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

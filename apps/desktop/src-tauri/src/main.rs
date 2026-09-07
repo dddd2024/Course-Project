@@ -1,10 +1,10 @@
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use serde::Serialize;
-use sha2::{Digest, Sha256};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    fs::File,
-    io::{Read, Seek, SeekFrom},
+    io::{BufRead, BufReader, Write},
+    path::Path,
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Mutex,
@@ -12,13 +12,14 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_dialog::DialogExt;
 
 const TASK_EVENT: &str = "task-update";
 
 #[derive(Clone)]
 struct AppState {
     tasks: Arc<Mutex<HashMap<String, bool>>>,
-    inputs: Arc<Mutex<HashMap<String, RegisteredInput>>>,
+    sidecar: Arc<Mutex<Option<SidecarClient>>>,
     next_id: Arc<AtomicU64>,
 }
 
@@ -26,7 +27,7 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             tasks: Arc::new(Mutex::new(HashMap::new())),
-            inputs: Arc::new(Mutex::new(HashMap::new())),
+            sidecar: Arc::new(Mutex::new(None)),
             next_id: Arc::new(AtomicU64::new(1)),
         }
     }
@@ -53,7 +54,7 @@ struct TaskUpdate {
     error: Option<TaskError>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct InputMetadata {
     input_ref: String,
@@ -65,7 +66,7 @@ struct InputMetadata {
     timestamp_available: bool,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RangeData {
     input_ref: String,
@@ -77,91 +78,160 @@ struct RangeData {
     eof: bool,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InputOverview {
-    input_ref: String,
-    size_bytes: u64,
-    entropy: f64,
-    printable_ratio: f64,
-    distinct_byte_count: u64,
-    zero_byte_ratio: f64,
-    string_count: u64,
-    longest_string: u64,
+struct SidecarClient {
+    _child: Child,
+    stdin: ChildStdin,
+    stdout: BufReader<ChildStdout>,
+    next_id: u64,
 }
 
-#[derive(Clone)]
-struct RegisteredInput {
-    metadata: InputMetadata,
-    path: String,
+impl Drop for SidecarClient {
+    fn drop(&mut self) {
+        let _ = self._child.kill();
+        let _ = self._child.wait();
+    }
 }
 
-fn emit_update(app: &AppHandle, update: TaskUpdate) {
-    let _ = app.emit(TASK_EVENT, update);
+impl SidecarClient {
+    fn spawn() -> Result<Self, String> {
+        let program = std::env::var("COURSE_PROJECT_SIDECAR_COMMAND")
+            .unwrap_or_else(|_| "python".to_string());
+        let state_dir = std::env::var("COURSE_PROJECT_STATE_DIR")
+            .unwrap_or_else(|_| ".course-project-state".to_string());
+        let mut command = Command::new(program);
+        let mut python_paths = vec![Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(3)
+            .unwrap_or_else(|| Path::new("."))
+            .join("src")];
+        if let Some(existing) = std::env::var_os("PYTHONPATH") {
+            python_paths.extend(std::env::split_paths(&existing));
+        }
+        let python_path = std::env::join_paths(python_paths)
+            .map_err(|error| format!("cannot prepare sidecar PYTHONPATH: {error}"))?;
+        let mut child = command
+            .args(["-m", "course_project.sidecar", "--state-dir", &state_dir])
+            .env("PYTHONPATH", python_path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|error| format!("cannot start Python sidecar: {error}"))?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "sidecar stdin unavailable".to_string())?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| "sidecar stdout unavailable".to_string())?;
+        Ok(Self {
+            _child: child,
+            stdin,
+            stdout: BufReader::new(stdout),
+            next_id: 1,
+        })
+    }
+
+    fn request<T: DeserializeOwned>(&mut self, method: &str, params: Value) -> Result<T, String> {
+        let id = format!("desktop-{}", self.next_id);
+        self.next_id += 1;
+        let message = json!({"protocolVersion": 1, "id": id, "method": method, "params": params});
+        serde_json::to_writer(&mut self.stdin, &message)
+            .map_err(|error| format!("cannot encode sidecar request: {error}"))?;
+        self.stdin
+            .write_all(b"\n")
+            .map_err(|error| format!("cannot write sidecar request: {error}"))?;
+        self.stdin
+            .flush()
+            .map_err(|error| format!("cannot flush sidecar request: {error}"))?;
+
+        let mut line = String::new();
+        let count = self
+            .stdout
+            .read_line(&mut line)
+            .map_err(|error| format!("cannot read sidecar response: {error}"))?;
+        if count == 0 {
+            return Err("Python sidecar exited without a response".to_string());
+        }
+        let response: Value = serde_json::from_str(&line)
+            .map_err(|error| format!("invalid sidecar JSON response: {error}"))?;
+        if let Some(error) = response.get("error") {
+            let code = error
+                .get("code")
+                .and_then(Value::as_str)
+                .unwrap_or("sidecar_failed");
+            let message = error
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("sidecar request failed");
+            return Err(format!("{code}: {message}"));
+        }
+        let data = response
+            .get("data")
+            .cloned()
+            .ok_or_else(|| "sidecar response has no data".to_string())?;
+        serde_json::from_value(data)
+            .map_err(|error| format!("invalid sidecar response data: {error}"))
+    }
+}
+
+fn sidecar_request<T: DeserializeOwned>(
+    state: &State<'_, AppState>,
+    method: &str,
+    params: Value,
+) -> Result<T, String> {
+    let mut guard = state
+        .sidecar
+        .lock()
+        .map_err(|_| "sidecar state is unavailable".to_string())?;
+    if guard.is_none() {
+        *guard = Some(SidecarClient::spawn()?);
+    }
+    let result = guard
+        .as_mut()
+        .expect("sidecar initialized")
+        .request(method, params);
+    if result.is_err() {
+        *guard = None;
+    }
+    result
 }
 
 #[tauri::command]
-fn register_input(path: String, state: State<'_, AppState>) -> Result<InputMetadata, String> {
-    let file_path = std::path::PathBuf::from(&path);
-    let metadata =
-        std::fs::metadata(&file_path).map_err(|error| format!("cannot read input: {error}"))?;
-    if !metadata.is_file() {
-        return Err("input path is not a regular file".to_string());
-    }
-
-    let mut file = File::open(&file_path).map_err(|error| format!("cannot open input: {error}"))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let count = file
-            .read(&mut buffer)
-            .map_err(|error| format!("cannot hash input: {error}"))?;
-        if count == 0 {
-            break;
-        }
-        hasher.update(&buffer[..count]);
-    }
-
-    let sha256 = format!("{:x}", hasher.finalize());
-    let input_ref = format!("input-{}", &sha256[..16]);
-    let kind = file_path
-        .extension()
-        .and_then(|value| value.to_str())
-        .map(|value| match value.to_ascii_lowercase().as_str() {
-            "dat" => "dat",
-            "bin" => "bin",
-            "pcap" => "pcap",
-            "pcapng" => "pcapng",
-            _ => "unknown",
-        })
-        .unwrap_or("unknown")
-        .to_string();
-    let result = InputMetadata {
-        input_ref: input_ref.clone(),
-        kind,
-        size_bytes: metadata.len(),
-        sha256,
-        source_name: file_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("input")
-            .to_string(),
-        direction_available: false,
-        timestamp_available: false,
+async fn select_input(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<InputMetadata>, String> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .add_filter("Binary traffic", &["dat", "bin", "pcap", "pcapng"])
+        .set_title("Select authorized binary traffic input")
+        .pick_file(move |file| {
+            let _ = sender.send(file);
+        });
+    let selected = tauri::async_runtime::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|error| format!("file dialog failed: {error}"))?
+        .map_err(|error| format!("file dialog callback failed: {error}"))?;
+    let Some(file) = selected else {
+        return Ok(None);
     };
+    let path = file
+        .into_path()
+        .map_err(|error| format!("cannot access selected input: {error:?}"))?;
+    sidecar_request(
+        &state,
+        "register_input",
+        json!({"sourceRef": path.to_string_lossy().replace('\\', "/")}),
+    )
+    .map(Some)
+}
 
-    state
-        .inputs
-        .lock()
-        .map_err(|_| "input state is unavailable".to_string())?
-        .insert(
-            input_ref,
-            RegisteredInput {
-                metadata: result.clone(),
-                path,
-            },
-        );
-    Ok(result)
+#[tauri::command]
+fn inspect_file(input_ref: String, state: State<'_, AppState>) -> Result<InputMetadata, String> {
+    sidecar_request(&state, "inspect_file", json!({"inputRef": input_ref}))
 }
 
 #[tauri::command]
@@ -174,111 +244,15 @@ fn read_range(
     if length == 0 || length > 1_048_576 {
         return Err("length must be between 1 and 1048576 bytes".to_string());
     }
-    let input = state
-        .inputs
-        .lock()
-        .map_err(|_| "input state is unavailable".to_string())?
-        .get(&input_ref)
-        .cloned()
-        .ok_or_else(|| "unknown inputRef".to_string())?;
-    let mut file =
-        File::open(&input.path).map_err(|error| format!("cannot open input: {error}"))?;
-    file.seek(SeekFrom::Start(offset))
-        .map_err(|error| format!("cannot seek input: {error}"))?;
-    let mut bytes = vec![0_u8; length as usize];
-    let actual = file
-        .read(&mut bytes)
-        .map_err(|error| format!("cannot read input range: {error}"))?;
-    bytes.truncate(actual);
-    Ok(RangeData {
-        input_ref,
-        offset,
-        requested_length: length,
-        actual_length: actual as u64,
-        encoding: "base64".to_string(),
-        bytes: BASE64.encode(bytes),
-        eof: offset.saturating_add(actual as u64) >= input.metadata.size_bytes,
-    })
+    sidecar_request(
+        &state,
+        "read_range",
+        json!({"inputRef": input_ref, "offset": offset, "length": length}),
+    )
 }
 
-#[tauri::command]
-fn inspect_file(input_ref: String, state: State<'_, AppState>) -> Result<InputOverview, String> {
-    let input = state
-        .inputs
-        .lock()
-        .map_err(|_| "input state is unavailable".to_string())?
-        .get(&input_ref)
-        .cloned()
-        .ok_or_else(|| "unknown inputRef".to_string())?;
-    let mut file =
-        File::open(&input.path).map_err(|error| format!("cannot open input: {error}"))?;
-    let mut counts = [0_u64; 256];
-    let mut total = 0_u64;
-    let mut printable = 0_u64;
-    let mut zeroes = 0_u64;
-    let mut current_string = 0_u64;
-    let mut string_count = 0_u64;
-    let mut longest_string = 0_u64;
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let count = file
-            .read(&mut buffer)
-            .map_err(|error| format!("cannot inspect input: {error}"))?;
-        if count == 0 {
-            break;
-        }
-        for &byte in &buffer[..count] {
-            counts[byte as usize] += 1;
-            total += 1;
-            if byte == 0 {
-                zeroes += 1;
-            }
-            if byte.is_ascii_graphic() || byte == b' ' {
-                printable += 1;
-                current_string += 1;
-            } else if current_string >= 4 {
-                string_count += 1;
-                longest_string = longest_string.max(current_string);
-                current_string = 0;
-            } else {
-                current_string = 0;
-            }
-        }
-    }
-    if current_string >= 4 {
-        string_count += 1;
-        longest_string = longest_string.max(current_string);
-    }
-    let entropy = if total == 0 {
-        0.0
-    } else {
-        counts
-            .iter()
-            .filter(|&&count| count > 0)
-            .map(|&count| {
-                let probability = count as f64 / total as f64;
-                -probability * probability.log2()
-            })
-            .sum()
-    };
-    Ok(InputOverview {
-        input_ref,
-        size_bytes: total,
-        entropy,
-        printable_ratio: if total == 0 {
-            0.0
-        } else {
-            printable as f64 / total as f64
-        },
-        distinct_byte_count: counts.iter().filter(|&&count| count > 0).count() as u64,
-        zero_byte_ratio: if total == 0 {
-            0.0
-        } else {
-            zeroes as f64 / total as f64
-        },
-        string_count,
-        longest_string,
-    })
+fn emit_update(app: &AppHandle, update: TaskUpdate) {
+    let _ = app.emit(TASK_EVENT, update);
 }
 
 #[tauri::command]
@@ -406,6 +380,56 @@ fn cancel_contract_spike(id: String, state: State<'_, AppState>) -> Result<(), S
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::SidecarClient;
+    use serde_json::json;
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn sidecar_register_inspect_and_read_range_round_trip() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("course-project-sidecar-{suffix}"));
+        fs::create_dir_all(&root).expect("temp state root should be writable");
+        let sample = root.join("sample.dat");
+        fs::write(&sample, b"header\0payload").expect("sample should be writable");
+
+        let mut client = SidecarClient::spawn().expect("Python sidecar should start");
+        let registered: serde_json::Value = client
+            .request(
+                "register_input",
+                json!({"sourceRef": sample.to_string_lossy().replace('\\', "/")}),
+            )
+            .expect("register_input should return metadata");
+        let input_ref = registered
+            .get("inputRef")
+            .and_then(|value| value.as_str())
+            .expect("metadata should include inputRef")
+            .to_string();
+        let inspected: serde_json::Value = client
+            .request("inspect_file", json!({"inputRef": input_ref}))
+            .expect("inspect_file should return metadata");
+        assert_eq!(inspected["sizeBytes"], 14);
+        let range: serde_json::Value = client
+            .request(
+                "read_range",
+                json!({"inputRef": input_ref, "offset": 6, "length": 8}),
+            )
+            .expect("read_range should return bytes");
+        assert_eq!(range["actualLength"], 8);
+        assert_eq!(range["encoding"], "base64");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -413,9 +437,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_contract_spike,
             cancel_contract_spike,
-            register_input,
-            read_range,
-            inspect_file
+            select_input,
+            inspect_file,
+            read_range
         ])
         .run(tauri::generate_context!())
         .expect("error while running Evidence Workbench");

@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   cancelTask,
   inspectInput,
+  isDesktopRuntime,
   readInputRange,
   selectInput,
   startTask,
   subscribeToTaskUpdates,
   type InputMetadata,
-  type InputOverview,
   type RangeData,
   type TaskStatus,
   type TaskUpdate,
@@ -120,7 +120,7 @@ export function App() {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [failureMode, setFailureMode] = useState(false);
   const [input, setInput] = useState<InputMetadata | null>(null);
-  const [overview, setOverview] = useState<InputOverview | null>(null);
+  const [overview, setOverview] = useState<InputMetadata | null>(null);
   const [range, setRange] = useState<RangeData | null>(null);
   const [rangeOffset, setRangeOffset] = useState(0);
   const [loadingRange, setLoadingRange] = useState(false);
@@ -176,7 +176,9 @@ export function App() {
     try {
       const selected = await selectInput();
       if (!selected) {
-        setInputError("Run the Tauri desktop app to access the controlled file picker.");
+        if (!isDesktopRuntime()) {
+          setInputError("Run the Tauri desktop app to access the controlled file picker.");
+        }
         return;
       }
       setInput(selected);
@@ -259,12 +261,12 @@ export function App() {
             {!input && <p className="range-state">Select an input to calculate byte-level statistics.</p>}
             {input && overview && (
               <dl className="overview-grid">
-                <div><dt>Entropy</dt><dd>{overview.entropy.toFixed(3)} / 8.000</dd></div>
-                <div><dt>Printable</dt><dd>{(overview.printableRatio * 100).toFixed(1)}%</dd></div>
-                <div><dt>Distinct bytes</dt><dd>{overview.distinctByteCount} / 256</dd></div>
-                <div><dt>Zero bytes</dt><dd>{(overview.zeroByteRatio * 100).toFixed(1)}%</dd></div>
-                <div><dt>Strings ≥ 4</dt><dd>{overview.stringCount}</dd></div>
-                <div><dt>Longest string</dt><dd>{overview.longestString} bytes</dd></div>
+                <div><dt>Format</dt><dd>{overview.kind}</dd></div>
+                <div><dt>Size</dt><dd>{formatBytes(overview.sizeBytes)}</dd></div>
+                <div><dt>SHA-256</dt><dd>{overview.sha256.slice(0, 16)}…</dd></div>
+                <div><dt>Direction</dt><dd>{overview.directionAvailable ? "available" : "unavailable"}</dd></div>
+                <div><dt>Timestamp</dt><dd>{overview.timestampAvailable ? "available" : "unavailable"}</dd></div>
+                <div><dt>Source</dt><dd>{overview.sourceName}</dd></div>
               </dl>
             )}
           </section>

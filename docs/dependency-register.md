@@ -16,9 +16,8 @@ This register separates **candidate technology choices** from **accepted project
 | scikit-learn | behavior baseline | optional | D/C | TBD | TBD | not integrated |
 | React | desktop UI | required for desktop MVP | B | 18.3.1 (package-lock.json) | MIT | active; Vite build |
 | Tauri 2 | desktop shell | required for desktop MVP | B | 2.11.5 (Cargo.lock) | Apache-2.0 OR MIT | active; cargo check |
-| tauri-plugin-dialog | controlled file picker | required for desktop MVP | B | 2.7.3 (Cargo.lock) / 2.x JS plugin | Apache-2.0 OR MIT | active; register_input smoke path |
-| base64 | bounded Hex transport encoding | required for desktop MVP | B | 0.22.1 (Cargo.lock) | MIT OR Apache-2.0 | active; read_range response |
-| sha2 | input SHA-256 metadata | required for desktop MVP | B | 0.10.9 (Cargo.lock) | MIT OR Apache-2.0 | active; register_input hashing |
+| tauri-plugin-dialog | controlled file picker | required for desktop MVP | B | 2.7.3 (Cargo.lock) / Rust plugin | Apache-2.0 OR MIT | active; Rust-owned dialog smoke path |
+| serde_json | Rust JSONL sidecar envelope | required for desktop MVP | B | 1.0.151 (Cargo.lock) | MIT OR Apache-2.0 | active; sidecar proxy serialization |
 
 ## Acceptance gate for a new dependency
 

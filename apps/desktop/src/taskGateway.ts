@@ -1,6 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 
 export type TaskStatus = "CREATED" | "INSPECTING" | "ANALYZING" | "VERIFYING" | "COMPLETED" | "CANCELLED" | "FAILED";
 
@@ -35,17 +34,6 @@ export interface RangeData {
   eof: boolean;
 }
 
-export interface InputOverview {
-  inputRef: string;
-  sizeBytes: number;
-  entropy: number;
-  printableRatio: number;
-  distinctByteCount: number;
-  zeroByteRatio: number;
-  stringCount: number;
-  longestString: number;
-}
-
 const EVENT_NAME = "task-update";
 const hasTauriRuntime = () => "__TAURI_INTERNALS__" in window;
 const browserTimers = new Map<string, number[]>();
@@ -54,23 +42,21 @@ function dispatchBrowserUpdate(update: TaskUpdate) {
   window.dispatchEvent(new CustomEvent<TaskUpdate>(EVENT_NAME, { detail: update }));
 }
 
+export function isDesktopRuntime() {
+  return hasTauriRuntime();
+}
+
 export async function selectInput(): Promise<InputMetadata | null> {
   if (!hasTauriRuntime()) return null;
-  const selected = await open({
-    multiple: false,
-    directory: false,
-    filters: [{ name: "Binary traffic", extensions: ["dat", "bin", "pcap", "pcapng"] }],
-  });
-  const path = Array.isArray(selected) ? selected[0] : selected;
-  return path ? invoke<InputMetadata>("register_input", { path }) : null;
+  return invoke<InputMetadata | null>("select_input");
 }
 
 export async function readInputRange(inputRef: string, offset: number, length = 256): Promise<RangeData> {
   return invoke<RangeData>("read_range", { inputRef, offset, length });
 }
 
-export async function inspectInput(inputRef: string): Promise<InputOverview> {
-  return invoke<InputOverview>("inspect_file", { inputRef });
+export async function inspectInput(inputRef: string): Promise<InputMetadata> {
+  return invoke<InputMetadata>("inspect_file", { inputRef });
 }
 
 export async function startTask(failureMode: boolean): Promise<string> {

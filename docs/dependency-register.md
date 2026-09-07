@@ -12,7 +12,7 @@ This register separates **candidate technology choices** from **accepted project
 | NFStream | flow feature baseline | optional | D | TBD | TBD | not integrated |
 | Netzob | PRE/alignment baseline | optional | D | TBD | TBD | not integrated |
 | BinaryInferno | field-inference research baseline/reference | optional | D/C | TBD | TBD | not integrated |
-| Kaitai Struct | schema/parser export | optional V1/V2 backend | A | TBD | TBD | not integrated |
+| Kaitai Struct | `.ksy` schema/parser export backend | optional V1/V2 backend | A | emitted `ks-version: 0.10`; compiler version not pinned until compiler invocation lands | compiler license verification required before invocation | project-native `.ksy` exporter active; external compiler invocation not yet integrated |
 | scikit-learn | behavior baseline | optional | D/C | TBD | TBD | not integrated |
 | React | desktop UI | required when desktop scaffold lands | B | lockfile | upstream verification required | not scaffolded |
 | Tauri 2 | desktop shell | required when desktop scaffold lands | B | Cargo/package lockfiles | upstream verification required | not scaffolded |

@@ -295,7 +295,7 @@ class SidecarRuntime:
             with self._lock:
                 task.status = "FAILED"
             raise
-        except Exception as exc:  # noqa: BLE001 - third-party adapter boundary must fail closed
+        except Exception as exc:
             with self._lock:
                 task.status = "FAILED"
             raise SidecarError(

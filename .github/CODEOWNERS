@@ -15,7 +15,9 @@
 # Shared contracts / architecture
 /contracts/ @dddd2024 @sunny1ce @hinaLove1
 /docs/architecture.md @dddd2024 @hinaLove1 @sunny1ce @zhaohongjun20-creator
-/src/course_project/models.py @dddd2024 @sunny1ce
+/docs/day0-contract-freeze.md @dddd2024 @hinaLove1 @sunny1ce @zhaohongjun20-creator
+/src/course_project/models.py @dddd2024 @sunny1ce @zhaohongjun20-creator
+/tests/test_models.py @dddd2024 @sunny1ce @zhaohongjun20-creator
 
 # Startup / repository governance
 /.env.example @dddd2024 @sunny1ce
@@ -57,5 +59,6 @@
 # Documentation ownership
 /docs/team-division.md @dddd2024
 /docs/desktop-app-guide.md @hinaLove1 @dddd2024
+/docs/design-v1.md @dddd2024 @zhaohongjun20-creator @sunny1ce
 /docs/design-v2.md @sunny1ce @dddd2024
 /docs/research-roadmap.md @sunny1ce @dddd2024

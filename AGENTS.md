@@ -39,9 +39,11 @@ When instructions disagree, use this order:
 
 Agents may inspect the whole repository but should implement primarily in their Track's owned paths. Cross-Track edits should be narrow and justified by an actual shared-interface or blocking integration need.
 
+Ownership defines implementation responsibility; it is not a merge-approval mechanism.
+
 ## 4. Shared interfaces
 
-These are shared/high-risk surfaces:
+Shared/high-risk surfaces include:
 
 - `contracts/` and golden fixtures;
 - `src/course_project/models.py`;
@@ -50,7 +52,7 @@ These are shared/high-risk surfaces:
 - `.github/workflows/`;
 - root dependency/build/environment configuration.
 
-For a shared-interface change, document the old/new behavior, update producer/consumer tests and fixtures as needed, and make the change explicit in the PR. Do not silently change a frozen contract.
+For a shared-interface change, document the old/new behavior, update schemas/fixtures and producer/consumer tests as needed, and make the migration explicit in the PR. Do not silently change a frozen contract.
 
 ### Frozen Day-0 names
 
@@ -104,52 +106,33 @@ For each task:
 
 Do not use one long-lived personal branch for unrelated work.
 
-## 7. Review governance — three gates only
+## 7. Merge governance — CI only
 
-A PR can merge only when all three gates are green:
+There is **no required human review, approval, Code Owner approval, review-thread resolution, or `CHANGES_REQUESTED` gate**.
 
-### Gate 1 — one valid human approval
+A PR may merge when all of the following CI-validity conditions hold:
 
-Exactly one approving human review is the minimum merge approval.
+- the PR is mechanically mergeable with the current `main` (no merge conflict);
+- the current PR head is the version being evaluated;
+- the branch is synchronized with current `main` whenever `main` has changed since the last valid CI evaluation;
+- every blocking CI job for that current version has completed with `success`:
+  - `test (3.10)`;
+  - `test (3.11)`;
+  - `windows-integration`;
+  - `merge-gate`;
+- no blocking CI job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful.
 
-Who should approve:
-- ordinary Track-internal PR: any other team member;
-- shared-interface or cross-Track PR: Track A (`@dddd2024`);
-- Track A-authored shared/cross-Track PR: one affected Track owner, because the author cannot self-approve.
+If the PR head changes, or `main` changes such that the tested merge result is no longer current, previous CI evidence does not authorize merge. Synchronize and rerun CI.
 
-Extra affected-owner review may be requested when useful, but it is advisory and does not add another merge approval requirement.
+Automated or human comments may still be used as optional engineering feedback, but they never block merge. Do not request approval as a merge requirement.
 
-Automated Codex/GitHub review is advisory. It can discover real defects, but it is not an additional approval layer. Valid blocking findings must still be fixed or explicitly resolved before merge.
-
-### Gate 2 — current PR version has full green CI
-
-After the last code change, the current PR version must pass all blocking CI jobs:
-
-- `test (3.10)`;
-- `test (3.11)`;
-- `windows-integration`;
-- `merge-gate`.
-
-If new commits are pushed, previous CI evidence no longer counts. Authors do not need to manually record SHAs or copy check results into the PR; the merge actor/agent must verify the current PR state immediately before merge.
-
-### Gate 3 — no unresolved blocking review issue
-
-Before merge:
-- no active `CHANGES_REQUESTED` review may remain;
-- blocking review threads must be resolved;
-- the PR must have no merge conflict.
-
-That is the complete governance model: **right reviewer + green CI + no unresolved blocker**.
-
-Do not add extra approval layers unless a specific PR documents why they are needed.
+`merge-gate` must depend on every blocking CI job. If a new blocking job is added, add it to `merge-gate.needs` in the same change.
 
 ## 8. Merge behavior
 
 Preferred merge method: **squash merge**.
 
-Immediately before merging, the human or AI merge actor should fresh-read the PR and verify the three gates above. This exact-head/base synchronization checking is an implementation detail of the merge actor; PR authors should not manage it manually.
-
-If `main` changed and the PR needs synchronization to obtain valid CI or remove a conflict, update the branch and rerun CI. Do not merge using an older green run.
+Immediately before merging, the merge actor/agent fresh-reads the current PR/base state and verifies only the CI-validity conditions above. PR authors do not need to copy SHAs or check results into the PR description.
 
 ## 9. Definition of done
 
@@ -159,7 +142,7 @@ A task is done when:
 - relevant tests/fixtures cover the changed behavior;
 - shared contracts remain compatible or are explicitly migrated;
 - dependency/docs records are updated when applicable;
-- the three merge gates pass.
+- current-version CI is fully green.
 
 ## 10. Track entrypoints
 

@@ -21,6 +21,7 @@ node_modules/
 
 # Rust / Tauri
 **/target/
+apps/desktop/src-tauri/gen/
 
 # Build
 build/

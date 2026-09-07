@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "id": "range-demo-001",
+  "method": "read_range",
+  "params": {
+    "inputRef": "input-demo-001",
+    "offset": 0,
+    "length": 256
+  }
+}

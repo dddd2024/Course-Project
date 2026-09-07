@@ -10,7 +10,9 @@ CONTRACTS = ROOT / "contracts"
 FIXTURES = CONTRACTS / "fixtures"
 
 CASES = [
+    ("sidecar-message.schema.json", "sidecar-register-input.json"),
     ("sidecar-message.schema.json", "sidecar-request.json"),
+    ("sidecar-message.schema.json", "sidecar-read-range.json"),
     ("sidecar-message.schema.json", "sidecar-progress.json"),
     ("sidecar-message.schema.json", "sidecar-result.json"),
     ("sidecar-message.schema.json", "sidecar-error.json"),
@@ -46,3 +48,49 @@ def test_sidecar_fixture_ids_stay_correlated() -> None:
         )
     }
     assert ids == {"task-demo-001"}
+
+
+def test_sidecar_request_uses_canonical_analyze_method() -> None:
+    request = load_json(FIXTURES / "sidecar-request.json")
+    assert request["method"] == "analyze"
+    assert request["params"]["mode"] in {"baseline", "evidencegraph"}
+
+
+def test_sidecar_rejects_unknown_method_and_config_keys() -> None:
+    schema = load_json(CONTRACTS / "sidecar-message.schema.json")
+    validator = Draft202012Validator(schema)
+
+    unknown_method = {
+        "protocolVersion": 1,
+        "id": "task-bad-001",
+        "method": "run_analysis",
+        "params": {"inputRef": "input-1", "mode": "baseline"},
+    }
+    drifted_config = {
+        "protocolVersion": 1,
+        "id": "task-bad-002",
+        "method": "analyze",
+        "params": {
+            "inputRef": "input-1",
+            "mode": "baseline",
+            "enable_llm": True,
+        },
+    }
+
+    assert list(validator.iter_errors(unknown_method))
+    assert list(validator.iter_errors(drifted_config))
+
+
+def test_analysis_result_evidence_references_resolve() -> None:
+    result = load_json(FIXTURES / "analysis-result.json")
+    evidence_ids = {item["evidenceId"] for item in result["evidence"]}
+
+    for finding in result["findings"]:
+        assert set(finding["evidenceIds"]).issubset(evidence_ids)
+        assert finding["status"] in {"ACCEPTED", "REJECTED", "UNCERTAIN"}
+
+
+def test_analysis_result_artifact_ids_are_unique() -> None:
+    result = load_json(FIXTURES / "analysis-result.json")
+    artifact_ids = [item["artifactId"] for item in result["artifacts"]]
+    assert len(artifact_ids) == len(set(artifact_ids))

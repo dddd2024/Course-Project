@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "id": "input-register-demo-001",
+  "method": "register_input",
+  "params": {
+    "sourceRef": "desktop-grant://teacher-sample.dat",
+    "kindHint": "dat"
+  }
+}

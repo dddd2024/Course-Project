@@ -14,9 +14,10 @@ Produce deterministic, reproducible evidence from `.dat`/packet data for the res
 3. `docs/design-v1.md`
 4. `docs/design-v2.md` sections on evidence producers and shared models
 5. `docs/architecture.md`
-6. `docs/open-source-stack.md`
-7. `docs/testing-plan.md`
-8. `docs/team-division.md`
+6. `src/course_project/models.py`
+7. `docs/open-source-stack.md`
+8. `docs/testing-plan.md`
+9. `docs/team-division.md`
 
 ## Primary owned paths
 
@@ -40,17 +41,26 @@ Produce deterministic, reproducible evidence from `.dat`/packet data for the res
 
 ## Inputs
 
-- controlled `.dat`, `.bin`, PCAP/PCAPNG data and project-native normalized records;
+- teacher-provided `.dat` when available, plus authorized `.bin`, PCAP/PCAPNG or tiny engineering fixtures;
 - shared models/contracts from Track A.
 
-## Outputs
+Teacher raw data remains external unless redistribution is explicitly allowed. Track D must not read teacher ground truth as inference input.
 
-- `PacketCandidate` objects;
-- deterministic/statistical evidence suitable for conversion to `Evidence`;
-- alignment/message-family results in project-native structures;
-- normalized field candidates;
-- behavior feature records/predictions where implemented;
+## Canonical outputs
+
+Use the project-native types in `src/course_project/models.py` rather than ad-hoc dicts or third-party objects:
+
+- `InputMetadata` for registered input metadata;
+- `PacketCandidate` for lightweight boundary candidates;
+- `MessageCandidate` for normalized byte-range messages;
+- `MessageFamily` for clusters;
+- `AlignmentRegion` and `AlignmentResult` for stable/variable alignment output;
+- `FieldCandidate` for normalized PRE/deterministic field candidates;
+- `BehaviorFeatures` before behavior classification;
+- deterministic/statistical observations or `Evidence` records with explicit source/method/provenance information;
 - reproducible baseline artifacts for Track C.
+
+If a new output cannot be represented by these DTOs, propose a shared contract change through Track A rather than leaking a Netzob/BinaryInferno/NFStream/Scapy object.
 
 ## Integration rule with Track C
 
@@ -66,12 +76,12 @@ Do not make Track C depend on raw Netzob, BinaryInferno, NFStream, Scapy, or oth
 
 ## First implementation sequence
 
-1. deterministic `.dat -> normalized bytes/messages` path;
+1. deterministic `.dat -> InputMetadata + normalized MessageCandidate/PacketCandidate` path;
 2. statistical features and boundary candidate scoring;
-3. clustering/alignment + normalized field candidates;
-4. one reproducible PRE baseline adapter;
-5. behavior feature extraction baseline;
-6. fixtures/export consumed by Track C experiments.
+3. `MessageFamily` + `AlignmentResult` + `FieldCandidate` production;
+4. one reproducible PRE baseline adapter behind those DTOs;
+5. `BehaviorFeatures` extraction baseline;
+6. fixtures/artifacts consumed by Track C experiments.
 
 ## Completion standard
 

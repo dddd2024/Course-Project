@@ -13,10 +13,11 @@ Build the local desktop workbench that makes the analysis pipeline inspectable a
 2. Issue `#13`
 3. `docs/desktop-app-guide.md`
 4. `docs/architecture.md`
-5. `contracts/sidecar-message.schema.json`
-6. `contracts/analysis-result.schema.json`
-7. `contracts/agent-response.schema.json`
-8. `docs/team-division.md`
+5. `contracts/README.md`
+6. `contracts/sidecar-message.schema.json`
+7. `contracts/analysis-result.schema.json`
+8. `contracts/agent-response.schema.json`
+9. `docs/team-division.md`
 
 ## Primary owned paths
 
@@ -37,9 +38,31 @@ Build the local desktop workbench that makes the analysis pipeline inspectable a
 - finding-to-byte-offset navigation;
 - packaging and clean-machine demo workflow.
 
+## Frozen contract assumptions
+
+Track B should generate/derive types from the shared contracts rather than inventing UI-specific transport shapes.
+
+Canonical sidecar methods are:
+
+- `register_input`;
+- `inspect_file`;
+- `analyze`;
+- `cancel_task`;
+- `get_result`;
+- `read_range`.
+
+Semantic finding status is `ACCEPTED / REJECTED / UNCERTAIN`.
+
+`AnalysisResult` provides:
+- findings with `evidenceIds` and byte locations;
+- small `evidence[]` provenance records;
+- `artifacts[]` references for messages, alignment, statistics, behavior, restored output, schema/report and other large views.
+
+Do not require the Python sidecar to inline large packet/alignment tables in JSON messages.
+
 ## Inputs
 
-Consume only project-native/versioned interfaces from Track A. Typical inputs include task progress, analysis summaries, packet/field references, verification states, evidence references, behavior predictions, and exported artifacts.
+Consume only project-native/versioned interfaces from Track A. Typical inputs include task progress, analysis summaries, evidence records, byte locations, behavior predictions and controlled artifact references.
 
 ## Outputs
 
@@ -56,11 +79,12 @@ Consume only project-native/versioned interfaces from Track A. Typical inputs in
 
 ## First implementation sequence
 
-1. fixed-data React -> Tauri -> Python/fixture -> React contract spike;
-2. read-only `.dat` import + overview + hex view;
-3. task progress/error/result flow;
-4. inference/evidence/behavior visualizations;
-5. packaging and clean-machine rehearsal.
+1. create React/Tauri scaffold + lockfiles;
+2. consume the golden sidecar/result fixtures in a fixed-data contract spike;
+3. implement controlled `.dat` selection/registration and `read_range`-based overview/hex view;
+4. implement task progress/error/result flow;
+5. render findings/evidence/artifact-backed inference and behavior views;
+6. add desktop CI and packaging/clean-machine rehearsal.
 
 ## Completion standard
 

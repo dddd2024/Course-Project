@@ -116,7 +116,7 @@ Shared/high-risk paths:
 - root dependency/build configuration
 
 Rules:
-1. Shared contract changes require Track A review and at least one affected consumer owner review.
+1. Shared contract changes follow the single-reviewer rule in `AGENTS.md`: Track A reviews shared/cross-Track PRs; when Track A is the author, one affected Track owner reviews.
 2. UI/Rust/Python integration is contract-first: update schema + fixture before changing both sides independently.
 3. Third-party objects must remain behind adapters; do not leak Netzob/NFStream/LLM-provider-specific types across modules.
 4. Every track owns tests for its primary paths.

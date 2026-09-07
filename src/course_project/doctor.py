@@ -78,6 +78,11 @@ def _major(version_output: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _active_toolchain_matches(output: str, expected_channel: str) -> bool:
+    token = output.split(maxsplit=1)[0] if output else ""
+    return token == expected_channel or token.startswith(f"{expected_channel}-")
+
+
 def _command_check(
     *,
     name: str,
@@ -160,12 +165,33 @@ def collect_checks(
     )
 
     channel = _rust_channel(root)
-    rust_expected = channel or "channel from rust-toolchain.toml"
+    if channel is None:
+        checks.append(
+            CheckResult(
+                "rust-toolchain",
+                "fail",
+                'a parseable channel in rust-toolchain.toml',
+                "unparseable",
+                "toolchain channel is missing or malformed",
+            )
+        )
+    else:
+        checks.append(
+            _command_check(
+                name="rust-toolchain",
+                command=("rustup", "show", "active-toolchain"),
+                expected=channel,
+                root=root,
+                probe=probe,
+                validator=lambda output: _active_toolchain_matches(output, channel),
+            )
+        )
+
     checks.append(
         _command_check(
             name="rustc",
             command=("rustc", "--version"),
-            expected=rust_expected,
+            expected="available",
             root=root,
             probe=probe,
         )

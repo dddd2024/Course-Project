@@ -25,9 +25,9 @@ def serve_stream(
         try:
             decoded = json.loads(line)
             if not isinstance(decoded, dict):
-                raise ValueError("top-level JSON value must be an object")
+                raise TypeError("top-level JSON value must be an object")
             responses = runtime.handle(decoded)
-        except (json.JSONDecodeError, ValueError) as exc:
+        except (json.JSONDecodeError, TypeError) as exc:
             print(f"sidecar input error on line {line_number}: {exc}", file=errstream)
             responses = [
                 {

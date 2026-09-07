@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import re
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -143,12 +144,21 @@ class InputRegistry:
                 details={"sourceName": path.name},
             )
 
-        sha256 = _sha256_file(path)
+        try:
+            sha256 = _sha256_file(path)
+            size_bytes = path.stat().st_size
+        except OSError as exc:
+            raise SidecarError(
+                "invalid_input",
+                "sourceRef could not be read during registration",
+                details={"sourceName": path.name},
+            ) from exc
+
         input_ref = f"input-{sha256[:16]}"
         metadata = InputMetadata(
             input_id=input_ref,
             kind=_resolve_kind(path, kind_hint),
-            size_bytes=path.stat().st_size,
+            size_bytes=size_bytes,
             sha256=sha256,
             metadata={"sourceName": path.name},
         )
@@ -166,13 +176,54 @@ class InputRegistry:
                 "unknown inputRef",
                 details={"inputRef": input_ref},
             )
+        self._require_source_available(record)
         return record
+
+    def _require_source_available(self, record: RegisteredInput) -> None:
+        try:
+            current = record.path.stat()
+        except OSError as exc:
+            raise SidecarError(
+                "invalid_input",
+                "registered source file is no longer available",
+                details={
+                    "inputRef": record.metadata.input_id,
+                    "sourceName": record.source_name,
+                },
+            ) from exc
+        if not stat.S_ISREG(current.st_mode):
+            raise SidecarError(
+                "invalid_input",
+                "registered source file is no longer available",
+                details={
+                    "inputRef": record.metadata.input_id,
+                    "sourceName": record.source_name,
+                },
+            )
+        if current.st_size != record.metadata.size_bytes:
+            raise SidecarError(
+                "invalid_input",
+                "registered source file size changed since registration",
+                details={
+                    "inputRef": record.metadata.input_id,
+                    "sourceName": record.source_name,
+                    "expectedSizeBytes": record.metadata.size_bytes,
+                    "actualSizeBytes": current.st_size,
+                },
+            )
 
     def read_range(self, input_ref: str, offset: int, length: int) -> dict[str, Any]:
         record = self.get(input_ref)
-        with record.path.open("rb") as handle:
-            handle.seek(offset)
-            chunk = handle.read(length)
+        try:
+            with record.path.open("rb") as handle:
+                handle.seek(offset)
+                chunk = handle.read(length)
+        except OSError as exc:
+            raise SidecarError(
+                "invalid_input",
+                "registered source file is no longer readable",
+                details={"inputRef": input_ref, "sourceName": record.source_name},
+            ) from exc
         return {
             "inputRef": input_ref,
             "offset": offset,
@@ -197,11 +248,18 @@ class ResultStore:
         result.result_ref = ref
         payload = analysis_result_to_dict(result)
         target = self.root / ref
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise SidecarError(
+                "sidecar_failed",
+                "failed to persist analysis result",
+                details={"taskId": result.task_id},
+            ) from exc
         return ref
 
     def resolve(self, ref: str) -> Path:
@@ -264,8 +322,20 @@ class SidecarRuntime:
     def _analyze(self, task_id: str, params: Mapping[str, Any]) -> list[dict[str, Any]]:
         _validate_task_id(task_id)
         input_ref = params["inputRef"]
-        record = self.inputs.get(input_ref)
         config = dict(params)
+
+        with self._lock:
+            existing = self._tasks.get(task_id)
+            if existing is not None:
+                if existing.input_ref != input_ref or existing.config != config:
+                    raise SidecarError(
+                        "invalid_input",
+                        "task id is already bound to a different analyze request",
+                        details={"taskId": task_id},
+                    )
+                return self._existing_task_messages(task_id, existing)
+
+        record = self.inputs.get(input_ref)
 
         with self._lock:
             existing = self._tasks.get(task_id)
@@ -304,20 +374,27 @@ class SidecarRuntime:
                 details={"exceptionType": type(exc).__name__},
             ) from exc
 
-        _validate_backend_result(result, task_id=task_id, input_ref=input_ref)
-        result.input_id = input_ref
+        try:
+            _validate_backend_result(result, task_id=task_id, input_ref=input_ref)
+            result.input_id = input_ref
 
-        with self._lock:
-            cancelled = task.status == "CANCELLED"
-        if cancelled:
-            result = AnalysisResult(
-                task_id=task_id,
-                status="cancelled",
-                input_id=input_ref,
-                limitations=("Task was cancelled before its result was published.",),
-            )
+            with self._lock:
+                cancelled = task.status == "CANCELLED"
+            if cancelled:
+                result = AnalysisResult(
+                    task_id=task_id,
+                    status="cancelled",
+                    input_id=input_ref,
+                    limitations=("Task was cancelled before its result was published.",),
+                )
 
-        ref = self.results.write_analysis_result(result)
+            ref = self.results.write_analysis_result(result)
+        except SidecarError:
+            with self._lock:
+                task.result_ref = None
+                task.status = "FAILED"
+            raise
+
         with self._lock:
             task.result_ref = ref
             task.status = result.status.upper()

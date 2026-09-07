@@ -114,25 +114,29 @@ A PR may merge when all of the following CI-validity conditions hold:
 
 - the PR is mechanically mergeable with the current `main` (no merge conflict);
 - the current PR head is the version being evaluated;
-- the branch is synchronized with current `main` whenever `main` has changed since the last valid CI evaluation;
-- every blocking CI job for that current version has completed with `success`:
+- GitHub has evaluated that current head against the current `main`;
+- every blocking CI job for that current merge result has completed with `success`:
   - `test (3.10)`;
   - `test (3.11)`;
   - `windows-integration`;
   - `merge-gate`;
 - no blocking CI job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful.
 
-If the PR head changes, or `main` changes such that the tested merge result is no longer current, previous CI evidence does not authorize merge. Synchronize and rerun CI.
+If the PR head changes, or `main` changes after the valid CI run, previous CI evidence does not authorize merge. Retrigger CI and validate the new pull-request merge result.
+
+A literal merge/rebase of `main` into every feature branch is not required solely for governance. GitHub pull-request CI on the current head is sufficient when its synthetic merge result uses the current `main`. If base metadata is stale or ambiguous, verify the synthetic merge commit parents before treating the run as current.
 
 Automated or human comments may still be used as optional engineering feedback, but they never block merge. Do not request approval as a merge requirement.
 
 `merge-gate` must depend on every blocking CI job. If a new blocking job is added, add it to `merge-gate.needs` in the same change.
 
+The repository ruleset is intentionally disabled by current project-owner decision. Do not re-enable or replace it unless the owner explicitly changes that decision. Disabled server enforcement never makes CI optional.
+
 ## 8. Merge behavior
 
 Preferred merge method: **squash merge**.
 
-Immediately before merging, the merge actor/agent fresh-reads the current PR/base state and verifies only the CI-validity conditions above. PR authors do not need to copy SHAs or check results into the PR description.
+Immediately before merging, the merge actor/agent fresh-reads the current PR/head, current `main`, tested merge result, and blocking CI conclusions. PR authors do not need to copy SHAs or check results into the PR description.
 
 **Once those CI-only conditions are satisfied, merge promptly. Do not leave a green PR waiting for review, approval, discussion, or owner acknowledgement.**
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from course_project.behavior import extract_behavior_features, from_packet_candidates
 from course_project.boundary import detect_boundaries, to_message_candidates
@@ -51,8 +52,10 @@ class TrackDBaselineBackend:
                     "trackDExecuted": False,
                 },
                 limitations=(
-                    f"Track D baseline currently accepts raw .dat/.bin inputs; "
-                    f"registered kind {input_metadata.kind!r} was not analyzed.",
+                    (
+                        f"Track D baseline currently accepts raw .dat/.bin inputs; "
+                        f"registered kind {input_metadata.kind!r} was not analyzed."
+                    ),
                 ),
             )
 
@@ -147,9 +150,11 @@ class TrackDBaselineBackend:
         )
 
         limitations = [
-            "Track D deterministic analysis ran successfully, but Track C semantic "
-            "evidence/verification is not connected; field candidates are not promoted "
-            "to protocol findings.",
+            (
+                "Track D deterministic analysis ran successfully, but Track C semantic "
+                "evidence/verification is not connected; field candidates are not promoted "
+                "to protocol findings."
+            ),
         ]
         if config["mode"] == "evidencegraph":
             limitations.append(

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "course-project"
+version = "0.1.0"
+description = "Unknown binary protocol inference and encrypted traffic behavior analysis course project"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "For educational use in this course repository"}
+authors = [{name = "Course Project Team"}]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+  "mypy>=1.11",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100

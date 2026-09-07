@@ -33,7 +33,7 @@ def build_kaitai_schema(
     exporter from inventing semantics that Track C did not verify.
     """
 
-    normalized = sorted(tuple(fields), key=lambda item: (item.offset, item.field_id))
+    normalized = sorted(fields, key=lambda item: (item.offset, item.field_id))
     # Reuse the project-native exporter validation for IDs, offsets, sizes and scores.
     build_protocol_schema(normalized, protocol_name=protocol_name)
 

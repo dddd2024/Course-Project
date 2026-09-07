@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, Literal
+from dataclasses import dataclass, field
 
 
 DecisionStatus = Literal["accepted", "rejected", "uncertain"]

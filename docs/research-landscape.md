@@ -96,7 +96,7 @@ candidate evidence
       -> executable schema / parser
       -> corpus-wide execution
       -> constraint checks
-      -> ACCEPT / REJECT / UNCERTAIN
+      -> ACCEPTED / REJECTED / UNCERTAIN
       -> feedback / alternative interpretation
 ```
 
@@ -181,7 +181,7 @@ Evaluation should include a risk-coverage curve:
 - as acceptance threshold increases, how much of the protocol remains automatically covered?
 - how quickly does the false-semantic rate decrease?
 
-This aligns naturally with the existing `ACCEPT / REJECT / UNSURE` verifier design.
+This aligns naturally with the canonical `ACCEPTED / REJECTED / UNCERTAIN` verifier design.
 
 ### E. Counterfactual field validation
 
@@ -189,7 +189,7 @@ On self-generated controlled protocols, create counterfactual message variants a
 
 Example: if a field is believed to encode payload length, increase payload size while keeping other semantics constant and verify the expected field change.
 
-This must be positioned as controlled/offline consistency validation, not as a claim that active protocol probing itself is novel.
+This must be positioned as controlled/offline consistency validation, not as a claim that active protocol probing itself is novel. Controlled synthetic data remains an optional mechanism fixture and must not be reported as teacher-data benchmark evidence.
 
 ### F. Shortcut-resistant encrypted-traffic behavior analysis
 
@@ -261,6 +261,8 @@ Primary metrics:
 - abstention risk-coverage;
 - processing time;
 - LLM token/cost statistics.
+
+Metrics requiring unavailable ground truth must be reported as not evaluable rather than inferred from the analysis output itself.
 
 Critical ablations:
 

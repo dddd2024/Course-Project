@@ -127,13 +127,16 @@ def test_finding_location_must_match_result_input() -> None:
         analysis_result_to_dict(result)
 
 
-def test_artifact_refs_must_be_task_local_and_controlled() -> None:
+def test_refs_follow_frozen_controlled_relative_path_rule() -> None:
     result = _valid_result()
     result.artifacts = (
-        replace(result.artifacts[0], ref="tasks/other-task/report.json"),
+        replace(result.artifacts[0], ref="shared/reports/report.json"),
     )
-    with pytest.raises(ValueError, match="must stay under tasks/task-integrity/"):
-        analysis_result_to_dict(result)
+    result.result_ref = "results/task-integrity.json"
+
+    payload = analysis_result_to_dict(result)
+    assert payload["artifacts"][0]["ref"] == "shared/reports/report.json"
+    assert payload["resultRef"] == "results/task-integrity.json"
 
     result = _valid_result()
     result.artifacts = (
@@ -142,12 +145,9 @@ def test_artifact_refs_must_be_task_local_and_controlled() -> None:
     with pytest.raises(ValueError, match="without traversal"):
         analysis_result_to_dict(result)
 
-
-def test_result_ref_must_be_canonical_for_task() -> None:
     result = _valid_result()
-    result.result_ref = "tasks/task-integrity/other-result.json"
-
-    with pytest.raises(ValueError, match="resultRef must equal"):
+    result.result_ref = "C:\\outside\\result.json"
+    with pytest.raises(ValueError, match="POSIX-style relative paths"):
         analysis_result_to_dict(result)
 
 

@@ -161,6 +161,22 @@ Then:
 6. open a PR linked to the Issue;
 7. report evidence, known limitations, environment/dependency changes and interface changes in the PR.
 
+### 8.1 Hard merge gate
+
+No human or AI agent may merge a PR until the latest CI run for the PR's **current head SHA** is completely green.
+
+Immediately before any merge action, fresh-read the PR head SHA and its current CI/check results. A merge is allowed only when:
+
+- every blocking CI job for that exact head has completed with `success`;
+- the final `merge-gate` job has completed with `success`;
+- no CI job is queued, in progress, failed, cancelled, timed out, action-required, stale, or otherwise non-successful;
+- no newer commit has been pushed after the verified run;
+- required reviews, Code Owner approval, and conversation-resolution conditions are also satisfied.
+
+Never use an older green commit, `mergeable=true`, partial CI success, or a deadline as justification to merge. If the head changes, discard the previous merge authorization and re-check CI from scratch. If a new blocking CI job is added to `.github/workflows/ci.yml`, add it to `merge-gate.needs` in the same PR.
+
+Repository settings should additionally require the emitted CI check names on `main`; see `docs/repository-settings.md`. Until branch protection/rulesets are enabled, this instruction remains a mandatory fail-closed operating rule for every project agent.
+
 Do not use one long-lived personal branch for unrelated work.
 
 ## 9. Definition of done
@@ -171,7 +187,7 @@ A task is not done merely because code was written. A Track task is done when:
 - tests/fixtures cover the changed behavior;
 - shared contracts remain compatible or are explicitly migrated;
 - dependency/version/license records are updated when applicable;
-- CI is green;
+- all blocking CI is green for the current PR head and `merge-gate` is green before merge;
 - docs/examples are updated when behavior or usage changed;
 - the PR makes ownership and limitations clear.
 

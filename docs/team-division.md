@@ -10,10 +10,12 @@ The project is organized around four ownership tracks. The goal is to minimize o
 |---|---|---|---:|---|
 | A | `@dddd2024` | repository owner | 25% | integration, architecture, contracts, sidecar, CI, export, E2E |
 | B | `@hinaLove1` | collaborator (write) | 25% | React/Tauri desktop, visualization, packaging, demo |
-| C | `@sunny1ce` | invitation pending when recorded | 25% | EvidenceGraph-PRE, LLM, verification, experiments |
-| D | `@zhaohongjun20-creator` | invitation pending when recorded | 25% | binary analysis, packet boundaries, PRE, behavior features |
+| C | `@sunny1ce` | collaborator | 25% | EvidenceGraph-PRE, LLM, verification, experiments |
+| D | `@zhaohongjun20-creator` | collaborator | 25% | binary analysis, packet boundaries, PRE, behavior features |
 
 Track B and Track D responsibilities were swapped on 2026-09-07. The GitHub accounts remain attached to their original Track letters; only the work packages changed.
+
+All four members now have repository collaboration access. Track C is assigned to Issue `#14`; Track D is assigned to Issue `#15`.
 
 The 25/25/25/25 split is an initial planning baseline, not a final grading claim. Final workload percentages should be based on actual Issues, PRs, commits, tests, experiments, documentation and demo ownership.
 
@@ -152,9 +154,11 @@ The original WP issues remain useful as task-level history:
 - `#11` four-person skeleton migration -> Track A
 - `#12`–`#15` current four ownership tracks
 
-## 9. Invitation Status
+## 9. Collaboration Access Status
 
-At the time of this revision, GitHub reported `@hinaLove1` with write permission, while `@sunny1ce` and `@zhaohongjun20-creator` were still pending repository invitations. Their ownership is recorded now, but issue assignment, CODEOWNERS review requests, branch pushes and PR review automation may not fully activate until they accept.
+All four members have accepted repository collaboration access. Issue assignment and CODEOWNERS-based review routing can now use the real GitHub accounts recorded above.
+
+Repository access does not override Track ownership: cross-Track or shared-interface edits still follow `AGENTS.md`, `CODEOWNERS`, contract-first migration, and review rules.
 
 ## 10. Final Workload Evidence
 

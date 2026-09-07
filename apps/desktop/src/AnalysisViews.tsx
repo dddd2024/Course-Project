@@ -5,6 +5,7 @@ import type {
   ArtifactRef,
   ByteLocation,
   EvidenceRecord,
+  FindingReview,
 } from "./analysisContracts";
 import { scoreLabel } from "./analysisContracts";
 
@@ -41,10 +42,17 @@ function StatusBadge({ status }: { status: AnalysisFinding["status"] }) {
 function FindingCard({
   finding,
   onJump,
+  review,
+  onReviewChange,
 }: {
   finding: AnalysisFinding;
   onJump: (location: ByteLocation) => void;
+  review?: FindingReview;
+  onReviewChange: (review: FindingReview) => void;
 }) {
+  const setDecision = (decision: FindingReview["decision"]) => {
+    onReviewChange({ decision, correction: review?.correction || finding.claim });
+  };
   return (
     <article className="finding-card">
       <div className="finding-heading">
@@ -63,6 +71,36 @@ function FindingCard({
           Inspect offset +{finding.location.offset} ({finding.location.length} bytes)
         </button>
       )}
+      <div className="finding-review">
+        <div className="review-heading">
+          <span>Local review</span>
+          {review && <StatusBadge status={review.decision} />}
+        </div>
+        <div className="review-actions" role="group" aria-label={`Review ${finding.findingId}`}>
+          {(["ACCEPTED", "REJECTED", "UNCERTAIN"] as const).map((decision) => (
+            <button
+              className={review?.decision === decision ? "review-button selected" : "review-button"}
+              key={decision}
+              onClick={() => setDecision(decision)}
+              aria-pressed={review?.decision === decision}
+              type="button"
+            >
+              {decision}
+            </button>
+          ))}
+        </div>
+        <label className="review-correction">
+          <span>Correction draft (local, not an accepted protocol fact)</span>
+          <textarea
+            value={review?.correction ?? finding.claim}
+            onChange={(event) => onReviewChange({
+              decision: review?.decision ?? "UNCERTAIN",
+              correction: event.target.value,
+            })}
+            rows={2}
+          />
+        </label>
+      </div>
     </article>
   );
 }
@@ -139,17 +177,27 @@ export function AnalysisViewContent({
   view,
   result,
   onJump,
+  reviews,
+  onReviewChange,
 }: {
   view: AnalysisViewName;
   result: AnalysisResult | null;
   onJump: (location: ByteLocation) => void;
+  reviews: Record<string, FindingReview>;
+  onReviewChange: (findingId: string, review: FindingReview) => void;
 }) {
   if (!result) return <EmptyResult />;
   if (view === "findings") {
     return (
       <div className="result-list">
         {result.findings.length > 0 ? result.findings.map((finding) => (
-          <FindingCard key={finding.findingId} finding={finding} onJump={onJump} />
+          <FindingCard
+            key={finding.findingId}
+            finding={finding}
+            onJump={onJump}
+            review={reviews[finding.findingId]}
+            onReviewChange={(review) => onReviewChange(finding.findingId, review)}
+          />
         )) : <div className="result-empty"><strong>No findings</strong><p>The result contains no protocol claims.</p></div>}
       </div>
     );

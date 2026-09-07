@@ -1,5 +1,10 @@
 export type DecisionStatus = "ACCEPTED" | "REJECTED" | "UNCERTAIN";
 
+export interface FindingReview {
+  decision: DecisionStatus;
+  correction: string;
+}
+
 export interface ByteLocation {
   inputId: string;
   offset: number;

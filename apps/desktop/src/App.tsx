@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnalysisTabs, AnalysisViewContent } from "./AnalysisViews";
 import { demoAnalysisResult } from "./fixtures/demoAnalysisResult";
-import type { AnalysisViewName, ByteLocation, AnalysisResult } from "./analysisContracts";
+import type { AnalysisViewName, ByteLocation, FindingReview, AnalysisResult } from "./analysisContracts";
 import {
   cancelTask,
   inspectInput,
@@ -133,6 +133,7 @@ export function App() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [activeView, setActiveView] = useState<AnalysisViewName>("findings");
   const [focusedLocation, setFocusedLocation] = useState<ByteLocation | null>(null);
+  const [findingReviews, setFindingReviews] = useState<Record<string, FindingReview>>({});
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -204,11 +205,16 @@ export function App() {
     setAnalysisResult(demoAnalysisResult);
     setActiveView("findings");
     setFocusedLocation(null);
+    setFindingReviews({});
   }
 
   function jumpToLocation(location: ByteLocation) {
     setFocusedLocation(location);
     setRangeOffset(Math.floor(location.offset / RANGE_SIZE) * RANGE_SIZE);
+  }
+
+  function updateFindingReview(findingId: string, review: FindingReview) {
+    setFindingReviews((current) => ({ ...current, [findingId]: review }));
   }
 
   async function stopTask() {
@@ -292,11 +298,18 @@ export function App() {
               <div><h3>Analysis result</h3><span>{analysisResult ? analysisResult.status + " / fixture preview" : "awaiting result"}</span></div>
               <button className="secondary compact" onClick={loadFixture}>Load synthetic fixture</button>
             </div>
+            {analysisResult && <p className="review-summary">{Object.keys(findingReviews).length}/{analysisResult.findings.length} findings reviewed locally; analyzer status remains unchanged.</p>}
             <AnalysisTabs active={activeView} onChange={setActiveView} hasResult={analysisResult !== null} />
             {focusedLocation && (
               <p className="focus-note">Hex focus: {focusedLocation.inputId} @ +{focusedLocation.offset} ({focusedLocation.length} bytes)</p>
             )}
-            <AnalysisViewContent view={activeView} result={analysisResult} onJump={jumpToLocation} />
+            <AnalysisViewContent
+              view={activeView}
+              result={analysisResult}
+              onJump={jumpToLocation}
+              reviews={findingReviews}
+              onReviewChange={updateFindingReview}
+            />
           </section>
           <HexView
             input={input}
@@ -322,6 +335,7 @@ export function App() {
             <div><dt>Finding</dt><dd>{analysisResult ? analysisResult.findings.length + " linked" : "None"}</dd></div>
             <div><dt>Evidence</dt><dd>{analysisResult ? (analysisResult.evidence?.length || 0) + " records" : input ? "Input metadata" : "None"}</dd></div>
             <div><dt>Decision</dt><dd>{analysisResult?.findings[0]?.status ?? "UNCERTAIN"}</dd></div>
+            <div><dt>Local review</dt><dd>{analysisResult ? Object.keys(findingReviews).length + " reviewed" : "None"}</dd></div>
           </dl>
         </aside>
       </section>

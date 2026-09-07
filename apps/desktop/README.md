@@ -30,3 +30,8 @@ Use **Load synthetic fixture** to exercise the result presentation before the fu
 - Artifact cards expose controlled result-relative refs without inlining large tables.
 - Packet, alignment, statistics and behavior tabs remain artifact-backed until their producers are connected.
 - A finding location moves the Hex range to the referenced offset; it does not turn an uncertain claim into a fact.
+
+
+### D2 local candidate review
+
+Each finding exposes a local review control for `ACCEPTED`, `REJECTED` or `UNCERTAIN`, plus a correction draft. These controls are presentation-layer state only: they do not mutate the analyzer result, claim verification, or protocol contract. The summary makes the distinction visible so a reviewer can prepare a correction without presenting it as an accepted protocol fact.

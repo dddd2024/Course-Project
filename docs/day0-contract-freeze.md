@@ -98,7 +98,9 @@ A breaking or semantic change to any item above requires:
 
 1. schema/model/document change;
 2. golden fixture update;
-3. tests;
-4. producer/consumer migration notes;
-5. the single required human review selected by `AGENTS.md`;
-6. protocol version change when compatibility is broken.
+3. producer/consumer migration notes;
+4. compatibility/integration tests;
+5. protocol version change when compatibility is broken;
+6. full current-version CI success before merge.
+
+No human review or approval is required by this change process.

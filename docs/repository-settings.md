@@ -73,3 +73,5 @@ All four collaborators should be able to create branches and PRs. Shared/high-ri
 ## Manual verification record
 
 Repository files cannot by themselves prevent an administrator from pressing Merge. After this CI PR lands, enable branch protection or a repository ruleset in GitHub so `main` requires the emitted `test (3.10)`, `test (3.11)`, `windows-integration`, and `merge-gate` checks. Then verify from the GitHub UI/API that `main` reports protection/ruleset enforcement and record that verification in Track A Issue `#12`.
+
+Current server-truth checkpoint (2026-09-07): repository ruleset `main-protection` exists and is `active`, targets the default branch, has no bypass actors, blocks deletion and non-fast-forward updates, requires pull requests with one approval, dismisses stale approvals on push, and requires review-thread resolution. It is **not yet fully compliant** with this baseline because Code Owner review is not required and required status checks are not yet configured. Keep the Track A protection acceptance item open until those remaining rules are enabled and re-verified after PR #26 lands.

@@ -102,9 +102,10 @@ def collect_checks(
     root: Path,
     *,
     python_version: tuple[int, int] | None = None,
-    probe: Probe = _probe,
+    probe: Probe | None = None,
 ) -> list[CheckResult]:
     root = root.resolve()
+    probe = probe or _probe
     checks: list[CheckResult] = []
 
     missing = [relative for relative in _REQUIRED_FILES if not (root / relative).is_file()]

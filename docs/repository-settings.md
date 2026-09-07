@@ -58,6 +58,8 @@ CI has three layers:
 2. `windows-integration`: Python 3.11 + Node 22 + Rust/Tauri validation on the target desktop OS;
 3. `merge-gate`: final aggregate result.
 
+The workflow runs both on PRs targeting `main` and on pushes to `main`. PR CI is the pre-merge authorization evidence. `main` push CI is a post-merge safety net that detects an integration regression if a manual/concurrent merge slips past process discipline; a post-merge green run does not retroactively make a stale pre-merge decision correct.
+
 The Windows job may include additional integration checks, such as the Tauri -> Python Sidecar round-trip. Such checks are part of `windows-integration`; they do not create a separate human gate.
 
 A signed/package installer build is a release/demo gate, not a requirement for every PR.
@@ -74,6 +76,8 @@ Immediately before merge, the human or AI merge actor must fresh-read:
 - all blocking CI job conclusions.
 
 No manual review-state check is required.
+
+Merges must be serialized by process: do not authorize two PRs for merge against the same `main` snapshot and then merge them concurrently. After one PR changes `main`, every other previously green PR must be re-evaluated against the new `main` before it merges. If `main` changes between the final validation and the merge action, abort that authorization and retrigger CI.
 
 PR authors do not need to copy SHAs or job results into PR descriptions. Exact head/base validity is handled by the merge actor/agent.
 

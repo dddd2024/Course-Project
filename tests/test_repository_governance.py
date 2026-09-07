@@ -63,9 +63,11 @@ def test_disabled_ruleset_is_not_a_ci_bypass() -> None:
     assert "synthetic merge result" in settings
 
 
-def test_ci_keeps_all_blocking_jobs_and_aggregate_gate() -> None:
+def test_ci_keeps_all_blocking_jobs_and_post_merge_validation() -> None:
     workflow = _read(".github/workflows/ci.yml")
 
+    assert "push:\n    branches: [main]" in workflow
+    assert "pull_request:\n    branches: [main]" in workflow
     assert 'python-version: ["3.10", "3.11"]' in workflow
     assert "windows-integration:" in workflow
     assert "merge-gate:" in workflow

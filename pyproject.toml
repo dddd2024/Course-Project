@@ -12,6 +12,9 @@ license = {text = "For educational use in this course repository"}
 authors = [{name = "Course Project Team"}]
 dependencies = []
 
+[project.scripts]
+course-project-sidecar = "course_project.sidecar.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8",

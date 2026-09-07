@@ -53,22 +53,30 @@ def _validate_evidence_graph(evidence: tuple[Evidence, ...]) -> set[str]:
             raise ValueError(f"evidence {item.evidence_id} sampleIds must not contain duplicates")
         parents_by_id[item.evidence_id] = parents
 
-    visiting: set[str] = set()
-    visited: set[str] = set()
+    # Iterative three-color DFS avoids Python recursion limits on deep, valid provenance chains.
+    # 0/unset = unvisited, 1 = active DFS path, 2 = fully processed.
+    state: dict[str, int] = {}
+    for root_id in evidence_ids:
+        if state.get(root_id) == 2:
+            continue
+        state[root_id] = 1
+        stack: list[tuple[str, int]] = [(root_id, 0)]
+        while stack:
+            evidence_id, parent_index = stack[-1]
+            parents = parents_by_id[evidence_id]
+            if parent_index >= len(parents):
+                state[evidence_id] = 2
+                stack.pop()
+                continue
 
-    def visit(evidence_id: str) -> None:
-        if evidence_id in visiting:
-            raise ValueError("evidence parent graph must be acyclic")
-        if evidence_id in visited:
-            return
-        visiting.add(evidence_id)
-        for parent_id in parents_by_id[evidence_id]:
-            visit(parent_id)
-        visiting.remove(evidence_id)
-        visited.add(evidence_id)
-
-    for evidence_id in evidence_ids:
-        visit(evidence_id)
+            parent_id = parents[parent_index]
+            stack[-1] = (evidence_id, parent_index + 1)
+            parent_state = state.get(parent_id, 0)
+            if parent_state == 1:
+                raise ValueError("evidence parent graph must be acyclic")
+            if parent_state == 0:
+                state[parent_id] = 1
+                stack.append((parent_id, 0))
 
     return evidence_ids
 

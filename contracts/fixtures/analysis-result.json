@@ -1,0 +1,49 @@
+{
+  "protocolVersion": 1,
+  "taskId": "task-demo-001",
+  "status": "PARTIAL",
+  "inputId": "input-demo-001",
+  "resultRef": "results/task-demo-001/analysis-result.json",
+  "findings": [
+    {
+      "findingId": "field-length-001",
+      "claim": "bytes 4-5 are consistent with a big-endian packet-length field",
+      "status": "ACCEPTED",
+      "semanticType": "length",
+      "evidenceIds": ["ev-length-correlation-001", "ev-parser-check-001"],
+      "location": {
+        "inputId": "input-demo-001",
+        "offset": 4,
+        "length": 2
+      },
+      "scores": {
+        "model": 0.72,
+        "evidence": 0.96,
+        "verification": 0.99
+      }
+    },
+    {
+      "findingId": "field-time-001",
+      "claim": "bytes 8-11 may encode a timestamp",
+      "status": "UNCERTAIN",
+      "semanticType": "timestamp",
+      "evidenceIds": ["ev-llm-001"],
+      "location": {
+        "inputId": "input-demo-001",
+        "offset": 8,
+        "length": 4
+      },
+      "scores": {
+        "model": 0.61,
+        "evidence": 0.35,
+        "verification": 0.2
+      }
+    }
+  ],
+  "metrics": {
+    "parseCoverage": 0.92
+  },
+  "limitations": [
+    "Fixture data is synthetic and exists only to stabilize the cross-language contract."
+  ]
+}

@@ -27,16 +27,19 @@ CI is the authoritative merge evidence.
 
 <!-- What is intentionally not solved? What could still fail? -->
 
-## Review and Merge — Three Gates
+## Merge Gate — CI Only
 
-- [ ] **Gate 1 — Review:** one valid human approval from the correct reviewer
-  - ordinary Track PR: any other team member
-  - shared/cross-Track PR: Track A
-  - Track A-authored shared/cross-Track PR: one affected Track owner
-- [ ] **Gate 2 — CI:** current PR version has `test (3.10)`, `test (3.11)`, `windows-integration`, and `merge-gate` all green
-- [ ] **Gate 3 — Blockers:** no active `CHANGES_REQUESTED`, no unresolved blocking thread, and no merge conflict
+A PR is mergeable only when the current PR version, synchronized with current `main` when needed, has all blocking checks green:
 
-Automated Codex/GitHub review is advisory rather than a separate approval gate. If code changes after review/CI, re-check the three gates before merge.
+- [ ] `test (3.10)` = success
+- [ ] `test (3.11)` = success
+- [ ] `windows-integration` = success
+- [ ] `merge-gate` = success
+- [ ] no merge conflict
+
+Human approval, Code Owner approval, review-thread resolution, and `CHANGES_REQUESTED` are not merge requirements.
+
+If the PR head changes or `main` changes after the valid CI evaluation, synchronize/rerun CI before merging. Do not reuse an older green run.
 
 ## Final Checklist
 

@@ -40,6 +40,71 @@
       }
     }
   ],
+  "evidence": [
+    {
+      "evidenceId": "ev-length-correlation-001",
+      "sourceComponent": "features",
+      "method": "length-correlation",
+      "featureFamily": "length",
+      "score": 0.96,
+      "observation": {
+        "eligibleMessages": 100,
+        "matchingMessages": 98
+      },
+      "parentEvidenceIds": [],
+      "independenceGroup": "raw-length-correlation",
+      "sampleIds": ["msg-001", "msg-002"]
+    },
+    {
+      "evidenceId": "ev-parser-check-001",
+      "sourceComponent": "verification",
+      "method": "corpus-parser-check",
+      "featureFamily": "executable-verification",
+      "score": 0.99,
+      "observation": {
+        "eligibleMessages": 100,
+        "parsedMessages": 99
+      },
+      "parentEvidenceIds": ["ev-length-correlation-001"],
+      "independenceGroup": "parser-execution",
+      "sampleIds": ["msg-001", "msg-002"]
+    },
+    {
+      "evidenceId": "ev-llm-001",
+      "sourceComponent": "llm",
+      "method": "semantic-hypothesis",
+      "featureFamily": "semantic",
+      "score": 0.61,
+      "observation": {
+        "candidate": "timestamp"
+      },
+      "parentEvidenceIds": [],
+      "independenceGroup": "llm-semantic",
+      "sampleIds": ["msg-001", "msg-002"]
+    }
+  ],
+  "artifacts": [
+    {
+      "artifactId": "artifact-messages-001",
+      "type": "messages",
+      "format": "jsonl",
+      "ref": "results/task-demo-001/messages.jsonl",
+      "count": 100
+    },
+    {
+      "artifactId": "artifact-alignment-001",
+      "type": "alignment",
+      "format": "json",
+      "ref": "results/task-demo-001/alignment.json",
+      "count": 3
+    },
+    {
+      "artifactId": "artifact-statistics-001",
+      "type": "statistics",
+      "format": "json",
+      "ref": "results/task-demo-001/statistics.json"
+    }
+  ],
   "metrics": {
     "parseCoverage": 0.92
   },

@@ -7,9 +7,20 @@ import sys
 from pathlib import Path
 
 
+def _make_message(msg_type: int, seq: int, payload: bytes) -> bytes:
+    return (
+        b"SYN1"
+        + bytes([msg_type])
+        + b"\x00\x00\x00"
+        + bytes([seq])
+        + (11 + len(payload)).to_bytes(2, "big")
+        + payload
+    )
+
+
 def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     sample = tmp_path / "sample.dat"
-    sample_bytes = b"\x01\x02course-project\x03\x04"
+    sample_bytes = b"".join(_make_message(0x01, i + 1, b"P" * 8) for i in range(3))
     sample.write_bytes(sample_bytes)
     input_ref = f"input-{hashlib.sha256(sample_bytes).hexdigest()[:16]}"
     state_dir = tmp_path / "state"
@@ -35,8 +46,8 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
                 "inputRef": input_ref,
                 "mode": "baseline",
                 "llmEnabled": False,
-                "verificationEnabled": False,
-                "behaviorEnabled": False,
+                "verificationEnabled": True,
+                "behaviorEnabled": True,
                 "optionalDependencyPolicy": "degrade",
             },
         },
@@ -103,4 +114,16 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     assert result["status"] == "PARTIAL"
     assert result["inputId"] == input_ref
     assert result["resultRef"] == "tasks/task-1/analysis-result.json"
+    assert result["findings"] == []
+    assert result["metrics"]["analysisBackend"] == "track-d-baseline-v1"
+    assert result["metrics"]["trackDExecuted"] is True
+    assert result["metrics"]["messageCount"] > 0
+    assert result["metrics"]["fieldCandidateCount"] >= 0
     assert result["limitations"]
+
+    artifact_types = {artifact["type"] for artifact in result["artifacts"]}
+    assert {"messages", "alignment", "statistics", "behavior"} <= artifact_types
+    for artifact in result["artifacts"]:
+        artifact_path = state_dir / artifact["ref"]
+        assert artifact_path.is_file()
+        json.loads(artifact_path.read_text(encoding="utf-8"))

@@ -96,6 +96,7 @@ An AI agent may inspect the whole repository, but should not silently take over 
 Before parallel implementation:
 
 - [`docs/pre-implementation-readiness.md`](docs/pre-implementation-readiness.md) — readiness gate and first implementation slices;
+- [`docs/day0-contract-freeze.md`](docs/day0-contract-freeze.md) — exact shared names/DTOs/sidecar/result contracts all Tracks and AI agents must use at implementation start;
 - [`docs/development-environment.md`](docs/development-environment.md) — canonical Python/Node/Rust setup;
 - [`contracts/README.md`](contracts/README.md) — cross-language schemas and golden fixtures;
 - [`docs/repository-settings.md`](docs/repository-settings.md) — required `main` protection settings;
@@ -103,6 +104,17 @@ Before parallel implementation:
 - [`docs/delivery-checklist.md`](docs/delivery-checklist.md) — final course delivery and freeze checklist.
 
 Teacher-provided `.dat` evaluation files are intentionally **not** fabricated as a prerequisite. When they arrive, record only the metadata/hashes that are safe and permitted to store; do not commit raw files unless redistribution is explicitly allowed.
+
+## Day-0 Contract Baseline
+
+Before writing cross-Track integration code, use the frozen contracts rather than inventing local aliases:
+
+- semantic decisions: `ACCEPTED / REJECTED / UNCERTAIN` externally, lowercase equivalents in Python;
+- sidecar v1 methods: `register_input`, `inspect_file`, `analyze`, `cancel_task`, `get_result`, `read_range`;
+- Track D → C DTOs: `InputMetadata`, `MessageCandidate`, `MessageFamily`, `AlignmentResult`, `FieldCandidate`, `BehaviorFeatures` and related project-native models;
+- desktop-facing result linkage: `findings[].evidenceIds` → `evidence[]`, with larger outputs exposed through `artifacts[]` controlled references.
+
+Any incompatible or semantic change follows the shared-contract migration/review process in `docs/architecture.md` and `AGENTS.md`.
 
 ## Design Documents
 
@@ -119,7 +131,7 @@ Teacher-provided `.dat` evaluation files are intentionally **not** fabricated as
 ## Collaboration Rules
 
 1. Work from an Issue and a task-sized branch; non-trivial changes go through a PR.
-2. Treat `contracts/`, `models.py`, `docs/architecture.md`, and sidecar protocol versions as shared interfaces.
+2. Treat `contracts/`, `models.py`, `docs/architecture.md`, `docs/day0-contract-freeze.md`, and sidecar protocol versions as shared interfaces.
 3. Cross-language work is contract-first: schema + golden fixture first, then producer/consumer implementations.
 4. Every accepted protocol-semantic claim must retain evidence and verification records.
 5. Do not commit raw private traffic, credentials, test keys, restored sensitive plaintext, teacher files without permission, or unrestricted shell hooks.
@@ -128,4 +140,4 @@ Teacher-provided `.dat` evaluation files are intentionally **not** fabricated as
 
 ## Current Status
 
-**Phase: pre-implementation readiness baseline established; four Track implementations may proceed once `main` protection is enabled in repository settings.**
+**Phase: Day-0 shared contracts and pre-implementation readiness are established; the four Track implementations may proceed once the manual `main` protection setting is enabled.**

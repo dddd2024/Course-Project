@@ -8,21 +8,35 @@ from typing import Any
 
 from course_project.behavior import extract_behavior_features, from_packet_candidates
 from course_project.boundary import detect_boundaries, to_message_candidates
+from course_project.exporters.protocol_schema import build_protocol_schema
 from course_project.inference import family_analysis, infer_field_candidates
 from course_project.io import load_bin, load_dat
 from course_project.models import AnalysisResult, ArtifactRef, ArtifactType, InputMetadata
+from course_project.sidecar.semantic_bridge import (
+    SemanticAnalysis,
+    SemanticBackend,
+    validate_semantic_analysis,
+)
 
 
 class TrackDBaselineBackend:
-    """Run the deterministic Track D pipeline behind the Sidecar v1 boundary.
+    """Run deterministic Track D preprocessing and optionally compose Track C.
 
-    Track D produces pre-semantic protocol structure only. Until Track C is
-    connected, this backend deliberately returns ``partial`` and never promotes
-    a ``FieldCandidate`` into an ``AnalysisFinding``.
+    Track D produces pre-semantic protocol structure. Without a semantic backend,
+    requests that ask for evidence/verification remain ``partial`` and no
+    ``FieldCandidate`` is promoted into an ``AnalysisFinding``. Track C can be
+    connected through the narrow project-native ``SemanticBackend`` seam without
+    changing the Sidecar v1 request vocabulary or Track D's public DTOs.
     """
 
-    def __init__(self, *, state_dir: Path) -> None:
+    def __init__(
+        self,
+        *,
+        state_dir: Path,
+        semantic_backend: SemanticBackend | None = None,
+    ) -> None:
         self.state_dir = state_dir.expanduser().resolve()
+        self.semantic_backend = semantic_backend
 
     def analyze(
         self,
@@ -50,6 +64,7 @@ class TrackDBaselineBackend:
                     "inputSizeBytes": input_metadata.size_bytes,
                     "mode": config["mode"],
                     "trackDExecuted": False,
+                    "semanticExecuted": False,
                 },
                 limitations=(
                     (
@@ -128,6 +143,47 @@ class TrackDBaselineBackend:
                 )
             )
 
+        semantic_requested = _semantic_requested(config, requested_stages=requested_stages)
+        semantic = self._run_semantic_backend(
+            input_metadata=input_metadata,
+            input_path=input_path,
+            packets=tuple(packets),
+            messages=tuple(messages),
+            families=tuple(families),
+            alignments=tuple(alignments),
+            field_candidates=tuple(field_candidates),
+            behavior=behavior,
+            config=config,
+        ) if semantic_requested and self.semantic_backend is not None else None
+
+        if semantic is not None and semantic.evidence:
+            artifacts.append(
+                self._write_artifact(
+                    artifact_dir=artifact_dir,
+                    task_id=task_id,
+                    artifact_id="track-c-evidence",
+                    artifact_type="evidence",
+                    filename="evidence.json",
+                    payload={"evidence": [asdict(item) for item in semantic.evidence]},
+                    count=len(semantic.evidence),
+                    producer=semantic.producer,
+                )
+            )
+
+        if semantic is not None and semantic.verified_fields:
+            artifacts.append(
+                self._write_artifact(
+                    artifact_dir=artifact_dir,
+                    task_id=task_id,
+                    artifact_id="verified-protocol-schema",
+                    artifact_type="schema",
+                    filename="protocol-schema.json",
+                    payload=build_protocol_schema(semantic.verified_fields),
+                    count=len(semantic.verified_fields),
+                    producer=semantic.producer,
+                )
+            )
+
         statistics = {
             "inputSizeBytes": input_metadata.size_bytes,
             "packetCount": len(packets),
@@ -136,6 +192,10 @@ class TrackDBaselineBackend:
             "alignmentCount": len(alignments),
             "fieldCandidateCount": len(field_candidates),
             "behaviorComputed": behavior is not None,
+            "semanticExecuted": semantic is not None,
+            "findingCount": len(semantic.findings) if semantic is not None else 0,
+            "evidenceCount": len(semantic.evidence) if semantic is not None else 0,
+            "verifiedFieldCount": len(semantic.verified_fields) if semantic is not None else 0,
         }
         artifacts.append(
             self._write_artifact(
@@ -149,38 +209,80 @@ class TrackDBaselineBackend:
             )
         )
 
-        limitations = [
-            (
+        limitations = list(semantic.limitations if semantic is not None else ())
+        if semantic_requested and semantic is None:
+            limitations.append(
                 "Track D deterministic analysis ran successfully, but Track C semantic "
                 "evidence/verification is not connected; field candidates are not promoted "
                 "to protocol findings."
-            ),
-        ]
-        if config["mode"] == "evidencegraph":
-            limitations.append(
-                "EvidenceGraph mode was requested; this backend returns only the "
-                "deterministic Track D preprocessing needed by Track C."
             )
-        if config.get("llmEnabled"):
-            limitations.append("LLM reasoning was requested but is not connected in Track A yet.")
-        if config.get("verificationEnabled"):
-            limitations.append(
-                "Semantic verification was requested but remains pending Track C integration."
-            )
+            if config["mode"] == "evidencegraph":
+                limitations.append(
+                    "EvidenceGraph mode was requested; this backend returns only the "
+                    "deterministic Track D preprocessing needed by Track C."
+                )
+            if config.get("llmEnabled"):
+                limitations.append("LLM reasoning was requested but Track C is not connected.")
+            if config.get("verificationEnabled"):
+                limitations.append(
+                    "Semantic verification was requested but remains pending Track C integration."
+                )
 
+        metrics: dict[str, Any] = {
+            "analysisBackend": "track-d-baseline-v1",
+            "mode": config["mode"],
+            "trackDExecuted": True,
+            **statistics,
+        }
+        if semantic is not None:
+            metrics["semanticBackend"] = semantic.producer
+            if semantic.metrics:
+                metrics["semanticMetrics"] = dict(semantic.metrics)
+
+        status = (
+            semantic.status
+            if semantic is not None
+            else "partial" if semantic_requested else "completed"
+        )
         return AnalysisResult(
             task_id=task_id,
-            status="partial",
+            status=status,
+            findings=semantic.findings if semantic is not None else (),
             input_id=input_metadata.input_id,
+            evidence=semantic.evidence if semantic is not None else (),
             artifacts=tuple(artifacts),
-            metrics={
-                "analysisBackend": "track-d-baseline-v1",
-                "mode": config["mode"],
-                "trackDExecuted": True,
-                **statistics,
-            },
+            metrics=metrics,
             limitations=tuple(limitations),
         )
+
+    def _run_semantic_backend(
+        self,
+        *,
+        input_metadata: InputMetadata,
+        input_path: Path,
+        packets: tuple[Any, ...],
+        messages: tuple[Any, ...],
+        families: tuple[Any, ...],
+        alignments: tuple[Any, ...],
+        field_candidates: tuple[Any, ...],
+        behavior: Any,
+        config: Mapping[str, Any],
+    ) -> SemanticAnalysis:
+        if self.semantic_backend is None:
+            raise RuntimeError("semantic backend is not configured")
+        result = self.semantic_backend.analyze(
+            input_metadata=input_metadata,
+            input_path=input_path,
+            packets=packets,
+            messages=messages,
+            families=families,
+            alignments=alignments,
+            field_candidates=field_candidates,
+            behavior=behavior,
+            config=config,
+        )
+        validate_semantic_analysis(result)
+        return result
 
     def _write_artifact(
         self,
@@ -192,6 +294,7 @@ class TrackDBaselineBackend:
         filename: str,
         payload: Any,
         count: int,
+        producer: str = "track-d-baseline-v1",
     ) -> ArtifactRef:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         target = artifact_dir / filename
@@ -205,5 +308,15 @@ class TrackDBaselineBackend:
             format="json",
             ref=f"tasks/{task_id}/artifacts/{filename}",
             count=count,
-            metadata={"producer": "track-d-baseline-v1"},
+            metadata={"producer": producer},
         )
+
+
+def _semantic_requested(config: Mapping[str, Any], *, requested_stages: set[str]) -> bool:
+    if config.get("verificationEnabled") or config.get("llmEnabled"):
+        return True
+    if config.get("mode") == "evidencegraph":
+        return True
+    if not requested_stages:
+        return True
+    return bool({"evidence", "llm", "verification", "export"} & requested_stages)

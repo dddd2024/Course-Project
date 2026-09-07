@@ -17,7 +17,7 @@ Implement the V2 research contribution: provenance-aware evidence handling and e
 5. `docs/research-landscape.md`
 6. `docs/architecture.md`
 7. `docs/testing-plan.md`
-8. Track D output contracts/fixtures relevant to the task
+8. `src/course_project/models.py` and relevant Track D fixtures/contracts
 
 ## Primary owned paths
 
@@ -35,18 +35,28 @@ Implement the V2 research contribution: provenance-aware evidence handling and e
 - executable checks for length, sequence, magic/constant, enum/type, timestamp, and limited practical checksum families;
 - provenance-aware evidence fusion;
 - `ACCEPTED / REJECTED / UNCERTAIN` decisions;
+- deterministic mock/offline and real-provider boundary behind project-native interfaces;
 - naive-vote and LLM-only baselines;
 - ablations and metrics including false-hypothesis rate, ParseCoverage, calibration/risk-coverage when implemented.
 
 ## Inputs
 
-Track D supplies project-native deterministic observations, packet/message candidates, alignment/field candidates, and behavior/statistical evidence. Do not depend directly on Track D's third-party adapter objects.
+Track D supplies project-native deterministic/PRE outputs, specifically as appropriate:
+
+- `InputMetadata` / `PacketCandidate` / `MessageCandidate`;
+- `MessageFamily`;
+- `AlignmentResult` / `AlignmentRegion`;
+- `FieldCandidate`;
+- `BehaviorFeatures`;
+- deterministic `Evidence` records or observations that Track C converts into provenance-tagged evidence.
+
+Do not depend directly on Track D's Netzob, BinaryInferno, NFStream, Scapy or other third-party adapter objects.
 
 ## Outputs
 
 - `Evidence` records with provenance;
-- competing protocol hypotheses;
-- executable check records;
+- competing `ProtocolHypothesis` objects;
+- `ExecutableCheck` records;
 - `VerificationResult` and accepted `VerifiedField` objects;
 - experiment tables/figures/reproducibility notes consumed by Track A and presented by Track B.
 
@@ -56,6 +66,7 @@ Track D supplies project-native deterministic observations, packet/message candi
 - Derived evidence must not be counted as independent support merely because another tool/LLM restates it.
 - Plausible but unsupported hypotheses remain `UNCERTAIN` or become `REJECTED`.
 - Ground truth is evaluation-only and must not leak into inference.
+- Teacher-provided `.dat` is the authoritative course evaluation input; synthetic controlled fixtures are mechanism/engineering evidence only unless explicitly reported as such.
 - Every claimed innovation must have a measurable implementation plus baseline/ablation capable of testing the claim.
 
 ## Do not own by default
@@ -66,13 +77,13 @@ Track D supplies project-native deterministic observations, packet/message candi
 
 ## First implementation sequence
 
-1. evidence/provenance model and registry;
+1. evidence/provenance registry using shared models;
 2. competing hypothesis representation;
 3. length + sequence executable verification;
 4. dependency-aware fusion and abstention;
 5. provisional schema/parser feedback with Track A;
-6. LLM-only / verifier / naive-vote / full-system experiments.
+6. LLM-only / verifier / naive-vote / full-system experiments where ground truth supports comparison.
 
 ## Completion standard
 
-A research feature is complete only when it has deterministic tests or controlled evaluation data, preserves provenance, reports failures/uncertainty explicitly, and contributes evidence to a baseline or ablation rather than existing only as an architectural claim.
+A research feature is complete only when it has deterministic tests or explicitly identified controlled evaluation evidence, preserves provenance, reports failures/uncertainty explicitly, and contributes evidence to a baseline or ablation rather than existing only as an architectural claim.

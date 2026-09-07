@@ -15,6 +15,7 @@
     "event": {"type": "string", "enum": ["progress", "status"]},
     "stage": {"type": "string", "minLength": 1},
     "progress": {"type": "number", "minimum": 0, "maximum": 1},
+    "data": {"type": "object"},
     "resultRef": {"type": "string", "minLength": 1},
     "error": {
       "type": "object",
@@ -110,6 +111,47 @@
         "length": {"type": "integer", "minimum": 1, "maximum": 1048576}
       },
       "additionalProperties": false
+    },
+    "inputMetadataData": {
+      "type": "object",
+      "required": ["inputRef", "kind", "sizeBytes", "sha256", "sourceName"],
+      "properties": {
+        "inputRef": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "enum": ["dat", "bin", "pcap", "pcapng", "unknown"]},
+        "sizeBytes": {"type": "integer", "minimum": 0},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sourceName": {"type": "string", "minLength": 1},
+        "directionAvailable": {"type": "boolean"},
+        "timestampAvailable": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "rangeData": {
+      "type": "object",
+      "required": ["inputRef", "offset", "requestedLength", "actualLength", "encoding", "bytes", "eof"],
+      "properties": {
+        "inputRef": {"type": "string", "minLength": 1},
+        "offset": {"type": "integer", "minimum": 0},
+        "requestedLength": {"type": "integer", "minimum": 1, "maximum": 1048576},
+        "actualLength": {"type": "integer", "minimum": 0, "maximum": 1048576},
+        "encoding": {"type": "string", "const": "base64"},
+        "bytes": {"type": "string"},
+        "eof": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "taskStatusData": {
+      "type": "object",
+      "required": ["taskId", "status"],
+      "properties": {
+        "taskId": {"type": "string", "minLength": 1},
+        "status": {
+          "type": "string",
+          "enum": ["QUEUED", "RUNNING", "COMPLETED", "PARTIAL", "FAILED", "CANCELLED"]
+        },
+        "resultRef": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
     }
   },
   "oneOf": [
@@ -156,9 +198,41 @@
       }
     },
     {
-      "required": ["event"],
+      "required": ["event", "stage", "progress"],
       "properties": {
-        "event": {"enum": ["progress", "status"]}
+        "event": {"const": "progress"}
+      }
+    },
+    {
+      "required": ["event", "stage", "data"],
+      "properties": {
+        "event": {"const": "status"},
+        "stage": {"const": "registered"},
+        "data": {"$ref": "#/$defs/inputMetadataData"}
+      }
+    },
+    {
+      "required": ["event", "stage", "data"],
+      "properties": {
+        "event": {"const": "status"},
+        "stage": {"const": "inspected"},
+        "data": {"$ref": "#/$defs/inputMetadataData"}
+      }
+    },
+    {
+      "required": ["event", "stage", "data"],
+      "properties": {
+        "event": {"const": "status"},
+        "stage": {"const": "range"},
+        "data": {"$ref": "#/$defs/rangeData"}
+      }
+    },
+    {
+      "required": ["event", "stage", "data"],
+      "properties": {
+        "event": {"const": "status"},
+        "stage": {"const": "task_status"},
+        "data": {"$ref": "#/$defs/taskStatusData"}
       }
     },
     {"required": ["resultRef"]},

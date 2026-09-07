@@ -100,5 +100,5 @@ A breaking or semantic change to any item above requires:
 2. golden fixture update;
 3. tests;
 4. producer/consumer migration notes;
-5. Track A plus affected Track review;
+5. the single required human review selected by `AGENTS.md`;
 6. protocol version change when compatibility is broken.

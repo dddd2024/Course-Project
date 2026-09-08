@@ -190,7 +190,7 @@ def _build_contribution(
     evidence_ids: tuple[str, ...], by_id: dict[str, Evidence]
 ) -> EvidenceContribution:
     records = tuple(by_id[evidence_id] for evidence_id in evidence_ids)
-    representative = sorted(records, key=lambda item: (-item.score, item.evidence_id))[0]
+    representative = min(records, key=lambda item: (-item.score, item.evidence_id))
 
     group_counts: dict[str, int] = defaultdict(int)
     for item in records:

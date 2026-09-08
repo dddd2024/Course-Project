@@ -12,13 +12,23 @@ from course_project.evidence.fusion import (
     provenance_aware_fusion,
 )
 from course_project.evidence.graph import EvidenceGraph, EvidenceGraphError
+from course_project.evidence.producers import (
+    EvidenceProductionError,
+    evidence_from_executable_check,
+    evidence_from_field_candidate,
+    evidence_from_llm_hypothesis,
+)
 
 __all__ = [
     "EvidenceGraph",
     "EvidenceGraphError",
+    "EvidenceProductionError",
     "FusionError",
     "FusionPolicy",
     "FusionResult",
+    "evidence_from_executable_check",
+    "evidence_from_field_candidate",
+    "evidence_from_llm_hypothesis",
     "naive_vote",
     "provenance_aware_fusion",
 ]

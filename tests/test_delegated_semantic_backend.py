@@ -56,11 +56,16 @@ def test_delegated_backend_runs_real_length_sequence_verification(tmp_path: Path
     assert result.metrics["semanticBackend"] == "track-a-delegated-track-c-semantic-v1"
     semantic_metrics = result.metrics["semanticMetrics"]
     assert semantic_metrics["verificationExecuted"] is True
+    assert semantic_metrics["fusionExecuted"] is True
+    assert semantic_metrics["fusionPolicy"] == "transparent-component-mean-v1"
     assert semantic_metrics["decisionCounts"]["accepted"] >= 2
+    assert semantic_metrics["verificationDecisionCounts"]["accepted"] >= 2
     assert result.metrics["verifiedFieldCount"] >= 2
     assert any(finding.semantic_type == "length" for finding in result.findings)
     assert any(finding.semantic_type == "sequence" for finding in result.findings)
     assert all(finding.status in {"accepted", "rejected", "uncertain"} for finding in result.findings)
+    assert all("evidence" in finding.scores for finding in result.findings)
+    assert all("verification" in finding.scores for finding in result.findings)
 
     candidate_evidence = {
         item.evidence_id: item
@@ -79,6 +84,28 @@ def test_delegated_backend_runs_real_length_sequence_verification(tmp_path: Path
         parent_id = item.parent_evidence_ids[0]
         assert parent_id in candidate_evidence
         assert item.independence_group == candidate_evidence[parent_id].independence_group
+
+    evidence_by_id = {item.evidence_id: item for item in result.evidence}
+    finding_producers = [
+        {evidence_by_id[evidence_id].source_component for evidence_id in finding.evidence_ids}
+        for finding in result.findings
+    ]
+    assert any(
+        producers
+        >= {
+            "track-d-alignment",
+            "track-d-field-candidate",
+            "track-c-executable-verifier",
+        }
+        for producers in finding_producers
+    )
+    assert set(semantic_metrics["fusionEvidenceProducers"]) >= {
+        "track-d-alignment",
+        "track-d-field-candidate",
+        "track-c-executable-verifier",
+    }
+    assert semantic_metrics["fusionEvidenceProducerCount"] >= 3
+    assert semantic_metrics["fusionAudit"]
 
     schema_artifact = next(artifact for artifact in result.artifacts if artifact.type == "schema")
     schema = json.loads((state_dir / schema_artifact.ref).read_text(encoding="utf-8"))

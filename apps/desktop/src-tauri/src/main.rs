@@ -17,6 +17,7 @@ use tauri_plugin_dialog::DialogExt;
 
 const TASK_EVENT: &str = "task-update";
 const MAX_RESTORED_PREVIEW_BYTES: u64 = 64 * 1024;
+const SIDECAR_EXECUTABLE_NAME: &str = "course-project-sidecar";
 
 #[derive(Clone)]
 struct AppState {
@@ -107,6 +108,78 @@ struct SidecarClient {
     next_id: u64,
 }
 
+enum SidecarLaunch {
+    Bundled(PathBuf),
+    Python(PathBuf),
+}
+
+fn sidecar_state_dir() -> Result<PathBuf, String> {
+    let configured = std::env::var_os("COURSE_PROJECT_STATE_DIR").map(PathBuf::from);
+    let path = if let Some(path) = configured {
+        path
+    } else if !cfg!(debug_assertions) {
+        std::env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .map(|path| path.join("Evidence Workbench").join("state"))
+            .unwrap_or_else(|| PathBuf::from(".course-project-state"))
+    } else {
+        PathBuf::from(".course-project-state")
+    };
+    if path.is_absolute() {
+        Ok(path)
+    } else {
+        std::env::current_dir()
+            .map(|current| current.join(path))
+            .map_err(|error| format!("cannot resolve sidecar state directory: {error}"))
+    }
+}
+
+fn bundled_sidecar_candidates(current_executable: &Path) -> Vec<PathBuf> {
+    let extension = std::env::consts::EXE_EXTENSION;
+    let filename = if extension.is_empty() {
+        SIDECAR_EXECUTABLE_NAME.to_string()
+    } else {
+        format!("{SIDECAR_EXECUTABLE_NAME}.{extension}")
+    };
+    let Some(parent) = current_executable.parent() else {
+        return Vec::new();
+    };
+    let mut candidates = vec![parent.join(&filename)];
+    if parent.file_name().and_then(|name| name.to_str()) == Some("deps") {
+        if let Some(debug_or_release) = parent.parent() {
+            candidates.push(debug_or_release.join(filename));
+        }
+    }
+    candidates
+}
+
+fn resolve_sidecar_launch() -> Result<SidecarLaunch, String> {
+    if let Some(configured) = std::env::var_os("COURSE_PROJECT_SIDECAR_EXECUTABLE") {
+        let path = PathBuf::from(configured);
+        if !path.is_file() {
+            return Err(format!(
+                "configured packaged sidecar does not exist: {}",
+                path.display()
+            ));
+        }
+        return Ok(SidecarLaunch::Bundled(path));
+    }
+
+    if let Ok(current_executable) = std::env::current_exe() {
+        if let Some(path) = bundled_sidecar_candidates(&current_executable)
+            .into_iter()
+            .find(|candidate| candidate.is_file())
+        {
+            return Ok(SidecarLaunch::Bundled(path));
+        }
+    }
+
+    let python = std::env::var_os("COURSE_PROJECT_SIDECAR_COMMAND")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("python"));
+    Ok(SidecarLaunch::Python(python))
+}
+
 impl Drop for SidecarClient {
     fn drop(&mut self) {
         let _ = self._child.kill();
@@ -116,29 +189,49 @@ impl Drop for SidecarClient {
 
 impl SidecarClient {
     fn spawn() -> Result<Self, String> {
-        let program = std::env::var("COURSE_PROJECT_SIDECAR_COMMAND")
-            .unwrap_or_else(|_| "python".to_string());
-        let state_dir = std::env::var("COURSE_PROJECT_STATE_DIR")
-            .unwrap_or_else(|_| ".course-project-state".to_string());
+        let state_dir = sidecar_state_dir()?;
+        fs::create_dir_all(&state_dir)
+            .map_err(|error| format!("cannot create sidecar state directory: {error}"))?;
+        let launch = resolve_sidecar_launch()?;
+        let (program, args, python_mode) = match launch {
+            SidecarLaunch::Bundled(program) => (
+                program,
+                vec!["--state-dir".into(), state_dir.as_os_str().to_owned()],
+                false,
+            ),
+            SidecarLaunch::Python(program) => (
+                program,
+                vec![
+                    "-m".into(),
+                    "course_project.sidecar".into(),
+                    "--state-dir".into(),
+                    state_dir.as_os_str().to_owned(),
+                ],
+                true,
+            ),
+        };
+        let program_display = program.display().to_string();
         let mut command = Command::new(program);
-        let mut python_paths = vec![Path::new(env!("CARGO_MANIFEST_DIR"))
-            .ancestors()
-            .nth(3)
-            .unwrap_or_else(|| Path::new("."))
-            .join("src")];
-        if let Some(existing) = std::env::var_os("PYTHONPATH") {
-            python_paths.extend(std::env::split_paths(&existing));
+        command.args(args);
+        if python_mode {
+            let mut python_paths = vec![Path::new(env!("CARGO_MANIFEST_DIR"))
+                .ancestors()
+                .nth(3)
+                .unwrap_or_else(|| Path::new("."))
+                .join("src")];
+            if let Some(existing) = std::env::var_os("PYTHONPATH") {
+                python_paths.extend(std::env::split_paths(&existing));
+            }
+            let python_path = std::env::join_paths(python_paths)
+                .map_err(|error| format!("cannot prepare sidecar PYTHONPATH: {error}"))?;
+            command.env("PYTHONPATH", python_path);
         }
-        let python_path = std::env::join_paths(python_paths)
-            .map_err(|error| format!("cannot prepare sidecar PYTHONPATH: {error}"))?;
         let mut child = command
-            .args(["-m", "course_project.sidecar", "--state-dir", &state_dir])
-            .env("PYTHONPATH", python_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
-            .map_err(|error| format!("cannot start Python sidecar: {error}"))?;
+            .map_err(|error| format!("cannot start sidecar {program_display}: {error}"))?;
         let stdin = child
             .stdin
             .take()
@@ -180,7 +273,7 @@ impl SidecarClient {
                 .read_line(&mut line)
                 .map_err(|error| format!("cannot read sidecar response: {error}"))?;
             if count == 0 {
-                return Err("Python sidecar exited without a response".to_string());
+                return Err("sidecar exited without a response".to_string());
             }
             let response: Value = serde_json::from_str(&line)
                 .map_err(|error| format!("invalid sidecar JSON response: {error}"))?;
@@ -222,7 +315,7 @@ impl SidecarClient {
             .read_line(&mut line)
             .map_err(|error| format!("cannot read sidecar response: {error}"))?;
         if count == 0 {
-            return Err("Python sidecar exited without a response".to_string());
+            return Err("sidecar exited without a response".to_string());
         }
         let response: Value = serde_json::from_str(&line)
             .map_err(|error| format!("invalid sidecar JSON response: {error}"))?;
@@ -367,17 +460,7 @@ fn emit_update(app: &AppHandle, update: TaskUpdate) {
 }
 
 fn result_state_root() -> Result<PathBuf, String> {
-    let configured = std::env::var("COURSE_PROJECT_STATE_DIR")
-        .unwrap_or_else(|_| ".course-project-state".to_string());
-    let path = PathBuf::from(configured);
-    let absolute = if path.is_absolute() {
-        path
-    } else {
-        std::env::current_dir()
-            .map_err(|error| format!("cannot resolve sidecar state directory: {error}"))?
-            .join(path)
-    };
-    absolute
+    sidecar_state_dir()?
         .canonicalize()
         .map_err(|error| format!("cannot access sidecar state directory: {error}"))
 }
@@ -809,13 +892,44 @@ fn cancel_contract_spike(id: String, state: State<'_, AppState>) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::{
-        find_restored_artifact, read_artifact_preview, resolve_controlled_path, SidecarClient,
+        bundled_sidecar_candidates, find_restored_artifact, read_artifact_preview,
+        resolve_controlled_path, SidecarClient, SIDECAR_EXECUTABLE_NAME,
     };
     use serde_json::json;
     use std::{
         fs,
+        path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    #[test]
+    fn bundled_sidecar_candidates_cover_release_and_test_executables() {
+        let extension = std::env::consts::EXE_EXTENSION;
+        let sidecar_name = if extension.is_empty() {
+            SIDECAR_EXECUTABLE_NAME.to_string()
+        } else {
+            format!("{SIDECAR_EXECUTABLE_NAME}.{extension}")
+        };
+        let release_dir = PathBuf::from("target").join("release");
+        let release_executable = release_dir.join(if extension.is_empty() {
+            "course-project-desktop".to_string()
+        } else {
+            format!("course-project-desktop.{extension}")
+        });
+        assert_eq!(
+            bundled_sidecar_candidates(&release_executable),
+            vec![release_dir.join(&sidecar_name)]
+        );
+
+        let test_executable = release_dir.join("deps").join("desktop-test");
+        assert_eq!(
+            bundled_sidecar_candidates(&test_executable),
+            vec![
+                release_dir.join("deps").join(&sidecar_name),
+                release_dir.join(sidecar_name),
+            ]
+        );
+    }
 
     #[test]
     fn controlled_restored_artifact_preview_enforces_task_manifest_and_root() {

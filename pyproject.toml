@@ -23,6 +23,9 @@ dev = [
   "mypy>=1.11",
   "jsonschema>=4.23",
 ]
+package = [
+  "pyinstaller==6.22.2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

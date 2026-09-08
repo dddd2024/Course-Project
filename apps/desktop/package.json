@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "sidecar:build": "python ../../scripts/build_sidecar.py",
+    "sidecar:smoke": "python ../../scripts/build_sidecar.py --smoke",
+    "bundle:windows": "python ../../scripts/build_sidecar.py --smoke && tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis",
     "tauri": "tauri"
   },
   "dependencies": {

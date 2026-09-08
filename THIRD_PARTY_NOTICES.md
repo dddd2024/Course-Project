@@ -17,3 +17,17 @@ When third-party material is added, record:
 - modifications made by this project.
 
 Normal package-manager dependencies should still have their version/license recorded in `docs/dependency-register.md`, even when their source is not redistributed here.
+
+## PyInstaller 6.22.2 bootloader and run-time hooks
+
+Windows packages built by `scripts/build_sidecar.py` embed the PyInstaller bootloader and run-time
+hooks. PyInstaller is Copyright (c) 2010-2023, PyInstaller Development Team; Copyright (c)
+2005-2009, Giovanni Bajo; based on previous work Copyright (c) 2002 McMillan Enterprises, Inc.
+
+- Upstream: https://github.com/pyinstaller/pyinstaller/tree/v6.22.2
+- License: GPL-2.0-or-later WITH Bootloader-exception
+- Embedded run-time hooks: Apache-2.0
+- Project modification: none; the released build tool packages this repository's Python entrypoint.
+
+The upstream licensing terms grant permission to embed and distribute the compiled bootloader with
+other programs. See https://github.com/pyinstaller/pyinstaller/blob/v6.22.2/COPYING.txt.

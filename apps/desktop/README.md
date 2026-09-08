@@ -11,6 +11,20 @@ From this directory:
 
 The browser fallback keeps the D0 task lifecycle available, but file selection and bounded byte reads require the Tauri desktop runtime.
 
+## D4 Windows package
+
+Install the root packaging extra with `python -m pip install -e ".[dev,package]"`, then run:
+
+    npm run sidecar:smoke
+    npm run bundle:windows
+
+The build freezes the current Python analyzer into a target-suffixed executable, validates its JSONL
+file/range path, and embeds it in an NSIS installer. The installed application starts that bundled
+Sidecar without requiring Python. Local `tauri dev` continues to use the Python module fallback.
+
+See `docs/windows-packaging.md` for prerequisites, output paths, overrides, and the clean-machine
+rehearsal checklist.
+
 ## D1 flow
 
 1. Select an authorized .dat, .bin, .pcap or .pcapng file in the Rust-owned dialog.

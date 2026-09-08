@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from course_project.evidence.alignment_producer import produce_alignment_evidence
 from course_project.evidence.hypothesis_manager import HypothesisManager
 from course_project.models import (
     AlignmentResult,
@@ -45,7 +46,7 @@ class DeterministicTrackCSemanticBackend:
         behavior: BehaviorFeatures | None,
         config: Mapping[str, Any],
     ) -> SemanticAnalysis:
-        del packets, alignments, behavior
+        del packets, behavior
         requested_stages = set(config.get("stages") or ())
         if config.get("verificationEnabled") is False and "verification" not in requested_stages:
             return SemanticAnalysis(
@@ -67,7 +68,8 @@ class DeterministicTrackCSemanticBackend:
         entries: list[
             tuple[FieldCandidate, ProtocolHypothesis, tuple[bytes, ...], tuple[str, ...], str]
         ] = []
-        evidence: list[Evidence] = []
+        alignment_evidence = produce_alignment_evidence(alignments)
+        evidence: list[Evidence] = list(alignment_evidence)
         limitations: list[str] = []
 
         for candidate in field_candidates:
@@ -188,6 +190,7 @@ class DeterministicTrackCSemanticBackend:
             )
 
         status = "completed" if entries and not limitations else "partial"
+        evidence_producers = sorted({item.source_component for item in evidence})
         return SemanticAnalysis(
             producer=self.producer,
             status=status,
@@ -198,8 +201,11 @@ class DeterministicTrackCSemanticBackend:
                 "verificationExecuted": bool(entries),
                 "semanticSlice": "length-sequence",
                 "hypothesisCount": len(entries),
+                "alignmentEvidenceCount": len(alignment_evidence),
                 "candidateEvidenceCount": len(entries),
                 "verificationEvidenceCount": len(entries),
+                "evidenceProducerCount": len(evidence_producers),
+                "evidenceProducers": evidence_producers,
                 "acceptedFieldCount": len(verified_fields),
                 "decisionCounts": decision_counts,
                 "inputId": input_metadata.input_id,

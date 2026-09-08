@@ -21,6 +21,7 @@ from course_project.evidence.provenance_fusion import (
 )
 
 __all__ = [
+    "POLICY_VERSION",
     "DecisionVote",
     "EvidenceCollapseResult",
     "EvidenceContribution",
@@ -28,7 +29,6 @@ __all__ = [
     "FusionComponent",
     "NaiveVoteError",
     "NaiveVoteResult",
-    "POLICY_VERSION",
     "ProvenanceFusionError",
     "ProvenanceFusionResult",
     "collapse_dependent_evidence",

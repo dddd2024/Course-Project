@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import type {
   AnalysisFinding,
   AnalysisResult,
@@ -8,6 +9,11 @@ import type {
   FindingReview,
 } from "./analysisContracts";
 import { scoreLabel } from "./analysisContracts";
+import {
+  exportRestoredArtifact,
+  readRestoredArtifact,
+  type RestoredArtifactPreview,
+} from "./taskGateway";
 
 const labels: Record<AnalysisViewName, string> = {
   findings: "Findings",
@@ -17,6 +23,7 @@ const labels: Record<AnalysisViewName, string> = {
   alignment: "Alignment",
   statistics: "Statistics",
   behavior: "Behavior",
+  restoration: "Restoration",
 };
 
 const artifactTypes: Partial<Record<AnalysisViewName, string[]>> = {
@@ -24,7 +31,186 @@ const artifactTypes: Partial<Record<AnalysisViewName, string[]>> = {
   alignment: ["alignment"],
   statistics: ["statistics"],
   behavior: ["behavior"],
+  restoration: ["restored"],
 };
+
+type RestorationState = "complete" | "unavailable" | "failed" | "incomplete" | "not-required" | "unknown";
+
+const restorationStages = [
+  { key: "extractionStatus", label: "Extract" },
+  { key: "decryptionStatus", label: "Decrypt" },
+  { key: "decompressionStatus", label: "Decompress" },
+  { key: "reassemblyStatus", label: "Reassemble" },
+] as const;
+
+const restorationStateLabels: Record<RestorationState, string> = {
+  complete: "Complete",
+  unavailable: "Unavailable",
+  failed: "Failed",
+  incomplete: "Incomplete",
+  "not-required": "Not required",
+  unknown: "Unknown",
+};
+
+function normalizeRestorationState(value: unknown): RestorationState {
+  if (typeof value !== "string") return "unknown";
+  const normalized = value.trim().toLowerCase().replace(/[\s_]+/g, "-");
+  if (["complete", "completed", "success", "succeeded"].includes(normalized)) return "complete";
+  if (["unavailable", "no-key", "missing-key", "unsupported"].includes(normalized)) return "unavailable";
+  if (["failed", "error"].includes(normalized)) return "failed";
+  if (["incomplete", "partial", "truncated"].includes(normalized)) return "incomplete";
+  if (["not-required", "skipped"].includes(normalized)) return "not-required";
+  return "unknown";
+}
+
+function formatArtifactBytes(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KiB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+function BinaryArtifactPreview({ preview }: { preview: RestoredArtifactPreview }) {
+  const visibleBytes = preview.bytes.slice(0, 512);
+  const rows = Array.from({ length: Math.ceil(visibleBytes.length / 16) }, (_, rowIndex) => {
+    const offset = rowIndex * 16;
+    const row = visibleBytes.slice(offset, offset + 16);
+    return {
+      offset,
+      hex: row.map((value) => value.toString(16).padStart(2, "0")).join(" ").padEnd(47, " "),
+      ascii: row.map((value) => value >= 32 && value <= 126 ? String.fromCharCode(value) : ".").join(""),
+    };
+  });
+  return (
+    <div className="restoration-hex" role="table" aria-label="Restored binary preview">
+      {rows.map((row) => (
+        <div className="restoration-hex-row" role="row" key={row.offset}>
+          <code>{row.offset.toString(16).padStart(8, "0")}</code>
+          <code>{row.hex}</code>
+          <code>{row.ascii}</code>
+        </div>
+      ))}
+      {preview.bytes.length > visibleBytes.length && (
+        <p className="artifact-note">Hex rendering is limited to the first 512 preview bytes.</p>
+      )}
+    </div>
+  );
+}
+
+function RestorationView({ result }: { result: AnalysisResult }) {
+  const artifacts = useMemo(
+    () => (result.artifacts || []).filter((artifact) => artifact.type === "restored"),
+    [result.artifacts],
+  );
+  const [selectedId, setSelectedId] = useState(artifacts[0]?.artifactId ?? "");
+  const [preview, setPreview] = useState<RestoredArtifactPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedId(artifacts[0]?.artifactId ?? "");
+    setExportMessage(null);
+    setExportError(null);
+  }, [result.taskId, artifacts]);
+
+  const selected = artifacts.find((artifact) => artifact.artifactId === selectedId) ?? artifacts[0];
+
+  useEffect(() => {
+    if (!selected) {
+      setPreview(null);
+      setPreviewError(null);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    setPreview(null);
+    setPreviewError(null);
+    void readRestoredArtifact(result.taskId, selected.artifactId)
+      .then((next) => { if (active) setPreview(next); })
+      .catch((error: unknown) => {
+        if (active) setPreviewError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [result.taskId, selected]);
+
+  if (!selected) {
+    return (
+      <div className="artifact-backed">
+        <p className="view-intro">Restored content appears only when the analyzer advertises a controlled restored artifact.</p>
+        <div className="result-empty">
+          <strong>No restored artifact advertised</strong>
+          <p>{result.limitations?.[0] || "The analyzer did not produce extracted, decrypted, decompressed or reassembled output."}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const metadata = selected.metadata || {};
+  const overallState = normalizeRestorationState(metadata.restorationStatus);
+
+  async function handleExport() {
+    setExportMessage(null);
+    setExportError(null);
+    try {
+      const destination = await exportRestoredArtifact(result.taskId, selected.artifactId);
+      if (destination) setExportMessage(`Exported as ${destination}`);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <div className="restoration-view">
+      <p className="view-intro">Preview and export are restricted to restored artifacts registered by this task.</p>
+      <div className="restoration-heading">
+        <div>
+          <span className="finding-id">{selected.artifactId}</span>
+          <h4>{String(metadata.contentDescription || "Restored output")}</h4>
+        </div>
+        <span className="restoration-state" data-state={overallState}>{restorationStateLabels[overallState]}</span>
+      </div>
+      {artifacts.length > 1 && (
+        <label className="artifact-selector">
+          <span>Artifact</span>
+          <select value={selected.artifactId} onChange={(event) => setSelectedId(event.target.value)}>
+            {artifacts.map((artifact) => <option key={artifact.artifactId} value={artifact.artifactId}>{artifact.artifactId}</option>)}
+          </select>
+        </label>
+      )}
+      <div className="restoration-track" aria-label="Restoration stage status">
+        {restorationStages.map((stage, index) => {
+          const state = normalizeRestorationState(metadata[stage.key]);
+          return (
+            <div className="restoration-stage" data-state={state} key={stage.key}>
+              <span className="stage-index">{String(index + 1).padStart(2, "0")}</span>
+              <strong>{stage.label}</strong>
+              <span>{restorationStateLabels[state]}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="restoration-preview-heading">
+        <div>
+          <strong>Controlled preview</strong>
+          <span>{selected.format} / {preview ? formatArtifactBytes(preview.totalBytes) : "size pending"}</span>
+        </div>
+        <button className="secondary compact" onClick={() => void handleExport()}>Export artifact</button>
+      </div>
+      {loading && <p className="range-state">Reading the bounded artifact preview…</p>}
+      {previewError && <p className="error">Preview unavailable: {previewError}</p>}
+      {preview?.text !== undefined && <pre className="restoration-text-preview">{preview.text}</pre>}
+      {preview && preview.text === undefined && <BinaryArtifactPreview preview={preview} />}
+      {preview && !preview.eof && (
+        <p className="artifact-note">Preview shows {formatArtifactBytes(preview.previewBytes)} of {formatArtifactBytes(preview.totalBytes)}. Export copies the complete artifact.</p>
+      )}
+      {exportMessage && <p className="export-status" role="status">{exportMessage}</p>}
+      {exportError && <p className="error">Export failed: {exportError}</p>}
+      <p className="restoration-safety">Restored content stays local. The preview is bounded and the original artifact is not written to application logs.</p>
+    </div>
+  );
+}
 
 function EmptyResult() {
   return (
@@ -226,6 +412,7 @@ export function AnalysisViewContent({
     const artifacts = result.artifacts || [];
     return <div className="result-list">{artifacts.length > 0 ? artifacts.map((artifact) => <ArtifactCard key={artifact.artifactId} artifact={artifact} />) : <div className="result-empty"><strong>No artifacts</strong><p>The result contains no large-view references.</p></div>}</div>;
   }
+  if (view === "restoration") return <RestorationView result={result} />;
   return <ArtifactBackedView view={view} artifacts={result.artifacts || []} />;
 }
 

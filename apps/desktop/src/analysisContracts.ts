@@ -79,7 +79,8 @@ export type AnalysisViewName =
   | "packets"
   | "alignment"
   | "statistics"
-  | "behavior";
+  | "behavior"
+  | "restoration";
 
 export function scoreLabel(value: number | undefined) {
   return value === undefined ? "—" : value.toFixed(2);

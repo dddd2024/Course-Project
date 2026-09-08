@@ -1,4 +1,4 @@
-# Desktop D1: read-only binary workbench
+# Desktop D3: evidence and controlled restoration workbench
 
 The desktop app is a Tauri 2 + React + TypeScript workbench for controlled binary inspection.
 
@@ -37,3 +37,17 @@ Use **Load synthetic fixture** to exercise the result presentation before the fu
 ### D2 local candidate review
 
 Each finding exposes a local review control for `ACCEPTED`, `REJECTED` or `UNCERTAIN`, plus a correction draft. These controls are presentation-layer state only: they do not mutate the analyzer result, claim verification, or protocol contract. The summary makes the distinction visible so a reviewer can prepare a correction without presenting it as an accepted protocol fact.
+
+## D3 controlled restoration
+
+The Restoration tab appears when an `AnalysisResult` advertises an artifact with `type: "restored"`. The tab separates extraction, decryption, decompression and reassembly states, previews bounded text/JSON or hexadecimal bytes, and exports the complete artifact through a Rust-owned save dialog.
+
+The WebView sends only the current `taskId` and `artifactId`. Rust reloads the task result, requires that the artifact is listed as `restored`, resolves its `ref` beneath the Sidecar state directory, and caps previews at 64 KiB. The WebView cannot supply an artifact path or export source path.
+
+Producers may report the following optional artifact metadata values without changing protocol v1:
+
+- `restorationStatus` for the overall result;
+- `extractionStatus`, `decryptionStatus`, `decompressionStatus`, and `reassemblyStatus` for the four visible stages;
+- `contentDescription` for a short factual label.
+
+Recognized states are complete, unavailable, failed, incomplete, not-required and unknown. Missing metadata remains unknown; the desktop does not infer successful decryption merely because a restored artifact exists. The built-in browser fixture is explicitly synthetic and exercises this UI before a Track A/C/D producer publishes a real restored artifact.

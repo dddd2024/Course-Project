@@ -265,7 +265,7 @@ export function App() {
     <main className="workbench">
       <header className="masthead">
         <div>
-          <p className="eyebrow">Course Project / D1 Read-only Desktop MVP</p>
+          <p className="eyebrow">Course Project / D3 Controlled Restoration</p>
           <h1>Evidence Workbench</h1>
         </div>
         <div className="protocol-badge">Protocol v{update.protocolVersion}</div>
@@ -305,7 +305,7 @@ export function App() {
         </aside>
 
         <section className="panel analysis-panel">
-          <div className="panel-heading"><h2>Analysis workspace</h2><span className="mode">Read-only MVP</span></div>
+          <div className="panel-heading"><h2>Analysis workspace</h2><span className="mode">D3 Workbench</span></div>
           <div className="progress-block">
             <div className="progress-labels"><span>{stageName}</span><strong>{Math.round(update.progress * 100)}%</strong></div>
             <div className="progress-track" aria-label={"Task progress " + Math.round(update.progress * 100) + " percent"}>

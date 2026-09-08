@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import type { AnalysisResult } from "./analysisContracts";
+import type { AnalysisResult, ArtifactRef } from "./analysisContracts";
 
 export type TaskStatus = "CREATED" | "INSPECTING" | "ANALYZING" | "VERIFYING" | "COMPLETED" | "CANCELLED" | "FAILED";
 
@@ -33,6 +33,16 @@ export interface RangeData {
   encoding: "base64";
   bytes: string;
   eof: boolean;
+}
+
+export interface RestoredArtifactPreview {
+  artifactId: string;
+  format: ArtifactRef["format"];
+  totalBytes: number;
+  previewBytes: number;
+  eof: boolean;
+  bytes: number[];
+  text?: string;
 }
 
 const EVENT_NAME = "task-update";
@@ -99,6 +109,52 @@ export async function startTask(failureMode: boolean, inputRef?: string): Promis
 
 export async function getAnalysisResult(taskId: string): Promise<AnalysisResult> {
   return invoke<AnalysisResult>("get_analysis_result", { taskId });
+}
+
+export async function readRestoredArtifact(
+  taskId: string,
+  artifactId: string,
+  length = 32 * 1024,
+): Promise<RestoredArtifactPreview> {
+  if (hasTauriRuntime()) {
+    return invoke<RestoredArtifactPreview>("read_restored_artifact", { taskId, artifactId, length });
+  }
+  if (taskId !== "task-demo-001" || artifactId !== "artifact-restored-001") {
+    throw new Error("Artifact previews require the Tauri desktop runtime.");
+  }
+  const text = JSON.stringify({
+    fixture: true,
+    objectType: "synthetic-contract-object",
+    fields: { messageType: 3, payloadLength: 12 },
+  }, null, 2) + "\n";
+  const bytes = Array.from(new TextEncoder().encode(text));
+  return {
+    artifactId,
+    format: "json",
+    totalBytes: bytes.length,
+    previewBytes: bytes.length,
+    eof: true,
+    bytes,
+    text,
+  };
+}
+
+export async function exportRestoredArtifact(taskId: string, artifactId: string): Promise<string | null> {
+  if (hasTauriRuntime()) {
+    return invoke<string | null>("export_restored_artifact", { taskId, artifactId });
+  }
+  const preview = await readRestoredArtifact(taskId, artifactId);
+  if (!preview.eof) throw new Error("The browser preview does not contain the complete artifact.");
+  const blob = new Blob([Uint8Array.from(preview.bytes)], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const extension = preview.format === "binary" ? "bin" : preview.format;
+  const fileName = `${taskId}-${artifactId}.${extension}`;
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  return fileName;
 }
 
 export async function cancelTask(id: string): Promise<void> {

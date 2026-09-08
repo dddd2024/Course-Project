@@ -2,8 +2,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    fs,
-    io::{BufRead, BufReader, Write},
+    fs::{self, File},
+    io::{BufRead, BufReader, Read, Write},
     path::{Component, Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::{
@@ -16,6 +16,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
 const TASK_EVENT: &str = "task-update";
+const MAX_RESTORED_PREVIEW_BYTES: u64 = 64 * 1024;
 
 #[derive(Clone)]
 struct AppState {
@@ -77,6 +78,26 @@ struct RangeData {
     encoding: String,
     bytes: String,
     eof: bool,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RestoredArtifactPreview {
+    artifact_id: String,
+    format: String,
+    total_bytes: u64,
+    preview_bytes: u64,
+    eof: bool,
+    bytes: Vec<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+}
+
+#[derive(Clone)]
+struct RestoredArtifactDescriptor {
+    artifact_id: String,
+    format: String,
+    controlled_ref: String,
 }
 
 struct SidecarClient {
@@ -361,27 +382,128 @@ fn result_state_root() -> Result<PathBuf, String> {
         .map_err(|error| format!("cannot access sidecar state directory: {error}"))
 }
 
-fn read_controlled_result(result_ref: &str) -> Result<Value, String> {
-    let relative = Path::new(result_ref);
-    if result_ref.is_empty()
-        || relative.is_absolute()
+fn resolve_controlled_path(root: &Path, controlled_ref: &str) -> Result<PathBuf, String> {
+    let relative = Path::new(controlled_ref);
+    if controlled_ref.is_empty()
+        || controlled_ref.contains('\\')
         || relative
             .components()
-            .any(|component| matches!(component, Component::ParentDir))
+            .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err("sidecar returned an unsafe result reference".to_string());
+        return Err("sidecar returned an unsafe controlled reference".to_string());
     }
-    let root = result_state_root()?;
     let target = root
         .join(relative)
         .canonicalize()
-        .map_err(|error| format!("cannot read controlled analysis result: {error}"))?;
-    if !target.starts_with(&root) {
-        return Err("sidecar result escapes the controlled state directory".to_string());
+        .map_err(|error| format!("cannot access controlled result artifact: {error}"))?;
+    if !target.starts_with(root) {
+        return Err("sidecar artifact escapes the controlled state directory".to_string());
     }
+    Ok(target)
+}
+
+fn read_controlled_result(result_ref: &str) -> Result<Value, String> {
+    let root = result_state_root()?;
+    let target = resolve_controlled_path(&root, result_ref)?;
     let content = fs::read_to_string(target)
         .map_err(|error| format!("cannot read controlled analysis result: {error}"))?;
     serde_json::from_str(&content).map_err(|error| format!("invalid analysis result JSON: {error}"))
+}
+
+fn request_task_result_ref(state: &AppState, task_id: &str) -> Result<String, String> {
+    let mut guard = state
+        .sidecar
+        .lock()
+        .map_err(|_| "sidecar state is unavailable".to_string())?;
+    if guard.is_none() {
+        *guard = Some(SidecarClient::spawn()?);
+    }
+    let result = guard
+        .as_mut()
+        .expect("sidecar initialized")
+        .request_result_ref(task_id);
+    if result.is_err() {
+        *guard = None;
+    }
+    result
+}
+
+fn load_task_analysis_result(state: &AppState, task_id: &str) -> Result<Value, String> {
+    let result_ref = request_task_result_ref(state, task_id)?;
+    let result = read_controlled_result(&result_ref)?;
+    if result.get("taskId").and_then(Value::as_str) != Some(task_id) {
+        return Err("analysis result taskId does not match the requested task".to_string());
+    }
+    Ok(result)
+}
+
+fn find_restored_artifact(
+    result: &Value,
+    artifact_id: &str,
+) -> Result<RestoredArtifactDescriptor, String> {
+    if artifact_id.is_empty() {
+        return Err("artifactId must not be empty".to_string());
+    }
+    let artifacts = result
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "analysis result contains no artifacts".to_string())?;
+    let artifact = artifacts
+        .iter()
+        .find(|artifact| artifact.get("artifactId").and_then(Value::as_str) == Some(artifact_id))
+        .ok_or_else(|| format!("unknown artifactId for this task: {artifact_id}"))?;
+    if artifact.get("type").and_then(Value::as_str) != Some("restored") {
+        return Err("only restored artifacts can be previewed or exported".to_string());
+    }
+    let format = artifact
+        .get("format")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "restored artifact has no format".to_string())?;
+    let controlled_ref = artifact
+        .get("ref")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "restored artifact has no controlled ref".to_string())?;
+    Ok(RestoredArtifactDescriptor {
+        artifact_id: artifact_id.to_string(),
+        format: format.to_string(),
+        controlled_ref: controlled_ref.to_string(),
+    })
+}
+
+fn read_artifact_preview(
+    artifact: &RestoredArtifactDescriptor,
+    path: &Path,
+    length: u64,
+) -> Result<RestoredArtifactPreview, String> {
+    if length == 0 || length > MAX_RESTORED_PREVIEW_BYTES {
+        return Err(format!(
+            "length must be between 1 and {MAX_RESTORED_PREVIEW_BYTES} bytes"
+        ));
+    }
+    let total_bytes = path
+        .metadata()
+        .map_err(|error| format!("cannot inspect restored artifact: {error}"))?
+        .len();
+    let mut bytes = Vec::with_capacity(length.min(total_bytes) as usize);
+    File::open(path)
+        .map_err(|error| format!("cannot open restored artifact: {error}"))?
+        .take(length)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("cannot read restored artifact preview: {error}"))?;
+    let text_format = matches!(
+        artifact.format.as_str(),
+        "json" | "jsonl" | "csv" | "text" | "ksy"
+    );
+    let text = text_format.then(|| String::from_utf8_lossy(&bytes).into_owned());
+    Ok(RestoredArtifactPreview {
+        artifact_id: artifact.artifact_id.clone(),
+        format: artifact.format.clone(),
+        total_bytes,
+        preview_bytes: bytes.len() as u64,
+        eof: bytes.len() as u64 == total_bytes,
+        bytes,
+        text,
+    })
 }
 
 fn run_sidecar_analysis(
@@ -472,24 +594,68 @@ fn run_sidecar_analysis(
 
 #[tauri::command]
 fn get_analysis_result(task_id: String, state: State<'_, AppState>) -> Result<Value, String> {
-    let result_ref = {
-        let mut guard = state
-            .sidecar
-            .lock()
-            .map_err(|_| "sidecar state is unavailable".to_string())?;
-        if guard.is_none() {
-            *guard = Some(SidecarClient::spawn()?);
-        }
-        let result = guard
-            .as_mut()
-            .expect("sidecar initialized")
-            .request_result_ref(&task_id);
-        if result.is_err() {
-            *guard = None;
-        }
-        result?
+    load_task_analysis_result(state.inner(), &task_id)
+}
+
+#[tauri::command]
+fn read_restored_artifact(
+    task_id: String,
+    artifact_id: String,
+    length: u64,
+    state: State<'_, AppState>,
+) -> Result<RestoredArtifactPreview, String> {
+    let result = load_task_analysis_result(state.inner(), &task_id)?;
+    let artifact = find_restored_artifact(&result, &artifact_id)?;
+    let root = result_state_root()?;
+    let path = resolve_controlled_path(&root, &artifact.controlled_ref)?;
+    read_artifact_preview(&artifact, &path, length)
+}
+
+#[tauri::command]
+async fn export_restored_artifact(
+    app: AppHandle,
+    task_id: String,
+    artifact_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let result = load_task_analysis_result(state.inner(), &task_id)?;
+    let artifact = find_restored_artifact(&result, &artifact_id)?;
+    let root = result_state_root()?;
+    let source = resolve_controlled_path(&root, &artifact.controlled_ref)?;
+    if !source.is_file() {
+        return Err("restored artifact is not a regular file".to_string());
+    }
+    let default_name = Path::new(&artifact.controlled_ref)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("restored-output.bin")
+        .to_string();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .set_title("Export restored artifact")
+        .set_file_name(&default_name)
+        .save_file(move |file| {
+            let _ = sender.send(file);
+        });
+    let selected = tauri::async_runtime::spawn_blocking(move || receiver.recv())
+        .await
+        .map_err(|error| format!("file dialog failed: {error}"))?
+        .map_err(|error| format!("file dialog callback failed: {error}"))?;
+    let Some(file) = selected else {
+        return Ok(None);
     };
-    read_controlled_result(&result_ref)
+    let destination = file
+        .into_path()
+        .map_err(|error| format!("cannot access export destination: {error:?}"))?;
+    fs::copy(&source, &destination)
+        .map_err(|error| format!("cannot export restored artifact: {error}"))?;
+    let exported_name = destination
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("restored artifact")
+        .to_string();
+    Ok(Some(exported_name))
 }
 
 #[tauri::command]
@@ -642,12 +808,57 @@ fn cancel_contract_spike(id: String, state: State<'_, AppState>) -> Result<(), S
 
 #[cfg(test)]
 mod tests {
-    use super::SidecarClient;
+    use super::{
+        find_restored_artifact, read_artifact_preview, resolve_controlled_path, SidecarClient,
+    };
     use serde_json::json;
     use std::{
         fs,
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    #[test]
+    fn controlled_restored_artifact_preview_enforces_task_manifest_and_root() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("course-project-restored-preview-{suffix}"));
+        let artifact_dir = root.join("tasks").join("task-preview");
+        fs::create_dir_all(&artifact_dir).expect("artifact directory should be writable");
+        fs::write(artifact_dir.join("restored.json"), b"{\"ok\":true}\n")
+            .expect("artifact should be writable");
+        let root = root.canonicalize().expect("artifact root should resolve");
+        let result = json!({
+            "taskId": "task-preview",
+            "artifacts": [{
+                "artifactId": "restored-1",
+                "type": "restored",
+                "format": "json",
+                "ref": "tasks/task-preview/restored.json"
+            }, {
+                "artifactId": "statistics-1",
+                "type": "statistics",
+                "format": "json",
+                "ref": "tasks/task-preview/statistics.json"
+            }]
+        });
+        let artifact = find_restored_artifact(&result, "restored-1")
+            .expect("restored artifact should be present in the task manifest");
+        let path = resolve_controlled_path(&root, &artifact.controlled_ref)
+            .expect("controlled artifact should resolve beneath the root");
+        let preview = read_artifact_preview(&artifact, &path, 64)
+            .expect("bounded artifact preview should be readable");
+
+        assert_eq!(preview.text.as_deref(), Some("{\"ok\":true}\n"));
+        assert!(preview.eof);
+        assert!(find_restored_artifact(&result, "statistics-1").is_err());
+        assert!(resolve_controlled_path(&root, "../outside.bin").is_err());
+        assert!(resolve_controlled_path(&root, "tasks\\task-preview\\restored.json").is_err());
+        let _ = fs::remove_dir_all(root);
+    }
 
     #[test]
     fn sidecar_analyze_and_get_result_round_trip() {
@@ -764,6 +975,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_contract_spike,
             get_analysis_result,
+            read_restored_artifact,
+            export_restored_artifact,
             cancel_contract_spike,
             select_input,
             inspect_file,

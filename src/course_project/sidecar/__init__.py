@@ -21,6 +21,7 @@ from course_project.sidecar.semantic_bridge import (
     SemanticBackend,
     validate_semantic_analysis,
 )
+from course_project.sidecar.track_c_semantic_backend import DeterministicTrackCSemanticBackend
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "PROTOCOL_VERSION",
     "SIDE_CAR_METHODS",
     "AnalysisBackend",
+    "DeterministicTrackCSemanticBackend",
     "MetadataOnlyBackend",
     "SemanticAnalysis",
     "SemanticBackend",

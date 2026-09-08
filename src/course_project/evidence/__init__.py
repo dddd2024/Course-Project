@@ -1,9 +1,4 @@
-"""Evidence registry and provenance graph for EvidenceGraph-PRE.
-
-Track C owns the broader EvidenceGraph-PRE research surface. Narrow delegated
-integration primitives remain project-native and must not silently redefine the
-shared contracts or final fusion policy.
-"""
+"""Evidence registry, provenance graph and fusion primitives for EvidenceGraph-PRE."""
 
 from course_project.evidence.dependency_collapse import (
     EvidenceCollapseResult,
@@ -17,14 +12,26 @@ from course_project.evidence.naive_vote import (
     NaiveVoteResult,
     naive_multi_source_vote,
 )
+from course_project.evidence.provenance_fusion import (
+    POLICY_VERSION,
+    FusionComponent,
+    ProvenanceFusionError,
+    ProvenanceFusionResult,
+    fuse_hypothesis_evidence,
+)
 
 __all__ = [
+    "POLICY_VERSION",
     "DecisionVote",
     "EvidenceCollapseResult",
     "EvidenceContribution",
     "EvidenceDependencyError",
+    "FusionComponent",
     "NaiveVoteError",
     "NaiveVoteResult",
+    "ProvenanceFusionError",
+    "ProvenanceFusionResult",
     "collapse_dependent_evidence",
+    "fuse_hypothesis_evidence",
     "naive_multi_source_vote",
 ]

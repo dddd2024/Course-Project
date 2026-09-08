@@ -11,10 +11,20 @@ from course_project.evidence.dependency_collapse import (
     EvidenceDependencyError,
     collapse_dependent_evidence,
 )
+from course_project.evidence.naive_vote import (
+    DecisionVote,
+    NaiveVoteError,
+    NaiveVoteResult,
+    naive_multi_source_vote,
+)
 
 __all__ = [
+    "DecisionVote",
     "EvidenceCollapseResult",
     "EvidenceContribution",
     "EvidenceDependencyError",
+    "NaiveVoteError",
+    "NaiveVoteResult",
     "collapse_dependent_evidence",
+    "naive_multi_source_vote",
 ]

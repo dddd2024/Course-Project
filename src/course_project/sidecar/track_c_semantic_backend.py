@@ -166,10 +166,7 @@ class DeterministicTrackCSemanticBackend:
                     status=result.status,
                     evidence_ids=(verification_evidence_id,),
                     semantic_type=hypothesis.semantic_type,
-                    scores={
-                        "candidate": max(0.0, min(1.0, float(candidate.score))),
-                        "verification": result.score,
-                    },
+                    scores={"verification": result.score},
                 )
             )
             if result.status == "accepted":

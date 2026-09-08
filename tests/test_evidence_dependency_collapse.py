@@ -133,7 +133,7 @@ def test_output_is_deterministic_independent_of_input_order() -> None:
             "duplicate evidence_id",
         ),
         ((_evidence("missing-group", score=0.4, group=None),), "independence_group"),
-        ((_evidence("bad-score", score=1.1, group="a"),), "score must be in [0, 1]"),
+        ((_evidence("bad-score", score=1.1, group="a"),), r"score must be in \[0, 1\]"),
         (
             (_evidence("child", score=0.4, group="a", parents=("missing",)),),
             "unknown parent",

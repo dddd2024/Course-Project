@@ -2,12 +2,19 @@ from __future__ import annotations
 
 from importlib.metadata import version
 
+import pytest
+
 from course_project.inference.netzob_adapter import (
     is_netzob_available,
     run_netzob_baseline,
 )
 from course_project.io import load_raw
 from course_project.models import FieldCandidate, PacketCandidate
+
+pytestmark = pytest.mark.skipif(
+    not is_netzob_available(),
+    reason="live Netzob smoke runs only in the isolated Netzob baseline workflow",
+)
 
 
 def _fixture() -> tuple[object, list[PacketCandidate]]:

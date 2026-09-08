@@ -1,5 +1,15 @@
 """Track C experiment evaluation utilities."""
 
+from experiments.comparison import (
+    CANONICAL_VARIANTS,
+    ComparisonExecutionError,
+    ComparisonExecutor,
+    ComparisonSuiteResult,
+    ExecutionFailure,
+    ExperimentVariant,
+    build_comparison_report,
+    execute_variants,
+)
 from experiments.metrics import (
     EvaluatedHypothesis,
     HypothesisMetrics,
@@ -26,11 +36,17 @@ from experiments.runner import (
 )
 
 __all__ = [
+    "CANONICAL_VARIANTS",
     "NOT_EVALUABLE",
     "REQUIRED_ABLATIONS",
     "REQUIRED_COMPARISONS",
+    "ComparisonExecutionError",
+    "ComparisonExecutor",
+    "ComparisonSuiteResult",
     "EvaluatedHypothesis",
+    "ExecutionFailure",
     "ExperimentManifest",
+    "ExperimentVariant",
     "GroundTruth",
     "HypothesisMetrics",
     "HypothesisPrediction",
@@ -39,7 +55,9 @@ __all__ = [
     "RunObservation",
     "SemanticMetrics",
     "boundary_metrics",
+    "build_comparison_report",
     "evaluate_experiment",
+    "execute_variants",
     "field_boundary_metrics",
     "hypothesis_metrics",
     "ratio_metric",

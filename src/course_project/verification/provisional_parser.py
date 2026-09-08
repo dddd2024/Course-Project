@@ -76,22 +76,28 @@ def execute_provisional_schema(
     if corpus_kind not in {"teacher", "synthetic", "other"}:
         raise ValueError(f"unsupported corpus_kind: {corpus_kind!r}")
 
-    normalized_fields = tuple(sorted(fields, key=lambda item: (item.offset, item.field_id)))
-    if not normalized_fields:
+    raw_fields = tuple(fields)
+    if not raw_fields:
         raise ValueError("provisional schema requires at least one VerifiedField")
+    if any(not isinstance(field, VerifiedField) for field in raw_fields):
+        raise TypeError("fields must contain VerifiedField objects")
+    normalized_fields = tuple(
+        sorted(raw_fields, key=lambda item: (item.offset, item.field_id))
+    )
 
     # This validates IDs, offsets, overlaps, variable-size placement and scores
     # against the same conservative semantics used for the emitted Kaitai schema.
     build_kaitai_schema(normalized_fields, protocol_name="provisional_protocol")
 
-    normalized_samples = tuple(sorted(samples, key=lambda item: item.sample_id))
-    if not normalized_samples:
+    raw_samples = tuple(samples)
+    if not raw_samples:
         raise ValueError("eligible corpus must contain at least one sample")
+    if any(not isinstance(sample, ParseSample) for sample in raw_samples):
+        raise TypeError("samples must contain ParseSample objects")
 
     seen_sample_ids: set[str] = set()
-    for sample in normalized_samples:
-        if not isinstance(sample, ParseSample):
-            raise TypeError("samples must contain ParseSample objects")
+    validated_samples: list[ParseSample] = []
+    for sample in raw_samples:
         sample_id = sample.sample_id.strip()
         if not sample_id:
             raise ValueError("sample_id must be non-empty")
@@ -100,7 +106,9 @@ def execute_provisional_schema(
         seen_sample_ids.add(sample_id)
         if not isinstance(sample.payload, bytes):
             raise TypeError(f"sample {sample_id} payload must be bytes")
+        validated_samples.append(ParseSample(sample_id=sample_id, payload=sample.payload))
 
+    normalized_samples = tuple(sorted(validated_samples, key=lambda item: item.sample_id))
     outcomes: list[ParseSampleResult] = []
     success_count = 0
 

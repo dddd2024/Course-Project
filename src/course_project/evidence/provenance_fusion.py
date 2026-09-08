@@ -14,7 +14,10 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Literal
 
-from course_project.evidence.dependency_collapse import collapse_dependent_evidence
+from course_project.evidence.dependency_collapse import (
+    EvidenceContribution,
+    collapse_dependent_evidence,
+)
 from course_project.models import DecisionStatus, Evidence, VerificationResult
 
 EvidenceStance = Literal["support", "conflict", "neutral"]
@@ -228,13 +231,11 @@ def _classify_evidence(
 
 
 def _build_component(
-    contribution: object,
+    contribution: EvidenceContribution,
     by_id: dict[str, Evidence],
     signals: dict[str, tuple[EvidenceStance, float]],
 ) -> FusionComponent:
-    # The concrete object is EvidenceContribution, but keeping this helper local
-    # avoids exporting dependency-collapse implementation details into its type surface.
-    evidence_ids = contribution.evidence_ids  # type: ignore[attr-defined]
+    evidence_ids = contribution.evidence_ids
     records = tuple(by_id[evidence_id] for evidence_id in evidence_ids)
 
     support_ids = tuple(
@@ -263,11 +264,11 @@ def _build_component(
     )
 
     return FusionComponent(
-        representative_evidence_id=contribution.representative_evidence_id,  # type: ignore[attr-defined]
+        representative_evidence_id=contribution.representative_evidence_id,
         evidence_ids=evidence_ids,
         source_components=tuple(sorted({item.source_component for item in records})),
-        sample_ids=contribution.sample_ids,  # type: ignore[attr-defined]
-        dependency_signals=contribution.dependency_signals,  # type: ignore[attr-defined]
+        sample_ids=contribution.sample_ids,
+        dependency_signals=contribution.dependency_signals,
         support_strength=support_strength,
         conflict_strength=conflict_strength,
         net_strength=net_strength,

@@ -6,6 +6,11 @@ from typing import Any
 
 from course_project.evidence.alignment_producer import produce_alignment_evidence
 from course_project.evidence.hypothesis_manager import HypothesisManager
+from course_project.evidence.provenance_fusion import (
+    POLICY_VERSION,
+    ProvenanceFusionResult,
+    fuse_hypothesis_evidence,
+)
 from course_project.models import (
     AlignmentResult,
     AnalysisFinding,
@@ -24,11 +29,11 @@ from course_project.verification import verification_result, verify_length, veri
 
 
 class DeterministicTrackCSemanticBackend:
-    """Production adapter for the delegated Track C length/sequence slice.
+    """Production Track C adapter with executable verification and final fusion.
 
-    The adapter stays in Track A's Sidecar layer and consumes Track C's public
-    hypothesis/verification primitives. It does not implement provenance fusion,
-    LLM reasoning, or additional semantic verifier families.
+    Length/sequence hypotheses are verified deterministically, then promoted only
+    through the project-native provenance-aware fusion policy. The public Sidecar
+    boundary remains unchanged.
     """
 
     producer = "track-a-delegated-track-c-semantic-v1"
@@ -52,9 +57,9 @@ class DeterministicTrackCSemanticBackend:
             return SemanticAnalysis(
                 producer=self.producer,
                 status="partial",
-                metrics={"verificationExecuted": False},
+                metrics={"verificationExecuted": False, "fusionExecuted": False},
                 limitations=(
-                    "The delegated deterministic semantic backend requires verification to be enabled.",
+                    "The deterministic semantic backend requires verification to be enabled.",
                 ),
             )
 
@@ -127,7 +132,10 @@ class DeterministicTrackCSemanticBackend:
 
         findings: list[AnalysisFinding] = []
         verified_fields: list[VerifiedField] = []
+        verification_decision_counts = {"accepted": 0, "rejected": 0, "uncertain": 0}
         decision_counts = {"accepted": 0, "rejected": 0, "uncertain": 0}
+        fusion_results: list[ProvenanceFusionResult] = []
+        fusion_evidence_producers: set[str] = set()
 
         for candidate, hypothesis, samples, sample_ids, independence_group in entries:
             check = (
@@ -137,41 +145,62 @@ class DeterministicTrackCSemanticBackend:
             )
             result = verification_result(check)
             manager.record_verification(result)
-            decision_counts[result.status] += 1
+            verification_decision_counts[result.status] += 1
 
             verification_evidence_id = f"verification:{hypothesis.hypothesis_id}"
-            evidence.append(
-                Evidence(
-                    evidence_id=verification_evidence_id,
-                    source_component="track-c-executable-verifier",
-                    method=check.check_type,
-                    feature_family=hypothesis.semantic_type,
-                    score=check.score,
-                    observation={
-                        "hypothesisId": hypothesis.hypothesis_id,
-                        "status": result.status,
-                        "sampleCount": check.sample_count,
-                        "supportCount": check.support_count,
-                        "violationCount": check.violation_count,
-                        "checkId": check.check_id,
-                    },
-                    parent_evidence_ids=hypothesis.supporting_evidence_ids,
-                    independence_group=independence_group,
-                    sample_ids=sample_ids,
-                )
+            verification_evidence = Evidence(
+                evidence_id=verification_evidence_id,
+                source_component="track-c-executable-verifier",
+                method=check.check_type,
+                feature_family=hypothesis.semantic_type,
+                score=check.score,
+                observation={
+                    "hypothesisId": hypothesis.hypothesis_id,
+                    "status": result.status,
+                    "sampleCount": check.sample_count,
+                    "supportCount": check.support_count,
+                    "violationCount": check.violation_count,
+                    "checkId": check.check_id,
+                },
+                parent_evidence_ids=hypothesis.supporting_evidence_ids,
+                independence_group=independence_group,
+                sample_ids=sample_ids,
             )
+            evidence.append(verification_evidence)
+
+            relevant_evidence = _fusion_evidence(
+                candidate,
+                hypothesis,
+                alignment_evidence,
+                evidence,
+                verification_evidence_id,
+            )
+            fusion = fuse_hypothesis_evidence(
+                hypothesis.hypothesis_id,
+                relevant_evidence,
+                result,
+            )
+            fusion_results.append(fusion)
+            decision_counts[fusion.status] += 1
+            fusion_evidence_producers.update(
+                item.source_component for item in relevant_evidence
+            )
+            fused_evidence_ids = tuple(sorted(item.evidence_id for item in relevant_evidence))
 
             findings.append(
                 AnalysisFinding(
                     finding_id=f"finding:{hypothesis.hypothesis_id}",
-                    claim=_finding_claim(hypothesis, result.status),
-                    status=result.status,
-                    evidence_ids=(verification_evidence_id,),
+                    claim=_finding_claim(hypothesis, fusion.status),
+                    status=fusion.status,
+                    evidence_ids=fused_evidence_ids,
                     semantic_type=hypothesis.semantic_type,
-                    scores={"verification": result.score},
+                    scores={
+                        "evidence": fusion.support_score,
+                        "verification": result.score,
+                    },
                 )
             )
-            if result.status == "accepted":
+            if fusion.status == "accepted":
                 verified_fields.append(
                     VerifiedField(
                         field_id=f"verified:{candidate.candidate_id}",
@@ -180,13 +209,13 @@ class DeterministicTrackCSemanticBackend:
                         semantic_type=hypothesis.semantic_type,
                         interpretation=hypothesis.interpretation,
                         verification_score=result.score,
-                        evidence_ids=(verification_evidence_id,),
+                        evidence_ids=fused_evidence_ids,
                     )
                 )
 
         if not entries:
             limitations.append(
-                "No executable length/sequence field candidate was available for the delegated slice."
+                "No executable length/sequence field candidate was available for the semantic slice."
             )
 
         status = "completed" if entries and not limitations else "partial"
@@ -199,6 +228,10 @@ class DeterministicTrackCSemanticBackend:
             verified_fields=tuple(verified_fields),
             metrics={
                 "verificationExecuted": bool(entries),
+                "fusionExecuted": bool(entries),
+                "fusionPolicy": POLICY_VERSION,
+                "fusionAcceptanceSupportThreshold": 0.75,
+                "fusionMaxConflictForAccept": 0.25,
                 "semanticSlice": "length-sequence",
                 "hypothesisCount": len(entries),
                 "alignmentEvidenceCount": len(alignment_evidence),
@@ -206,12 +239,72 @@ class DeterministicTrackCSemanticBackend:
                 "verificationEvidenceCount": len(entries),
                 "evidenceProducerCount": len(evidence_producers),
                 "evidenceProducers": evidence_producers,
+                "fusionEvidenceProducerCount": len(fusion_evidence_producers),
+                "fusionEvidenceProducers": sorted(fusion_evidence_producers),
+                "fusionAudit": [_fusion_metric(item) for item in fusion_results],
                 "acceptedFieldCount": len(verified_fields),
+                "verificationDecisionCounts": verification_decision_counts,
                 "decisionCounts": decision_counts,
                 "inputId": input_metadata.input_id,
             },
             limitations=tuple(limitations),
         )
+
+
+def _fusion_evidence(
+    candidate: FieldCandidate,
+    hypothesis: ProtocolHypothesis,
+    alignment_evidence: tuple[Evidence, ...],
+    all_evidence: list[Evidence],
+    verification_evidence_id: str,
+) -> tuple[Evidence, ...]:
+    required_ids = {
+        *hypothesis.supporting_evidence_ids,
+        verification_evidence_id,
+    }
+    selected = [item for item in all_evidence if item.evidence_id in required_ids]
+    selected.extend(
+        item
+        for item in alignment_evidence
+        if _alignment_supports_candidate(item, candidate, hypothesis)
+    )
+    by_id = {item.evidence_id: item for item in selected}
+    return tuple(by_id[evidence_id] for evidence_id in sorted(by_id))
+
+
+def _alignment_supports_candidate(
+    item: Evidence,
+    candidate: FieldCandidate,
+    hypothesis: ProtocolHypothesis,
+) -> bool:
+    if candidate.family_id is None:
+        return False
+    if item.observation.get("familyId") != candidate.family_id:
+        return False
+    region_start = item.observation.get("regionStart")
+    region_end = item.observation.get("regionEnd")
+    if not isinstance(region_start, int) or isinstance(region_start, bool):
+        return False
+    if not isinstance(region_end, int) or isinstance(region_end, bool):
+        return False
+    field_end = hypothesis.offset + (hypothesis.size or 0)
+    return region_start < field_end and hypothesis.offset < region_end
+
+
+def _fusion_metric(result: ProvenanceFusionResult) -> dict[str, object]:
+    return {
+        "hypothesisId": result.hypothesis_id,
+        "status": result.status,
+        "supportScore": result.support_score,
+        "conflictScore": result.conflict_score,
+        "margin": result.margin,
+        "verificationStatus": result.verification_status,
+        "rawEvidenceCount": result.raw_evidence_count,
+        "effectiveComponentCount": result.effective_component_count,
+        "directSupportGroups": result.direct_support_groups,
+        "derivedSupportRecords": result.derived_support_records,
+        "conflictRecords": result.conflict_records,
+    }
 
 
 def _message_bytes(
@@ -303,5 +396,6 @@ def _finding_claim(hypothesis: ProtocolHypothesis, status: str) -> str:
     end = hypothesis.offset + (hypothesis.size or 0)
     return (
         f"Message-relative bytes {hypothesis.offset}:{end} as "
-        f"{hypothesis.interpretation} were {status} by executable verification."
+        f"{hypothesis.interpretation} were {status} after executable verification "
+        "and provenance-aware fusion."
     )

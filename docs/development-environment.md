@@ -27,6 +27,15 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
+For Track B Windows installer work, install the separately pinned packaging extra:
+
+```bash
+python -m pip install -e ".[dev,package]"
+```
+
+The installed application does not require Python. PyInstaller is a build-time dependency used only
+to produce its bundled Sidecar executable. See `docs/windows-packaging.md`.
+
 Run before opening a PR:
 
 ```bash
@@ -92,3 +101,6 @@ Formal experiments additionally record git SHA, dataset identifier supplied by t
 ## Clean-machine gate
 
 Before the final course demo, Track B + Track A must reproduce install/start on a clean Windows machine or clean Windows VM using only repository instructions plus locally supplied course test data and secrets. Run `course-project-doctor --json` on that machine and retain the output with the final demo/release evidence.
+
+Build the installer and follow the evidence checklist in `docs/windows-packaging.md` before this gate
+is marked complete.

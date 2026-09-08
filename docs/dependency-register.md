@@ -18,6 +18,7 @@ This register separates **candidate technology choices** from **accepted project
 | Tauri 2 | desktop shell | required for desktop MVP | B | 2.11.5 (Cargo.lock) | Apache-2.0 OR MIT | active; cargo check |
 | tauri-plugin-dialog | controlled file picker | required for desktop MVP | B | 2.7.3 (Cargo.lock) / Rust plugin | Apache-2.0 OR MIT | active; Rust-owned dialog smoke path |
 | serde_json | Rust JSONL sidecar envelope | required for desktop MVP | B | 1.0.151 (Cargo.lock) | MIT OR Apache-2.0 | active; sidecar proxy serialization |
+| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Windows Sidecar executable builder | build-only for desktop package | B | 6.22.2 (PyPI/GitHub tag) | GPL-2.0-or-later WITH Bootloader-exception; embedded run-time hooks Apache-2.0 | `python -m pip install -e ".[package]"`; Windows x64 + Python 3.11 packaging path; JSONL executable smoke; missing/wrong version fails the package build with an install instruction; no installed-app runtime dependency |
 
 ## Acceptance gate for a new dependency
 

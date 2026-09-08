@@ -18,6 +18,11 @@ from course_project.evidence.producers import (
     evidence_from_field_candidate,
     evidence_from_llm_hypothesis,
 )
+from course_project.evidence.workflow import (
+    SemanticWorkflow,
+    SemanticWorkflowError,
+    SemanticWorkflowResult,
+)
 
 __all__ = [
     "EvidenceGraph",
@@ -26,6 +31,9 @@ __all__ = [
     "FusionError",
     "FusionPolicy",
     "FusionResult",
+    "SemanticWorkflow",
+    "SemanticWorkflowError",
+    "SemanticWorkflowResult",
     "evidence_from_executable_check",
     "evidence_from_field_candidate",
     "evidence_from_llm_hypothesis",

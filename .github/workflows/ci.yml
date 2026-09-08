@@ -95,6 +95,9 @@ jobs:
       - name: Check Tauri Rust shell
         run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
 
+      - name: Record environment doctor evidence
+        run: course-project-doctor --json
+
       - name: Test Tauri Sidecar bridge
         shell: pwsh
         run: |
@@ -105,6 +108,80 @@ jobs:
       - name: Build Windows NSIS installer with bundled Sidecar
         working-directory: apps/desktop
         run: npm run bundle:windows
+
+      - name: Rehearse clean Windows install and launch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Get-ChildItem "apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if ($null -eq $installer) {
+            throw "NSIS installer was not produced"
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP "evidence-workbench-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $installDir) {
+            throw "Clean rehearsal directory already exists: $installDir"
+          }
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "NSIS installer exited with $($install.ExitCode)"
+          }
+
+          $desktopExecutable = Join-Path $installDir "course-project-desktop.exe"
+          $sidecarExecutable = Join-Path $installDir "course-project-sidecar.exe"
+          foreach ($required in @($desktopExecutable, $sidecarExecutable, (Join-Path $installDir "uninstall.exe"))) {
+            if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+              throw "Installed file is missing: $required"
+            }
+          }
+
+          python scripts/build_sidecar.py --smoke-executable $sidecarExecutable
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installed Sidecar smoke failed"
+          }
+
+          $desktop = Start-Process -FilePath $desktopExecutable -WindowStyle Hidden -PassThru
+          Start-Sleep -Seconds 8
+          if ($desktop.HasExited) {
+            throw "Installed desktop exited during the launch rehearsal with $($desktop.ExitCode)"
+          }
+          Stop-Process -Id $desktop.Id -Force
+          Wait-Process -Id $desktop.Id -ErrorAction SilentlyContinue
+
+          $installerSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName).Hash
+          $desktopSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $desktopExecutable).Hash
+          $sidecarSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $sidecarExecutable).Hash
+          $uninstaller = Join-Path $installDir "uninstall.exe"
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @("/S") -WindowStyle Hidden -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) {
+            throw "NSIS uninstaller exited with $($uninstall.ExitCode)"
+          }
+          Start-Sleep -Seconds 2
+          if (Test-Path -LiteralPath $installDir) {
+            throw "NSIS uninstaller left the rehearsal directory behind: $installDir"
+          }
+
+          $evidence = [ordered]@{
+            schemaVersion = 1
+            gitSha = $env:GITHUB_SHA
+            windowsVersion = [Environment]::OSVersion.VersionString
+            runnerArchitecture = $env:RUNNER_ARCH
+            installerName = $installer.Name
+            installerBytes = $installer.Length
+            installerSha256 = $installerSha256
+            desktopSha256 = $desktopSha256
+            sidecarSha256 = $sidecarSha256
+            installedSidecarSmoke = "passed"
+            desktopLaunch = "passed"
+            uninstall = "passed"
+            externalPythonRequired = $false
+            recordedAtUtc = [DateTime]::UtcNow.ToString("o")
+          }
+          Write-Output "CLEAN_WINDOWS_REHEARSAL_EVIDENCE_BEGIN"
+          Write-Output ($evidence | ConvertTo-Json -Compress)
+          Write-Output "CLEAN_WINDOWS_REHEARSAL_EVIDENCE_END"
 
   merge-gate:
     name: merge-gate

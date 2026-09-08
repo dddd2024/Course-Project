@@ -188,12 +188,12 @@ def _normalize_proposal(
     allowed_evidence_ids: set[str],
 ) -> HypothesisProposal:
     if isinstance(proposal.offset, bool) or not isinstance(proposal.offset, int):
-        raise ValueError("proposal offset must be an integer")
+        raise TypeError("proposal offset must be an integer")
     if proposal.offset < 0:
         raise ValueError("proposal offset must be non-negative")
     if proposal.size is not None:
         if isinstance(proposal.size, bool) or not isinstance(proposal.size, int):
-            raise ValueError("proposal size must be an integer or None")
+            raise TypeError("proposal size must be an integer or None")
         if proposal.size <= 0:
             raise ValueError("proposal size must be positive when provided")
 
@@ -202,7 +202,7 @@ def _normalize_proposal(
     confidence = _probability(proposal.model_confidence, "proposal model_confidence")
     parameters = _json_copy(proposal.parameters, "proposal parameters")
     if not isinstance(parameters, dict):
-        raise ValueError("proposal parameters must be a JSON object")
+        raise TypeError("proposal parameters must be a JSON object")
 
     supporting_ids = tuple(proposal.supporting_evidence_ids)
     if len(set(supporting_ids)) != len(supporting_ids):
@@ -270,7 +270,7 @@ def _json_copy(value: Any, label: str) -> Any:
 
 def _probability(value: float, label: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"{label} must be numeric")
+        raise TypeError(f"{label} must be numeric")
     normalized = float(value)
     if not math.isfinite(normalized) or not 0.0 <= normalized <= 1.0:
         raise ValueError(f"{label} must be within [0, 1]")
@@ -278,6 +278,8 @@ def _probability(value: float, label: str) -> float:
 
 
 def _require_text(value: str, label: str) -> str:
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
+        raise TypeError(f"{label} must be a string")
+    if not value.strip():
         raise ValueError(f"{label} must be a non-empty string")
     return value.strip()

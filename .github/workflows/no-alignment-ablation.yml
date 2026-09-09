@@ -1,0 +1,96 @@
+name: Synthetic No-Alignment Ablation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/course_project/experiments/no_alignment.py"
+      - "scripts/run_no_alignment_ablation.py"
+      - "tests/test_no_alignment_ablation.py"
+      - "experiments/no-alignment-ablation.md"
+      - ".github/workflows/no-alignment-ablation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/course_project/experiments/no_alignment.py"
+      - "scripts/run_no_alignment_ablation.py"
+      - "tests/test_no_alignment_ablation.py"
+      - "experiments/no-alignment-ablation.md"
+      - ".github/workflows/no-alignment-ablation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  no-alignment-ablation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip check
+
+      - name: Test alignment-evidence ablation
+        run: python -m pytest -q tests/test_no_alignment_ablation.py
+
+      - name: Execute and record alignment-evidence ablation
+        env:
+          CODE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python scripts/run_no_alignment_ablation.py \
+            --outdir experiment-results \
+            --code-sha "$CODE_SHA"
+
+      - name: Validate scientific claim scope
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("experiment-results/records")
+          record = json.loads((root / "ablation_no_alignment.json").read_text(encoding="utf-8"))
+          audit = json.loads((root / "ablation_no_alignment.audit.json").read_text(encoding="utf-8"))
+          manifest = json.loads((root / "ablation-no-alignment-manifest.json").read_text(encoding="utf-8"))
+
+          assert record["variant"] == "ablation_no_alignment"
+          assert record["resultScope"] == "mechanism"
+          assert record["config"]["ablationScope"] == "alignment_evidence_contribution"
+          assert record["config"]["preprocessingAlignmentStillUsed"] is True
+          assert record["config"]["trackCAlignmentInputRemoved"] is True
+          assert record["config"]["alignmentEvidenceUsed"] is False
+          assert record["config"]["structuralIntermediatesMatchControl"] is True
+          assert record["config"]["providerHypothesesMatchControl"] is True
+          assert audit["controlAlignmentEvidenceCount"] > 0
+          assert audit["ablationAlignmentEvidenceCount"] == 0
+          assert "track-d-alignment" not in audit["ablationFusionEvidenceProducers"]
+          assert audit["verificationExecuted"] is True
+          assert audit["fusionExecuted"] is True
+          assert audit["globalSelectionExecuted"] is True
+          assert audit["rejectedWrongHypothesisCount"] >= 1
+          assert audit["teacherBenchmark"] is False
+          assert audit["realLLMBenchmark"] is False
+          assert manifest["ablationScope"] == "alignment_evidence_contribution"
+          assert manifest["preprocessingAlignmentStillUsed"] is True
+          assert manifest["formalBenchmark"] is False
+          assert manifest["realLLMBenchmark"] is False
+          print(json.dumps(manifest, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload canonical ablation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: no-alignment-ablation-${{ github.event.pull_request.head.sha || github.sha }}
+          path: experiment-results/records/
+          if-no-files-found: error
+          retention-days: 30

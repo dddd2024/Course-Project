@@ -36,6 +36,12 @@ from course_project.experiments.llm_verification import (
     run_llm_verification_mechanism_baseline,
     write_llm_verification_mechanism_execution,
 )
+from course_project.experiments.no_alignment import (
+    ALIGNMENT_ABLATION_SCOPE,
+    NoAlignmentAblationExecution,
+    run_no_alignment_ablation,
+    write_no_alignment_ablation_execution,
+)
 from course_project.experiments.no_provenance import (
     NO_PROVENANCE_POLICY_VERSION,
     NoProvenanceAblationExecution,
@@ -88,6 +94,7 @@ from course_project.experiments.wrong_hypothesis_demo import (
 
 __all__ = [
     "ABLATION_VARIANTS",
+    "ALIGNMENT_ABLATION_SCOPE",
     "BASELINE_VARIANTS",
     "CONFLICT_THRESHOLDS",
     "DEFAULT_CONFLICT_THRESHOLD",
@@ -116,6 +123,7 @@ __all__ = [
     "LLMOnlyMechanismExecution",
     "LLMVerificationMechanismExecution",
     "MetricRecord",
+    "NoAlignmentAblationExecution",
     "NoProvenanceAblationExecution",
     "NoVerificationAblationExecution",
     "SyntheticMechanismCorpus",
@@ -136,6 +144,7 @@ __all__ = [
     "run_live_netzob_mechanism_experiment",
     "run_llm_only_mechanism_baseline",
     "run_llm_verification_mechanism_baseline",
+    "run_no_alignment_ablation",
     "run_no_provenance_ablation",
     "run_no_verification_ablation",
     "run_synthetic_mechanism_experiments",
@@ -149,6 +158,7 @@ __all__ = [
     "write_llm_only_mechanism_execution",
     "write_llm_verification_mechanism_execution",
     "write_netzob_experiment_bundle",
+    "write_no_alignment_ablation_execution",
     "write_no_provenance_ablation_execution",
     "write_no_verification_ablation_execution",
     "write_threshold_sensitivity_execution",

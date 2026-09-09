@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-from course_project.inference import binaryinferno_adapter
+from course_project.inference.binaryinferno_adapter import (
+    BinaryInfernoConfig,
+    BinaryInfernoOutputError,
+    encode_binaryinferno_input,
+    parse_binaryinferno_spec,
+    run_binaryinferno_baseline,
+)
 from course_project.io import load_raw
 from course_project.models import FieldCandidate, PacketCandidate
 
@@ -25,46 +29,39 @@ class FakeRunner:
     def __init__(self, stdout: str) -> None:
         self.stdout = stdout
         self.messages: tuple[bytes, ...] | None = None
-        self.config: binaryinferno_adapter.BinaryInfernoConfig | None = None
+        self.config: BinaryInfernoConfig | None = None
 
     def infer(
         self,
         messages: tuple[bytes, ...],
-        config: binaryinferno_adapter.BinaryInfernoConfig,
+        config: BinaryInfernoConfig,
     ) -> str:
         self.messages = messages
         self.config = config
         return self.stdout
 
 
-def test_unavailable_checkout_fails_closed() -> None:
+def test_unavailable_checkout_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BINARYINFERNO_ROOT", "definitely-not-present")
     stream = load_raw(b"\x01\x02\x03\x04", source_id="binaryinferno-test")
-    result = binaryinferno_adapter.run_binaryinferno_baseline(
-        stream,
-        [PacketCandidate(0, 4, 1.0)],
-        config=binaryinferno_adapter.BinaryInfernoConfig(
-            root=Path("definitely-not-present")
-        ),
-    )
+    result = run_binaryinferno_baseline(stream, [PacketCandidate(0, 4, 1.0)])
 
     assert result.backend == "binaryinferno"
     assert result.status == "unavailable"
     assert result.error_category == "dependency_unavailable"
-    assert binaryinferno_adapter.BINARYINFERNO_UPSTREAM_COMMIT in (result.detail or "")
+    assert "cb42a63ada74737c10d01e2c22f4502ba3983976" in (result.detail or "")
 
 
 def test_encode_input_is_one_lowercase_hex_message_per_line() -> None:
-    assert binaryinferno_adapter.encode_binaryinferno_input(
-        (b"\x01\xAF", b"\x00\x10")
-    ) == "01af\n0010\n"
+    assert encode_binaryinferno_input((b"\x01\xAF", b"\x00\x10")) == "01af\n0010\n"
     with pytest.raises(ValueError, match="at least one"):
-        binaryinferno_adapter.encode_binaryinferno_input(())
+        encode_binaryinferno_input(())
     with pytest.raises(ValueError, match="non-empty"):
-        binaryinferno_adapter.encode_binaryinferno_input((b"",))
+        encode_binaryinferno_input((b"",))
 
 
 def test_parse_readme_spec_is_exact_and_project_native() -> None:
-    candidates = binaryinferno_adapter.parse_binaryinferno_spec(README_SPEC, sample_count=3)
+    candidates = parse_binaryinferno_spec(README_SPEC, sample_count=3)
 
     assert all(isinstance(candidate, FieldCandidate) for candidate in candidates)
     assert [(candidate.offset, candidate.size) for candidate in candidates] == [
@@ -100,11 +97,8 @@ FieldRep *Q_ANY (variable payload)
 FieldFixed 2V_BE (BE trailer)
 SPECEND
 """
-    with pytest.raises(
-        binaryinferno_adapter.BinaryInfernoOutputError,
-        match="non-terminal variable-width",
-    ):
-        binaryinferno_adapter.parse_binaryinferno_spec(stdout, sample_count=2)
+    with pytest.raises(BinaryInfernoOutputError, match="non-terminal variable-width"):
+        parse_binaryinferno_spec(stdout, sample_count=2)
 
 
 def test_parser_rejects_missing_duplicate_or_unknown_spec_shapes() -> None:
@@ -115,8 +109,8 @@ def test_parser_rejects_missing_duplicate_or_unknown_spec_shapes() -> None:
         "SPECSTART\nnot a documented line\nSPECEND",
     ]
     for stdout in bad_outputs:
-        with pytest.raises(binaryinferno_adapter.BinaryInfernoOutputError):
-            binaryinferno_adapter.parse_binaryinferno_spec(stdout, sample_count=1)
+        with pytest.raises(BinaryInfernoOutputError):
+            parse_binaryinferno_spec(stdout, sample_count=1)
 
 
 def test_fake_runner_receives_only_valid_packet_slices_and_materializes_spec() -> None:
@@ -127,9 +121,9 @@ def test_fake_runner_receives_only_valid_packet_slices_and_materializes_spec() -
         PacketCandidate(8, 10, 1.0),
     ]
     runner = FakeRunner("SPECSTART\nFieldFixed 4V (Unknown Type 4 Byte(s))\nSPECEND")
-    config = binaryinferno_adapter.BinaryInfernoConfig(root=None, detectors=("boundBE",))
+    config = BinaryInfernoConfig(root=None, detectors=("boundBE",))
 
-    result = binaryinferno_adapter.run_binaryinferno_baseline(
+    result = run_binaryinferno_baseline(
         stream,
         packets,
         config=config,
@@ -148,9 +142,9 @@ def test_fake_runner_receives_only_valid_packet_slices_and_materializes_spec() -
 
 def test_invalid_input_and_invalid_output_fail_closed() -> None:
     stream = load_raw(b"AB", source_id="binaryinferno-test")
-    config = binaryinferno_adapter.BinaryInfernoConfig(root=None, detectors=("boundBE",))
+    config = BinaryInfernoConfig(root=None, detectors=("boundBE",))
 
-    invalid_input = binaryinferno_adapter.run_binaryinferno_baseline(
+    invalid_input = run_binaryinferno_baseline(
         stream,
         [PacketCandidate(2, 3, 1.0)],
         config=config,
@@ -159,7 +153,7 @@ def test_invalid_input_and_invalid_output_fail_closed() -> None:
     assert invalid_input.status == "failed"
     assert invalid_input.error_category == "invalid_input"
 
-    invalid_output = binaryinferno_adapter.run_binaryinferno_baseline(
+    invalid_output = run_binaryinferno_baseline(
         stream,
         [PacketCandidate(0, 2, 1.0)],
         config=config,
@@ -171,8 +165,8 @@ def test_invalid_input_and_invalid_output_fail_closed() -> None:
 
 def test_config_rejects_unsafe_detector_names_and_invalid_bounds() -> None:
     with pytest.raises(ValueError, match="detector"):
-        binaryinferno_adapter.BinaryInfernoConfig(detectors=("boundBE;rm",))
+        BinaryInfernoConfig(detectors=("boundBE;rm",))
     with pytest.raises(ValueError, match="timeout"):
-        binaryinferno_adapter.BinaryInfernoConfig(timeout_seconds=0)
+        BinaryInfernoConfig(timeout_seconds=0)
     with pytest.raises(ValueError, match="max_output"):
-        binaryinferno_adapter.BinaryInfernoConfig(max_output_bytes=100)
+        BinaryInfernoConfig(max_output_bytes=100)

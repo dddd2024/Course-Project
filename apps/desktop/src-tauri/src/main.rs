@@ -21,9 +21,16 @@ const SIDECAR_EXECUTABLE_NAME: &str = "course-project-sidecar";
 
 #[derive(Clone)]
 struct AppState {
-    tasks: Arc<Mutex<HashMap<String, bool>>>,
+    tasks: Arc<Mutex<HashMap<String, TaskLifecycle>>>,
     sidecar: Arc<Mutex<Option<SidecarClient>>>,
     next_id: Arc<AtomicU64>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TaskLifecycle {
+    Running,
+    Cancelled,
+    Finished,
 }
 
 impl Default for AppState {
@@ -459,6 +466,43 @@ fn emit_update(app: &AppHandle, update: TaskUpdate) {
     let _ = app.emit(TASK_EVENT, update);
 }
 
+fn task_is_cancelled(state: &AppState, task_id: &str) -> bool {
+    state
+        .tasks
+        .lock()
+        .map(|tasks| tasks.get(task_id) == Some(&TaskLifecycle::Cancelled))
+        .unwrap_or(true)
+}
+
+fn finish_task_if_running(state: &AppState, task_id: &str) -> bool {
+    let Ok(mut tasks) = state.tasks.lock() else {
+        return false;
+    };
+    let Some(lifecycle) = tasks.get_mut(task_id) else {
+        return false;
+    };
+    if *lifecycle != TaskLifecycle::Running {
+        return false;
+    }
+    *lifecycle = TaskLifecycle::Finished;
+    true
+}
+
+fn cancel_task_if_running(state: &AppState, task_id: &str) -> Result<bool, String> {
+    let mut tasks = state
+        .tasks
+        .lock()
+        .map_err(|_| "task state is unavailable".to_string())?;
+    let lifecycle = tasks
+        .get_mut(task_id)
+        .ok_or_else(|| format!("unknown task: {task_id}"))?;
+    if *lifecycle != TaskLifecycle::Running {
+        return Ok(false);
+    }
+    *lifecycle = TaskLifecycle::Cancelled;
+    Ok(true)
+}
+
 fn result_state_root() -> Result<PathBuf, String> {
     sidecar_state_dir()?
         .canonicalize()
@@ -605,6 +649,20 @@ fn run_sidecar_analysis(
         "timeoutSeconds": 300,
         "optionalDependencyPolicy": "degrade"
     });
+    emit_update(
+        app,
+        TaskUpdate {
+            protocol_version: 1,
+            id: task_id.to_string(),
+            event: "progress".to_string(),
+            status: "ANALYZING".to_string(),
+            stage: "analysis".to_string(),
+            progress: 0.0,
+            message: "Sidecar analysis started".to_string(),
+            error: None,
+        },
+    );
+
     let messages = {
         let mut guard = state
             .sidecar
@@ -623,20 +681,10 @@ fn run_sidecar_analysis(
         result?
     };
 
-    emit_update(
-        app,
-        TaskUpdate {
-            protocol_version: 1,
-            id: task_id.to_string(),
-            event: "progress".to_string(),
-            status: "ANALYZING".to_string(),
-            stage: "analysis".to_string(),
-            progress: 0.0,
-            message: "Sidecar analysis started".to_string(),
-            error: None,
-        },
-    );
     for message in messages {
+        if task_is_cancelled(state, task_id) {
+            return Ok(());
+        }
         if let Some(progress) = message.get("progress").and_then(Value::as_f64) {
             let stage = message
                 .get("stage")
@@ -657,6 +705,9 @@ fn run_sidecar_analysis(
             );
         }
         if message.get("resultRef").and_then(Value::as_str).is_some() {
+            if !finish_task_if_running(state, task_id) {
+                return Ok(());
+            }
             emit_update(
                 app,
                 TaskUpdate {
@@ -753,13 +804,16 @@ fn start_contract_spike(
         .tasks
         .lock()
         .map_err(|_| "task state is unavailable".to_string())?
-        .insert(id.clone(), false);
+        .insert(id.clone(), TaskLifecycle::Running);
 
     let task_state = state.inner().clone();
     let task_id = id.clone();
     tauri::async_runtime::spawn(async move {
         if let Some(input_ref) = input_ref {
             if let Err(error) = run_sidecar_analysis(&app, &task_state, &task_id, &input_ref) {
+                if !finish_task_if_running(&task_state, &task_id) {
+                    return;
+                }
                 emit_update(
                     &app,
                     TaskUpdate {
@@ -810,29 +864,14 @@ fn start_contract_spike(
 
         for (index, (status, stage, progress, message)) in stages.iter().enumerate() {
             std::thread::sleep(Duration::from_millis(650));
-            let cancelled = task_state
-                .tasks
-                .lock()
-                .map(|tasks| tasks.get(&task_id).copied().unwrap_or(false))
-                .unwrap_or(true);
-            if cancelled {
-                emit_update(
-                    &app,
-                    TaskUpdate {
-                        protocol_version: 1,
-                        id: task_id.clone(),
-                        event: "status".to_string(),
-                        status: "CANCELLED".to_string(),
-                        stage: "cancelled".to_string(),
-                        progress: *progress,
-                        message: "Task was cancelled by the user".to_string(),
-                        error: None,
-                    },
-                );
+            if task_is_cancelled(&task_state, &task_id) {
                 return;
             }
 
             if failure_mode && index == 2 {
+                if !finish_task_if_running(&task_state, &task_id) {
+                    return;
+                }
                 emit_update(
                     &app,
                     TaskUpdate {
@@ -849,6 +888,10 @@ fn start_contract_spike(
                         }),
                     },
                 );
+                return;
+            }
+
+            if *status == "COMPLETED" && !finish_task_if_running(&task_state, &task_id) {
                 return;
             }
 
@@ -877,24 +920,66 @@ fn start_contract_spike(
 }
 
 #[tauri::command]
-fn cancel_contract_spike(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut tasks = state
-        .tasks
-        .lock()
-        .map_err(|_| "task state is unavailable".to_string())?;
-    let task = tasks
-        .get_mut(&id)
-        .ok_or_else(|| format!("unknown task: {id}"))?;
-    *task = true;
+fn cancel_contract_spike(
+    app: AppHandle,
+    id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if cancel_task_if_running(state.inner(), &id)? {
+        emit_update(
+            &app,
+            TaskUpdate {
+                protocol_version: 1,
+                id,
+                event: "status".to_string(),
+                status: "CANCELLED".to_string(),
+                stage: "cancelled".to_string(),
+                progress: 0.0,
+                message: "Task was cancelled by the user".to_string(),
+                error: None,
+            },
+        );
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        bundled_sidecar_candidates, find_restored_artifact, read_artifact_preview,
-        resolve_controlled_path, SidecarClient, SIDECAR_EXECUTABLE_NAME,
+        bundled_sidecar_candidates, cancel_task_if_running, find_restored_artifact,
+        finish_task_if_running, read_artifact_preview, resolve_controlled_path, AppState,
+        SidecarClient, TaskLifecycle, SIDECAR_EXECUTABLE_NAME,
     };
+
+    #[test]
+    fn task_lifecycle_keeps_cancellation_terminal() {
+        let state = AppState::default();
+        state
+            .tasks
+            .lock()
+            .expect("task state should be writable")
+            .insert("task-cancelled".to_string(), TaskLifecycle::Running);
+
+        assert!(cancel_task_if_running(&state, "task-cancelled")
+            .expect("running task should be cancellable"));
+        assert!(!finish_task_if_running(&state, "task-cancelled"));
+        assert!(!cancel_task_if_running(&state, "task-cancelled")
+            .expect("cancelling twice should be an idempotent no-op"));
+    }
+
+    #[test]
+    fn task_lifecycle_keeps_completion_terminal() {
+        let state = AppState::default();
+        state
+            .tasks
+            .lock()
+            .expect("task state should be writable")
+            .insert("task-completed".to_string(), TaskLifecycle::Running);
+
+        assert!(finish_task_if_running(&state, "task-completed"));
+        assert!(!cancel_task_if_running(&state, "task-completed")
+            .expect("completed task cancellation should be an idempotent no-op"));
+    }
     use serde_json::json;
     use std::{
         fs,

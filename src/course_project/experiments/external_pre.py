@@ -238,14 +238,14 @@ def write_netzob_experiment_bundle(
     root.mkdir(parents=True, exist_ok=True)
 
     candidate_path = root / _CANDIDATE_ARTIFACT_NAME
-    candidate_path.write_text(bundle.candidate_artifact_json, encoding="utf-8")
+    candidate_path.write_bytes(bundle.candidate_artifact_json.encode("utf-8"))
     actual_sha = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
     expected_sha = bundle.record.artifacts[0].sha256
     if actual_sha != expected_sha:
         raise ExperimentValidationError("candidate artifact hash changed during write")
 
     record_path = root / _RECORD_NAME
-    record_path.write_text(canonical_record_json(bundle.record) + "\n", encoding="utf-8")
+    record_path.write_bytes((canonical_record_json(bundle.record) + "\n").encode("utf-8"))
     return root
 
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TextIO
 
 from course_project.sidecar.runtime import PROTOCOL_VERSION, SidecarRuntime
+from course_project.sidecar.track_c_llm_semantic_backend import DeterministicTrackCSemanticBackend
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 
@@ -72,7 +73,10 @@ def main(argv: list[str] | None = None) -> int:
     roots = tuple(args.allow_root) if args.allow_root else None
     runtime = SidecarRuntime(
         state_dir=args.state_dir,
-        backend=TrackDBaselineBackend(state_dir=args.state_dir),
+        backend=TrackDBaselineBackend(
+            state_dir=args.state_dir,
+            semantic_backend=DeterministicTrackCSemanticBackend(),
+        ),
         allowed_roots=roots,
     )
     return serve_stream(runtime, sys.stdin, sys.stdout, sys.stderr)

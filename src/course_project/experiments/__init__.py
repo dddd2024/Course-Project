@@ -30,6 +30,12 @@ from course_project.experiments.llm_only import (
     run_llm_only_mechanism_baseline,
     write_llm_only_mechanism_execution,
 )
+from course_project.experiments.llm_verification import (
+    LLM_VERIFICATION_SELECTION_POLICY_VERSION,
+    LLMVerificationMechanismExecution,
+    run_llm_verification_mechanism_baseline,
+    write_llm_verification_mechanism_execution,
+)
 from course_project.experiments.no_provenance import (
     NO_PROVENANCE_POLICY_VERSION,
     NoProvenanceAblationExecution,
@@ -73,6 +79,7 @@ __all__ = [
     "DETERMINISTIC_MECHANISM_MODEL_VERSION",
     "DETERMINISTIC_MECHANISM_PROVIDER",
     "LLM_ONLY_SELECTION_POLICY_VERSION",
+    "LLM_VERIFICATION_SELECTION_POLICY_VERSION",
     "METRIC_GROUND_TRUTH",
     "NO_PROVENANCE_POLICY_VERSION",
     "NO_VERIFICATION_POLICY_VERSION",
@@ -89,6 +96,7 @@ __all__ = [
     "ExternalPREExperimentBundle",
     "FullEvidenceGraphMechanismExecution",
     "LLMOnlyMechanismExecution",
+    "LLMVerificationMechanismExecution",
     "MetricRecord",
     "NoProvenanceAblationExecution",
     "NoVerificationAblationExecution",
@@ -107,6 +115,7 @@ __all__ = [
     "run_full_evidencegraph_mechanism_experiment",
     "run_live_netzob_mechanism_experiment",
     "run_llm_only_mechanism_baseline",
+    "run_llm_verification_mechanism_baseline",
     "run_no_provenance_ablation",
     "run_no_verification_ablation",
     "run_synthetic_mechanism_experiments",
@@ -115,6 +124,7 @@ __all__ = [
     "write_experiment_bundle",
     "write_full_evidencegraph_mechanism_execution",
     "write_llm_only_mechanism_execution",
+    "write_llm_verification_mechanism_execution",
     "write_netzob_experiment_bundle",
     "write_no_provenance_ablation_execution",
     "write_no_verification_ablation_execution",

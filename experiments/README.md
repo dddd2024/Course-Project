@@ -29,7 +29,7 @@ MLflow, Sacred, Hydra and BenchOpt were evaluated before adding the executable h
 Current honest executable variants are:
 - `heuristic`: real Track D boundary/inference candidates, with a fixed score-threshold control for executable `length`/`sequence` candidate types;
 - `naive_vote`: the project `naive_multi_source_vote` control over real candidate/alignment/verifier evidence materialized by the production semantic path;
-- `ablation_no_llm`: the current production Track D -> executable verification -> provenance-aware fusion path with `llmEnabled=false`.
+- `ablation_no_llm`: the current production Track D -> executable verification -> provenance-aware fusion -> global schema-promotion path with `llmEnabled=false`.
 
 The current production `DeterministicTrackCSemanticBackend` does **not** call `LLMHypothesisProvider`. Therefore the harness deliberately does not emit an `evidencegraph_pre` record. Full EvidenceGraph-PRE remains unevaluated until a real LLM hypothesis source is connected to the evidence/fusion path. This prevents the no-LLM production path from being mislabeled as the complete proposed method.
 
@@ -47,7 +47,9 @@ For this corpus no external ground truth is declared. Ground-truth-dependent met
 
 Schema execution is intentionally fail-closed. The experiment harness does not prune or rewrite a method's output merely to make it parseable. If a variant emits no fields, overlapping accepted fields, or another structurally invalid schema, its record sets `schemaExecutable=false`, retains the exact `schemaExecutionError`, and records `parse_coverage=0.0`. This preserves the distinction between per-hypothesis verification and globally executable schema validity.
 
-The first real harness execution on PR #69 exposed exactly such a production defect: the current no-LLM production path accepted overlapping length hypotheses (for example bytes `9:11` and byte `10`) that cannot coexist in one Kaitai/provisional schema. That defect is tracked separately in #70. The experiment layer records the failure rather than hiding it.
+PR #69 provided the historical evidence that motivated #70: the no-LLM production path could independently ACCEPT overlapping length hypotheses (for example bytes `9:11` and byte `10`) even though those ranges could not coexist in one executable schema. That historical artifact remains unchanged and correctly records `schemaExecutable=false` / zero ParseCoverage.
+
+The #70 fix adds a separate project-native global promotion layer after per-hypothesis verification/fusion. Isolated accepted fields can be promoted directly. An overlapping conflict group gets a unique winner only when one candidate transparently dominates its peers on fusion margin, support, verification and conflict signals; scientifically tied or incomparable conflicts abstain rather than being resolved by ID, insertion order, randomness or a hidden scalar weight. Per-hypothesis fusion history remains auditable even when final schema promotion abstains. Fresh experiment runs after #70 must execute the exact resulting schema and therefore demonstrate the fix rather than rewriting the old #69 evidence.
 
 `processing_time_seconds` is retained in exact run records as operational evidence. It is intentionally excluded from `scientific_record_fingerprint()` and from stable comparison identity, so wall-clock jitter cannot make otherwise identical scientific outcomes appear different. The stable comparison artifact currently compares `parse_coverage` and `constraint_satisfaction_rate` only.
 

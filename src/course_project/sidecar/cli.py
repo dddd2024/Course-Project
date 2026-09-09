@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TextIO
 
 from course_project.sidecar.runtime import PROTOCOL_VERSION, SidecarRuntime
-from course_project.sidecar.track_c_semantic_backend import DeterministicTrackCSemanticBackend
+from course_project.sidecar.track_c_llm_semantic_backend import DeterministicTrackCSemanticBackend
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 

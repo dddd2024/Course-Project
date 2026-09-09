@@ -1,11 +1,11 @@
 """Global structural-consistency selection for verified protocol fields.
 
 Per-hypothesis executable verification and provenance-aware fusion answer whether
-one interpretation is individually supportable.  Exporting a protocol schema has
+one interpretation is individually supportable. Exporting a protocol schema has
 an additional invariant: promoted byte ranges must be mutually compatible.
 
-This module deliberately keeps those two decision layers separate.  It never
-rewrites verification/fusion history.  Instead it applies a conservative final
+This module deliberately keeps those two decision layers separate. It never
+rewrites verification/fusion history. Instead it applies a conservative final
 promotion policy to already-accepted hypotheses:
 
 * candidates without overlap are selected;
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from itertools import pairwise
 from math import isfinite
 from typing import Literal
 
@@ -281,7 +282,7 @@ def _validate_selected_non_overlapping(
         (by_id[item_id] for item_id in selected),
         key=lambda item: (item.offset, item.end_offset, item.hypothesis_id),
     )
-    for previous, current in zip(records, records[1:]):
+    for previous, current in pairwise(records):
         if _overlaps(previous, current):
             raise GlobalSelectionError(
                 "global selection produced overlapping promoted fields"

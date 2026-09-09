@@ -7,11 +7,11 @@ from typing import Any
 import pytest
 
 from course_project.llm import (
-    LLMHypothesisProvider,
-    LLMHypothesisRequest,
     LiveLLMProviderError,
     LiveLLMResponseError,
     LiveLLMTransportError,
+    LLMHypothesisProvider,
+    LLMHypothesisRequest,
     OpenAICompatibleLLMProvider,
     OpenAICompatibleProviderConfig,
     UrllibJSONTransport,
@@ -48,7 +48,7 @@ class DummyHTTPResponse:
     def __init__(self, body: bytes) -> None:
         self._body = body
 
-    def __enter__(self) -> DummyHTTPResponse:
+    def __enter__(self):
         return self
 
     def __exit__(self, *_args: object) -> None:

@@ -24,6 +24,12 @@ from course_project.experiments.full_evidencegraph import (
     run_full_evidencegraph_mechanism_experiment,
     write_full_evidencegraph_mechanism_execution,
 )
+from course_project.experiments.llm_only import (
+    LLM_ONLY_SELECTION_POLICY_VERSION,
+    LLMOnlyMechanismExecution,
+    run_llm_only_mechanism_baseline,
+    write_llm_only_mechanism_execution,
+)
 from course_project.experiments.no_provenance import (
     NO_PROVENANCE_POLICY_VERSION,
     NoProvenanceAblationExecution,
@@ -66,6 +72,7 @@ __all__ = [
     "BASELINE_VARIANTS",
     "DETERMINISTIC_MECHANISM_MODEL_VERSION",
     "DETERMINISTIC_MECHANISM_PROVIDER",
+    "LLM_ONLY_SELECTION_POLICY_VERSION",
     "METRIC_GROUND_TRUTH",
     "NO_PROVENANCE_POLICY_VERSION",
     "NO_VERIFICATION_POLICY_VERSION",
@@ -81,6 +88,7 @@ __all__ = [
     "ExperimentValidationError",
     "ExternalPREExperimentBundle",
     "FullEvidenceGraphMechanismExecution",
+    "LLMOnlyMechanismExecution",
     "MetricRecord",
     "NoProvenanceAblationExecution",
     "NoVerificationAblationExecution",
@@ -98,6 +106,7 @@ __all__ = [
     "record_fingerprint",
     "run_full_evidencegraph_mechanism_experiment",
     "run_live_netzob_mechanism_experiment",
+    "run_llm_only_mechanism_baseline",
     "run_no_provenance_ablation",
     "run_no_verification_ablation",
     "run_synthetic_mechanism_experiments",
@@ -105,6 +114,7 @@ __all__ = [
     "scientific_record_fingerprint",
     "write_experiment_bundle",
     "write_full_evidencegraph_mechanism_execution",
+    "write_llm_only_mechanism_execution",
     "write_netzob_experiment_bundle",
     "write_no_provenance_ablation_execution",
     "write_no_verification_ablation_execution",

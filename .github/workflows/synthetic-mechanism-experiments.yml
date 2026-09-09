@@ -15,13 +15,16 @@ on:
       - "scripts/run_full_evidencegraph_mechanism_experiment.py"
       - "scripts/run_no_provenance_ablation.py"
       - "scripts/run_no_verification_ablation.py"
+      - "scripts/run_llm_only_mechanism_baseline.py"
       - "tests/test_experiment_execution.py"
       - "tests/test_full_evidencegraph_experiment.py"
       - "tests/test_no_provenance_ablation.py"
       - "tests/test_no_verification_ablation.py"
+      - "tests/test_llm_only_mechanism.py"
       - "experiments/README.md"
       - "experiments/no-provenance-ablation.md"
       - "experiments/no-verification-ablation.md"
+      - "experiments/llm-only-mechanism.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
   push:
     branches: [main]
@@ -37,13 +40,16 @@ on:
       - "scripts/run_full_evidencegraph_mechanism_experiment.py"
       - "scripts/run_no_provenance_ablation.py"
       - "scripts/run_no_verification_ablation.py"
+      - "scripts/run_llm_only_mechanism_baseline.py"
       - "tests/test_experiment_execution.py"
       - "tests/test_full_evidencegraph_experiment.py"
       - "tests/test_no_provenance_ablation.py"
       - "tests/test_no_verification_ablation.py"
+      - "tests/test_llm_only_mechanism.py"
       - "experiments/README.md"
       - "experiments/no-provenance-ablation.md"
       - "experiments/no-verification-ablation.md"
+      - "experiments/llm-only-mechanism.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
 
 permissions:
@@ -75,7 +81,8 @@ jobs:
             tests/test_experiment_execution.py \
             tests/test_full_evidencegraph_experiment.py \
             tests/test_no_provenance_ablation.py \
-            tests/test_no_verification_ablation.py
+            tests/test_no_verification_ablation.py \
+            tests/test_llm_only_mechanism.py
 
       - name: Execute and record mechanism experiments
         env:
@@ -93,6 +100,9 @@ jobs:
           python scripts/run_no_verification_ablation.py \
             --outdir experiment-results \
             --code-sha "$CODE_SHA"
+          python scripts/run_llm_only_mechanism_baseline.py \
+            --outdir experiment-results \
+            --code-sha "$CODE_SHA"
 
       - name: Validate recorded claim scope
         run: |
@@ -102,38 +112,22 @@ jobs:
 
           root = Path("experiment-results/records")
           legacy_manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-          full_manifest = json.loads(
-              (root / "full-method-manifest.json").read_text(encoding="utf-8")
-          )
-          full_record = json.loads(
-              (root / "evidencegraph_pre.json").read_text(encoding="utf-8")
-          )
-          full_audit = json.loads(
-              (root / "evidencegraph_pre.audit.json").read_text(encoding="utf-8")
-          )
-          no_provenance_manifest = json.loads(
-              (root / "ablation-no-provenance-manifest.json").read_text(encoding="utf-8")
-          )
-          no_provenance_record = json.loads(
-              (root / "ablation_no_provenance.json").read_text(encoding="utf-8")
-          )
-          no_provenance_audit = json.loads(
-              (root / "ablation_no_provenance.audit.json").read_text(encoding="utf-8")
-          )
-          no_verification_manifest = json.loads(
-              (root / "ablation-no-verification-manifest.json").read_text(
-                  encoding="utf-8"
-              )
-          )
-          no_verification_record = json.loads(
-              (root / "ablation_no_verification.json").read_text(encoding="utf-8")
-          )
-          no_verification_audit = json.loads(
-              (root / "ablation_no_verification.audit.json").read_text(encoding="utf-8")
-          )
+          full_manifest = json.loads((root / "full-method-manifest.json").read_text(encoding="utf-8"))
+          full_record = json.loads((root / "evidencegraph_pre.json").read_text(encoding="utf-8"))
+          full_audit = json.loads((root / "evidencegraph_pre.audit.json").read_text(encoding="utf-8"))
+          no_provenance_manifest = json.loads((root / "ablation-no-provenance-manifest.json").read_text(encoding="utf-8"))
+          no_provenance_record = json.loads((root / "ablation_no_provenance.json").read_text(encoding="utf-8"))
+          no_provenance_audit = json.loads((root / "ablation_no_provenance.audit.json").read_text(encoding="utf-8"))
+          no_verification_manifest = json.loads((root / "ablation-no-verification-manifest.json").read_text(encoding="utf-8"))
+          no_verification_record = json.loads((root / "ablation_no_verification.json").read_text(encoding="utf-8"))
+          no_verification_audit = json.loads((root / "ablation_no_verification.audit.json").read_text(encoding="utf-8"))
+          llm_only_manifest = json.loads((root / "llm-only-manifest.json").read_text(encoding="utf-8"))
+          llm_only_record = json.loads((root / "llm_only.json").read_text(encoding="utf-8"))
+          llm_only_audit = json.loads((root / "llm_only.audit.json").read_text(encoding="utf-8"))
 
           assert legacy_manifest["formalBenchmark"] is False
           assert legacy_manifest["variants"] == ["heuristic", "naive_vote", "ablation_no_llm"]
+
           assert full_manifest["formalBenchmark"] is False
           assert full_manifest["realLLMBenchmark"] is False
           assert full_manifest["variant"] == "evidencegraph_pre"
@@ -143,55 +137,34 @@ jobs:
               "version": "1",
           }
           assert full_record["config"]["realLLMBenchmark"] is False
-          semantic_metric = next(
-              metric
-              for metric in full_record["metrics"]
+          full_semantic = next(
+              metric for metric in full_record["metrics"]
               if metric["name"] == "field_semantic_accuracy"
           )
-          assert semantic_metric["evaluable"] is False
-          assert semantic_metric["value"] is None
+          assert full_semantic["evaluable"] is False
+          assert full_semantic["value"] is None
           assert full_audit["rejectedWrongHypothesisCount"] >= 1
-          assert (
-              full_audit["wrongHypothesisMaxConfidence"]
-              > full_audit["correctHypothesisMaxConfidence"]
-          )
+          assert full_audit["wrongHypothesisMaxConfidence"] > full_audit["correctHypothesisMaxConfidence"]
 
           assert no_provenance_manifest["formalBenchmark"] is False
           assert no_provenance_manifest["realLLMBenchmark"] is False
           assert no_provenance_manifest["variant"] == "ablation_no_provenance"
           assert no_provenance_record["resultScope"] == "mechanism"
-          assert no_provenance_record["model"] == {
-              "provider": "deterministic-evidencegraph-mechanism",
-              "version": "1",
-          }
           assert no_provenance_record["config"]["provenanceCollapseEnabled"] is False
           assert no_provenance_record["config"]["rawEvidenceTreatedAsIndependent"] is True
-          no_provenance_semantic_metric = next(
-              metric
-              for metric in no_provenance_record["metrics"]
-              if metric["name"] == "field_semantic_accuracy"
-          )
-          assert no_provenance_semantic_metric["evaluable"] is False
-          assert no_provenance_semantic_metric["value"] is None
           assert no_provenance_audit["controlCollapsedHypothesisCount"] >= 1
           assert no_provenance_audit["controlMaxDependencyReduction"] >= 1
           assert no_provenance_audit["ablationAllEvidenceIndependent"] is True
-          assert no_provenance_audit["rejectedWrongHypothesisCount"] >= 1
 
           assert no_verification_manifest["formalBenchmark"] is False
           assert no_verification_manifest["realLLMBenchmark"] is False
           assert no_verification_manifest["variant"] == "ablation_no_verification"
           assert no_verification_record["resultScope"] == "mechanism"
-          assert no_verification_record["model"] == {
-              "provider": "deterministic-evidencegraph-mechanism",
-              "version": "1",
-          }
           assert no_verification_record["config"]["verificationEnabled"] is False
           assert no_verification_record["config"]["verificationEvidenceUsed"] is False
           assert no_verification_record["config"]["provenanceCollapseEnabled"] is True
           no_verification_constraint = next(
-              metric
-              for metric in no_verification_record["metrics"]
+              metric for metric in no_verification_record["metrics"]
               if metric["name"] == "constraint_satisfaction_rate"
           )
           assert no_verification_constraint["evaluable"] is False
@@ -199,17 +172,33 @@ jobs:
           assert no_verification_audit["controlVerificationExecuted"] is True
           assert no_verification_audit["ablationVerificationExecuted"] is False
           assert no_verification_audit["controlRejectedWrongHypothesisCount"] >= 1
-          assert (
-              no_verification_audit[
-                  "wrongHypothesisNotRejectedWithoutVerificationCount"
-              ]
-              >= 1
+          assert no_verification_audit["wrongHypothesisNotRejectedWithoutVerificationCount"] >= 1
+
+          assert llm_only_manifest["formalBenchmark"] is False
+          assert llm_only_manifest["realLLMBenchmark"] is False
+          assert llm_only_manifest["variant"] == "llm_only"
+          assert llm_only_record["resultScope"] == "mechanism"
+          assert llm_only_record["model"] == {
+              "provider": "deterministic-evidencegraph-mechanism",
+              "version": "1",
+          }
+          assert llm_only_record["config"]["llmOnly"] is True
+          assert llm_only_record["config"]["verificationEnabled"] is False
+          assert llm_only_record["config"]["verificationEvidenceUsed"] is False
+          assert llm_only_record["config"]["provenanceAwareFusionEnabled"] is False
+          assert llm_only_record["config"]["provenanceEvidenceUsedForSelection"] is False
+          llm_only_constraint = next(
+              metric for metric in llm_only_record["metrics"]
+              if metric["name"] == "constraint_satisfaction_rate"
           )
-          assert (
-              no_verification_audit["wrongHypothesisMaxConfidence"]
-              > no_verification_audit["correctHypothesisMaxConfidence"]
-          )
-          print(json.dumps(no_verification_manifest, indent=2, sort_keys=True))
+          assert llm_only_constraint["evaluable"] is False
+          assert llm_only_constraint["value"] is None
+          assert llm_only_audit["pairedControlVerificationExecuted"] is True
+          assert llm_only_audit["pairedControlRejectedWrongHypothesisCount"] >= 1
+          assert llm_only_audit["wrongHypothesisMaxConfidence"] > llm_only_audit["correctHypothesisMaxConfidence"]
+          assert llm_only_audit["wrongConfidenceRegionWinnerCount"] >= 1
+          assert llm_only_audit["selectedWrongHypothesisCount"] >= 1
+          print(json.dumps(llm_only_manifest, indent=2, sort_keys=True))
           PY
 
       - name: Upload canonical experiment evidence

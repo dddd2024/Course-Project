@@ -80,7 +80,9 @@ def evaluate_behavior_predictions(
         )
 
     if not normalized:
-        raise ValueError("supervised behavior evaluation requires at least one prediction")
+        raise ValueError(
+            "supervised behavior evaluation requires at least one prediction"
+        )
 
     normalized_split = _split_unit(split_unit)
     label_by_id: dict[str, str] = {}
@@ -106,7 +108,9 @@ def evaluate_behavior_predictions(
     )
     observed_labels = tuple(sorted(set(truth) | set(predicted)))
     correct = sum(
-        1 for expected, actual in zip(truth, predicted, strict=True) if expected == actual
+        1
+        for expected, actual in zip(truth, predicted, strict=True)
+        if expected == actual
     )
     accuracy = correct / len(truth)
     macro_f1 = sum(
@@ -168,7 +172,7 @@ def _split_unit(value: str | None) -> BehaviorSplitUnit:
 
 
 def _behavior_label(value: str, label: str) -> str:
-    normalized = _text(value, label).upper()
+    normalized = _text(value, label)
     if normalized not in _BEHAVIOR_LABELS:
         raise ValueError(
             f"{label} must use the frozen behavior vocabulary: "

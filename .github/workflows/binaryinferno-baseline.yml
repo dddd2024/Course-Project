@@ -1,0 +1,55 @@
+name: BinaryInferno Baseline
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/course_project/inference/binaryinferno_adapter.py"
+      - "src/course_project/inference/__init__.py"
+      - "tests/unit/test_binaryinferno_adapter.py"
+      - "tests/integration/test_binaryinferno_live.py"
+      - "docs/dependency-register.md"
+      - ".github/workflows/binaryinferno-baseline.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  binaryinferno-live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned BinaryInferno upstream
+        uses: actions/checkout@v4
+        with:
+          repository: binaryinferno/binaryinferno
+          ref: cb42a63ada74737c10d01e2c22f4502ba3983976
+          path: .upstream/binaryinferno
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install project and upstream runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip install scipy scikit-learn
+          python -m pip check
+
+      - name: Verify pinned upstream identity
+        shell: bash
+        run: |
+          test "$(git -C .upstream/binaryinferno rev-parse HEAD)" = "cb42a63ada74737c10d01e2c22f4502ba3983976"
+          test -f .upstream/binaryinferno/LICENSE
+          test -f .upstream/binaryinferno/binaryinferno/blackboard.py
+
+      - name: Run live BinaryInferno adapter smoke
+        env:
+          BINARYINFERNO_ROOT: ${{ github.workspace }}/.upstream/binaryinferno
+        run: python -m pytest -q tests/integration/test_binaryinferno_live.py

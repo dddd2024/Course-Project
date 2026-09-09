@@ -17,17 +17,20 @@ on:
       - "scripts/run_no_verification_ablation.py"
       - "scripts/run_llm_only_mechanism_baseline.py"
       - "scripts/run_llm_verification_mechanism_baseline.py"
+      - "scripts/run_threshold_sensitivity_analysis.py"
       - "tests/test_experiment_execution.py"
       - "tests/test_full_evidencegraph_experiment.py"
       - "tests/test_no_provenance_ablation.py"
       - "tests/test_no_verification_ablation.py"
       - "tests/test_llm_only_mechanism.py"
       - "tests/test_llm_verification_mechanism.py"
+      - "tests/test_threshold_sensitivity.py"
       - "experiments/README.md"
       - "experiments/no-provenance-ablation.md"
       - "experiments/no-verification-ablation.md"
       - "experiments/llm-only-mechanism.md"
       - "experiments/llm-verification-mechanism.md"
+      - "experiments/threshold-sensitivity.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
   push:
     branches: [main]
@@ -45,17 +48,20 @@ on:
       - "scripts/run_no_verification_ablation.py"
       - "scripts/run_llm_only_mechanism_baseline.py"
       - "scripts/run_llm_verification_mechanism_baseline.py"
+      - "scripts/run_threshold_sensitivity_analysis.py"
       - "tests/test_experiment_execution.py"
       - "tests/test_full_evidencegraph_experiment.py"
       - "tests/test_no_provenance_ablation.py"
       - "tests/test_no_verification_ablation.py"
       - "tests/test_llm_only_mechanism.py"
       - "tests/test_llm_verification_mechanism.py"
+      - "tests/test_threshold_sensitivity.py"
       - "experiments/README.md"
       - "experiments/no-provenance-ablation.md"
       - "experiments/no-verification-ablation.md"
       - "experiments/llm-only-mechanism.md"
       - "experiments/llm-verification-mechanism.md"
+      - "experiments/threshold-sensitivity.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
 
 permissions:
@@ -89,7 +95,8 @@ jobs:
             tests/test_no_provenance_ablation.py \
             tests/test_no_verification_ablation.py \
             tests/test_llm_only_mechanism.py \
-            tests/test_llm_verification_mechanism.py
+            tests/test_llm_verification_mechanism.py \
+            tests/test_threshold_sensitivity.py
 
       - name: Execute and record mechanism experiments
         env:
@@ -111,6 +118,9 @@ jobs:
             --outdir experiment-results \
             --code-sha "$CODE_SHA"
           python scripts/run_llm_verification_mechanism_baseline.py \
+            --outdir experiment-results \
+            --code-sha "$CODE_SHA"
+          python scripts/run_threshold_sensitivity_analysis.py \
             --outdir experiment-results \
             --code-sha "$CODE_SHA"
 
@@ -137,6 +147,8 @@ jobs:
           llm_verification_manifest = json.loads((root / "llm-verification-manifest.json").read_text(encoding="utf-8"))
           llm_verification_record = json.loads((root / "llm_verification.json").read_text(encoding="utf-8"))
           llm_verification_audit = json.loads((root / "llm_verification.audit.json").read_text(encoding="utf-8"))
+          sensitivity_manifest = json.loads((root / "threshold-sensitivity-manifest.json").read_text(encoding="utf-8"))
+          sensitivity = json.loads((root / "threshold_sensitivity.json").read_text(encoding="utf-8"))
 
           assert legacy_manifest["formalBenchmark"] is False
           assert legacy_manifest["variants"] == ["heuristic", "naive_vote", "ablation_no_llm"]
@@ -242,7 +254,35 @@ jobs:
           assert llm_verification_audit["selectedWrongHypothesisCount"] == 0
           assert llm_verification_audit["globalAbstainedHypothesisCount"] >= 1
           assert llm_verification_audit["wrongHypothesisMaxConfidence"] > llm_verification_audit["correctHypothesisMaxConfidence"]
-          print(json.dumps(llm_verification_manifest, indent=2, sort_keys=True))
+
+          assert sensitivity_manifest["analysis"] == "fusion_threshold_sensitivity"
+          assert sensitivity_manifest["resultScope"] == "mechanism"
+          assert sensitivity_manifest["formalBenchmark"] is False
+          assert sensitivity_manifest["realLLMBenchmark"] is False
+          assert sensitivity_manifest["optimizationPerformed"] is False
+          assert sensitivity_manifest["gridPointCount"] == 9
+          assert sensitivity["analysis"] == "fusion_threshold_sensitivity"
+          assert sensitivity["resultScope"] == "mechanism"
+          assert sensitivity["formalBenchmark"] is False
+          assert sensitivity["realLLMBenchmark"] is False
+          assert sensitivity["optimizationPerformed"] is False
+          assert sensitivity["bestThresholdSelected"] is False
+          assert sensitivity["groundTruthDependentMetricsEvaluated"] is False
+          assert sensitivity["grid"]["pointCount"] == 9
+          assert sensitivity["grid"]["productionDefault"] == {
+              "acceptanceSupportThreshold": 0.75,
+              "maxConflictForAccept": 0.25,
+          }
+          assert sensitivity["defaultPointMatchesProduction"] is True
+          assert sensitivity["materialization"]["fullMethodExecutedOnce"] is True
+          assert sensitivity["materialization"]["verificationReusedAcrossGrid"] is True
+          assert sensitivity["materialization"]["evidenceReusedAcrossGrid"] is True
+          assert sensitivity["production"]["rejectedWrongHypothesisCount"] >= 1
+          assert all(
+              point["verifierRejectedSelectedCount"] == 0
+              for point in sensitivity["points"]
+          )
+          print(json.dumps(sensitivity_manifest, indent=2, sort_keys=True))
           PY
 
       - name: Upload canonical experiment evidence

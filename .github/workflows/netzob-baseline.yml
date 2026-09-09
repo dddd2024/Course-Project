@@ -6,14 +6,30 @@ on:
     branches: [main]
     paths:
       - "src/course_project/inference/netzob_adapter.py"
+      - "src/course_project/experiments/external_pre.py"
+      - "src/course_project/experiments/execution.py"
+      - "src/course_project/experiments/records.py"
+      - "src/course_project/experiments/__init__.py"
+      - "scripts/run_netzob_mechanism_experiment.py"
+      - "tests/test_external_pre_experiment.py"
       - "tests/integration/test_netzob_live.py"
+      - "tests/integration/test_netzob_experiment_live.py"
+      - "experiments/README.md"
       - ".github/workflows/netzob-baseline.yml"
       - "docs/dependency-register.md"
   push:
     branches: [main]
     paths:
       - "src/course_project/inference/netzob_adapter.py"
+      - "src/course_project/experiments/external_pre.py"
+      - "src/course_project/experiments/execution.py"
+      - "src/course_project/experiments/records.py"
+      - "src/course_project/experiments/__init__.py"
+      - "scripts/run_netzob_mechanism_experiment.py"
+      - "tests/test_external_pre_experiment.py"
       - "tests/integration/test_netzob_live.py"
+      - "tests/integration/test_netzob_experiment_live.py"
+      - "experiments/README.md"
       - ".github/workflows/netzob-baseline.yml"
       - "docs/dependency-register.md"
 
@@ -70,3 +86,62 @@ jobs:
 
       - name: Run real Netzob adapter smoke
         run: pytest -q tests/integration/test_netzob_live.py
+
+      - name: Run live Netzob experiment-record smoke
+        run: pytest -q tests/integration/test_netzob_experiment_live.py
+
+      - name: Execute and record live Netzob mechanism experiment
+        env:
+          CODE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python scripts/run_netzob_mechanism_experiment.py \
+            --outdir netzob-experiment-results \
+            --code-sha "$CODE_SHA"
+
+      - name: Validate recorded claim scope
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("netzob-experiment-results")
+          record = json.loads((root / "netzob_pre.json").read_text(encoding="utf-8"))
+          candidates_path = root / "netzob-field-candidates.json"
+          candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
+
+          assert record["variant"] == "netzob_pre"
+          assert record["resultScope"] == "mechanism"
+          assert record["dataset"]["datasetId"] == "synthetic-mechanism-v1"
+          assert record["dataset"]["corpusKind"] == "synthetic"
+          assert record["config"]["backend"] == "netzob"
+          assert record["config"]["backendVersion"] == "2.0.0"
+          assert record["config"]["formalBenchmark"] is False
+          assert record["config"]["externalGroundTruthUsed"] is False
+          assert record["config"]["sourceDto"] == "FieldCandidate"
+          assert record["config"]["productionPromotion"] is False
+          assert "not Track C semantic verification" in record["config"]["projectionSemantics"]
+
+          metrics = {item["name"]: item for item in record["metrics"]}
+          assert metrics["parse_coverage"]["evaluable"] is True
+          assert 0.0 <= metrics["parse_coverage"]["value"] <= 1.0
+          assert metrics["constraint_satisfaction_rate"]["evaluable"] is False
+          assert metrics["constraint_satisfaction_rate"]["value"] is None
+          assert "semantic verifier" in metrics["constraint_satisfaction_rate"]["unavailableReason"]
+
+          assert candidates["projectNativeDto"] == "FieldCandidate"
+          assert candidates["semanticVerificationExecuted"] is False
+          assert candidates["candidates"]
+          actual_sha = hashlib.sha256(candidates_path.read_bytes()).hexdigest()
+          assert actual_sha == record["artifacts"][0]["sha256"]
+          assert actual_sha == record["config"]["candidateArtifactSha256"]
+          print(json.dumps(record, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload canonical Netzob experiment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: netzob-experiment-${{ github.event.pull_request.head.sha || github.sha }}
+          path: netzob-experiment-results/
+          if-no-files-found: error
+          retention-days: 30

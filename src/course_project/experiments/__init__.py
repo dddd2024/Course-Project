@@ -33,6 +33,11 @@ from course_project.experiments.records import (
     metric_for_dataset,
     record_fingerprint,
 )
+from course_project.experiments.wrong_hypothesis_demo import (
+    EngineeringHypothesisOutcome,
+    WrongHypothesisEngineeringDemo,
+    run_wrong_hypothesis_engineering_demo,
+)
 
 __all__ = [
     "ABLATION_VARIANTS",
@@ -43,12 +48,14 @@ __all__ = [
     "ComparisonRow",
     "DatasetIdentity",
     "DependencyVersion",
+    "EngineeringHypothesisOutcome",
     "ExperimentExecutionBundle",
     "ExperimentRecord",
     "ExperimentValidationError",
     "ExternalPREExperimentBundle",
     "MetricRecord",
     "SyntheticMechanismCorpus",
+    "WrongHypothesisEngineeringDemo",
     "build_netzob_experiment_bundle",
     "build_stable_comparison",
     "build_synthetic_mechanism_corpus",
@@ -59,6 +66,7 @@ __all__ = [
     "record_fingerprint",
     "run_live_netzob_mechanism_experiment",
     "run_synthetic_mechanism_experiments",
+    "run_wrong_hypothesis_engineering_demo",
     "scientific_record_fingerprint",
     "write_experiment_bundle",
     "write_netzob_experiment_bundle",

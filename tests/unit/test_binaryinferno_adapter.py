@@ -12,7 +12,6 @@ from course_project.inference.binaryinferno_adapter import (
 from course_project.io import load_raw
 from course_project.models import FieldCandidate, PacketCandidate
 
-
 README_SPEC = """
 noise before
 SPECSTART

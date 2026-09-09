@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from course_project.inference import binaryinferno_adapter as binaryinferno
+import course_project.inference.binaryinferno_adapter as binaryinferno
 from course_project.io import load_raw
 from course_project.models import FieldCandidate, PacketCandidate
 

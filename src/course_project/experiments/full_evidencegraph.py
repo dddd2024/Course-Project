@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import platform
 from dataclasses import dataclass
@@ -310,7 +309,7 @@ def _validate_full_result(
         raise ValueError("production boundary detection did not recover the complete corpus")
     semantic = result.metrics.get("semanticMetrics")
     if not isinstance(semantic, dict):
-        raise ValueError("production semantic metrics are missing")
+        raise TypeError("production semantic metrics are missing")
     required_true = (
         "llmRequested",
         "llmExecuted",

@@ -170,3 +170,21 @@ For the course task-division report, collect per member:
 - documentation sections;
 - demo/packaging contributions;
 - final workload percentage with evidence.
+
+### Pre-teacher-data freeze checkpoint — 2026-09-09
+
+The GitHub merged-PR ledger at the freeze audit records:
+
+| GitHub author | Merged PRs | Changed-file instances | Representative scope |
+|---|---:|---:|---|
+| `dddd2024` | 42 | 284 | contracts, Sidecar, integration, verification/fusion and mechanism experiments |
+| `hinaLove1` | 11 | 134 | React/Tauri desktop, packaging, UI and ingress repair |
+| `zhaohongjun20-creator` | 1 | 35 | deterministic binary/PRE/behavior pipeline |
+| `sunny1ce` | 0 | 0 | no merged PR attributable to this GitHub author at this checkpoint |
+
+These counts are reproducible evidence, but they are not treated as workload
+percentages: PR size, transferred ownership, reviews, Issue work, experiments and
+documentation have different costs. Any course grading percentage must be agreed by
+the team from the linked PR/Issue record rather than inferred from memory or raw
+line counts. The release evidence and scope decision are frozen in
+[`release-freeze.md`](release-freeze.md).

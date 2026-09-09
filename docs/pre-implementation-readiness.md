@@ -25,9 +25,14 @@
 
 ### Repository-setting gate
 
-- [ ] `main` ruleset matches the CI-only target in `docs/repository-settings.md`.
+- [x] `main` repository setting matches the owner-approved CI-only process in
+  `docs/repository-settings.md`.
 
-This remains a server-setting task. The current ruleset still has obsolete review requirements and lacks required status checks; repository files cannot correct those administrator settings by themselves.
+Fresh server truth on 2026-09-09 confirms ruleset `main-protection` (ID `22429560`)
+remains intentionally disabled. This is the documented owner decision, not a
+pending configuration task. The merge actor therefore enforces the exact-current-
+base Python 3.10/3.11, Windows integration and aggregate `merge-gate` checks before
+every squash merge.
 
 ### Deferred to the owning implementation PR
 

@@ -1,0 +1,20 @@
+{
+  "fields": [
+    {
+      "evidenceIds": [
+        "alignment:family-0:8:9:variable",
+        "candidate:c0-sequence-x-8-1-big",
+        "global-selection:hypothesis:c0-sequence-x-8-1-big",
+        "verification:hypothesis:c0-sequence-x-8-1-big"
+      ],
+      "fieldId": "verified:c0-sequence-x-8-1-big",
+      "interpretation": "big-endian sequence increment by one",
+      "offset": 8,
+      "semanticType": "sequence",
+      "size": 1,
+      "verificationScore": 1.0
+    }
+  ],
+  "protocolName": "inferred_protocol",
+  "schemaVersion": 1
+}

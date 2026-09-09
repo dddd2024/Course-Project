@@ -1,0 +1,164 @@
+{
+  "messages": [
+    {
+      "confidence": 0.9256736362151675,
+      "direction": null,
+      "end_offset": 19,
+      "evidence_ids": [],
+      "family_id": null,
+      "input_id": "input-84494718abf27668",
+      "message_id": "input-84494718abf27668-m0",
+      "start_offset": 0,
+      "timestamp": null
+    },
+    {
+      "confidence": 0.8451734374792987,
+      "direction": null,
+      "end_offset": 38,
+      "evidence_ids": [],
+      "family_id": null,
+      "input_id": "input-84494718abf27668",
+      "message_id": "input-84494718abf27668-m1",
+      "start_offset": 19,
+      "timestamp": null
+    },
+    {
+      "confidence": 0.8494896176288844,
+      "direction": null,
+      "end_offset": 57,
+      "evidence_ids": [],
+      "family_id": null,
+      "input_id": "input-84494718abf27668",
+      "message_id": "input-84494718abf27668-m2",
+      "start_offset": 38,
+      "timestamp": null
+    },
+    {
+      "confidence": 0.9299898163647532,
+      "direction": null,
+      "end_offset": 76,
+      "evidence_ids": [],
+      "family_id": null,
+      "input_id": "input-84494718abf27668",
+      "message_id": "input-84494718abf27668-m3",
+      "start_offset": 57,
+      "timestamp": null
+    }
+  ],
+  "packets": [
+    {
+      "confidence": 0.9256736362151675,
+      "direction": null,
+      "end_offset": 19,
+      "evidence": {
+        "end_boundary": {
+          "components": {
+            "entropy": 0.4053890897213399,
+            "field": 1.0,
+            "length": 1.0,
+            "prefix": 1.0
+          },
+          "offset": 19,
+          "score": 0.851347272430335
+        },
+        "length": 19,
+        "start_boundary": {
+          "components": {
+            "stream_edge": 1.0
+          },
+          "offset": 0,
+          "score": 1.0
+        }
+      },
+      "start_offset": 0,
+      "timestamp": null
+    },
+    {
+      "confidence": 0.8451734374792987,
+      "direction": null,
+      "end_offset": 38,
+      "evidence": {
+        "end_boundary": {
+          "components": {
+            "entropy": 0.3559984101130499,
+            "field": 1.0,
+            "length": 1.0,
+            "prefix": 1.0
+          },
+          "offset": 38,
+          "score": 0.8389996025282624
+        },
+        "length": 19,
+        "start_boundary": {
+          "components": {
+            "entropy": 0.4053890897213399,
+            "field": 1.0,
+            "length": 1.0,
+            "prefix": 1.0
+          },
+          "offset": 19,
+          "score": 0.851347272430335
+        }
+      },
+      "start_offset": 19,
+      "timestamp": null
+    },
+    {
+      "confidence": 0.8494896176288844,
+      "direction": null,
+      "end_offset": 57,
+      "evidence": {
+        "end_boundary": {
+          "components": {
+            "entropy": 0.4399185309180258,
+            "field": 1.0,
+            "length": 1.0,
+            "prefix": 1.0
+          },
+          "offset": 57,
+          "score": 0.8599796327295064
+        },
+        "length": 19,
+        "start_boundary": {
+          "components": {
+            "entropy": 0.3559984101130499,
+            "field": 1.0,
+            "length": 1.0,
+            "prefix": 1.0
+          },
+          "offset": 38,
+          "score": 0.8389996025282624
+        }
+      },
+      "start_offset": 38,
+      "timestamp": null
+    },
+    {
+      "confidence": 0.9299898163647532,
+      "direction": null,
+      "end_offset": 76,
+      "evidence": {
+        "end_boundary": {
+          "components": {
+            "stream_edge": 1.0
+          },
+          "offset": 76,
+          "score": 1.0
+        },
+        "length": 19,
+        "start_boundary": {
+          "components": {
+            "entropy": 0.4399185309180258,
+            "field": 1.0,
+            "length": 1.0,
+            "prefix": 1.0
+          },
+          "offset": 57,
+          "score": 0.8599796327295064
+        }
+      },
+      "start_offset": 57,
+      "timestamp": null
+    }
+  ]
+}

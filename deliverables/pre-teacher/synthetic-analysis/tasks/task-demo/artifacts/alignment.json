@@ -1,0 +1,209 @@
+{
+  "alignments": [
+    {
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "message_ids": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "metadata": {
+        "cluster_id": 0,
+        "has_variable_tail": false
+      },
+      "regions": [
+        {
+          "end_offset": 8,
+          "evidence_ids": [],
+          "kind": "stable",
+          "score": 1.0,
+          "start_offset": 0
+        },
+        {
+          "end_offset": 9,
+          "evidence_ids": [],
+          "kind": "variable",
+          "score": 0.8125,
+          "start_offset": 8
+        },
+        {
+          "end_offset": 19,
+          "evidence_ids": [],
+          "kind": "stable",
+          "score": 1.0,
+          "start_offset": 9
+        }
+      ],
+      "score": 0.9375
+    }
+  ],
+  "families": [
+    {
+      "confidence": 1.0,
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "features": {
+        "max_length": 19,
+        "message_count": 4,
+        "min_length": 19
+      },
+      "message_ids": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ]
+    }
+  ],
+  "fieldCandidates": [
+    {
+      "attributes": {
+        "cluster_id": 0,
+        "sample_offsets": [
+          0,
+          19,
+          38,
+          57
+        ],
+        "support": 4,
+        "value": "53594e3101000000"
+      },
+      "candidate_id": "c0-magic-x-0-8-x",
+      "candidate_types": [
+        "magic"
+      ],
+      "endian": null,
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "offset": 0,
+      "score": 1.0,
+      "size": 8
+    },
+    {
+      "attributes": {
+        "cluster_id": 0,
+        "sample_offsets": [
+          9,
+          28,
+          47,
+          66
+        ],
+        "support": 4,
+        "value": "00135050505050505050"
+      },
+      "candidate_id": "c0-constant-x-9-10-x",
+      "candidate_types": [
+        "constant"
+      ],
+      "endian": null,
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "offset": 9,
+      "score": 1.0,
+      "size": 10
+    },
+    {
+      "attributes": {
+        "cardinality": 4,
+        "cluster_id": 0,
+        "distinct_values": [
+          "0x1",
+          "0x2",
+          "0x3",
+          "0x4"
+        ],
+        "sample_offsets": [
+          8,
+          27,
+          46,
+          65
+        ]
+      },
+      "candidate_id": "c0-enum-x-8-1-x",
+      "candidate_types": [
+        "enum"
+      ],
+      "endian": null,
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "offset": 8,
+      "score": 0.8125,
+      "size": 1
+    },
+    {
+      "attributes": {
+        "cluster_id": 0,
+        "match": "total",
+        "sample_count": 4,
+        "sample_offsets": [
+          10,
+          29,
+          48,
+          67
+        ],
+        "support": 1.0
+      },
+      "candidate_id": "c0-length-total-10-1-big",
+      "candidate_types": [
+        "length"
+      ],
+      "endian": "big",
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "offset": 10,
+      "score": 1.0,
+      "size": 1
+    },
+    {
+      "attributes": {
+        "cluster_id": 0,
+        "match": "total",
+        "sample_count": 4,
+        "sample_offsets": [
+          9,
+          28,
+          47,
+          66
+        ],
+        "support": 1.0
+      },
+      "candidate_id": "c0-length-total-9-2-big",
+      "candidate_types": [
+        "length"
+      ],
+      "endian": "big",
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "offset": 9,
+      "score": 1.0,
+      "size": 2
+    },
+    {
+      "attributes": {
+        "cluster_id": 0,
+        "first": 1,
+        "last": 4,
+        "sample_count": 4,
+        "sample_offsets": [
+          8,
+          27,
+          46,
+          65
+        ],
+        "step_support": 1.0
+      },
+      "candidate_id": "c0-sequence-x-8-1-big",
+      "candidate_types": [
+        "sequence"
+      ],
+      "endian": "big",
+      "evidence_ids": [],
+      "family_id": "family-0",
+      "offset": 8,
+      "score": 1.0,
+      "size": 1
+    }
+  ]
+}

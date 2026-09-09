@@ -1,19 +1,19 @@
 """Executable synthetic mechanism experiments for EvidenceGraph-PRE research.
 
-This module closes the gap between the project-native :mod:`records` contract
-and actual project execution.  It deliberately uses a tiny redistributable
-synthetic corpus and never labels its results as teacher-data benchmarks.
+The project already had a strict experiment-record contract, but no runner that
+materialized those records from real project components.  This module provides a
+small deterministic mechanism harness while preserving the rule that synthetic
+results are never teacher-data benchmark claims.
 
-The currently executable variants are:
+Current honest variants:
 
-* ``heuristic`` - Track D boundary/inference candidates accepted by a fixed
-  score threshold, without executable verification in the decision path;
-* ``naive_vote`` - equal-source voting over the real candidate/alignment/
-  verifier evidence materialized by the production semantic path;
-* ``ablation_no_llm`` - the current production provenance-aware executable
-  verification/fusion path.  It is intentionally *not* labeled
-  ``evidencegraph_pre`` because the current production backend does not invoke
-  an LLM hypothesis provider.
+* ``heuristic``: Track D boundary/inference plus a fixed score-threshold control;
+* ``naive_vote``: equal-source voting over real production evidence;
+* ``ablation_no_llm``: the current production executable-verification and
+  provenance-aware fusion path with LLM disabled.
+
+The production semantic backend does not currently invoke ``LLMHypothesisProvider``.
+It is therefore intentionally not recorded as full ``evidencegraph_pre``.
 """
 
 from __future__ import annotations
@@ -21,25 +21,27 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Iterable
+from typing import Any
 
-from course_project.boundary import detect_boundaries, to_message_candidates
+from course_project.boundary import detect_boundaries
 from course_project.evidence import DecisionVote, naive_multi_source_vote
 from course_project.experiments.records import (
     DatasetIdentity,
     DependencyVersion,
     ExperimentRecord,
     ExperimentValidationError,
+    ExperimentVariant,
     MetricRecord,
     canonical_record,
     canonical_record_json,
     compare_metric,
     metric_for_dataset,
 )
-from course_project.inference import family_analysis, infer_field_candidates
+from course_project.inference import infer_field_candidates
 from course_project.io import load_dat
 from course_project.models import Evidence, FieldCandidate, InputMetadata, VerifiedField
 from course_project.sidecar import DeterministicTrackCSemanticBackend, TrackDBaselineBackend
@@ -50,7 +52,11 @@ SYNTHETIC_DATASET_VERSION = "1"
 _SYNTHETIC_MESSAGE_COUNT = 8
 _SYNTHETIC_PAYLOAD = b"P" * 8
 _HEURISTIC_THRESHOLD = 0.75
-_EXECUTED_VARIANTS = ("heuristic", "naive_vote", "ablation_no_llm")
+_EXECUTED_VARIANTS: tuple[ExperimentVariant, ...] = (
+    "heuristic",
+    "naive_vote",
+    "ablation_no_llm",
+)
 _GROUND_TRUTH_METRICS = (
     "packet_boundary_f1",
     "field_boundary_f1",
@@ -65,11 +71,20 @@ _STABLE_COMPARISON_METRICS = ("parse_coverage", "constraint_satisfaction_rate")
 
 @dataclass(frozen=True, slots=True)
 class SyntheticMechanismCorpus:
-    """Exact redistributable corpus bytes and their project experiment identity."""
+    """Exact redistributable corpus bytes and their experiment identity."""
 
     capture: bytes
     messages: tuple[bytes, ...]
     dataset: DatasetIdentity
+
+
+@dataclass(frozen=True, slots=True)
+class SchemaExecutionSummary:
+    """Fail-closed schema execution result used to derive ParseCoverage."""
+
+    parse_coverage: float
+    executable: bool
+    error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,9 +124,8 @@ def run_synthetic_mechanism_experiments(
 ) -> ExperimentExecutionBundle:
     """Execute the three currently honest mechanism variants on one exact corpus.
 
-    ``processing_time_seconds`` is retained as operational evidence in each exact
-    run record.  Scientific identity and the comparison artifact intentionally
-    exclude that volatile timing metric via :func:`scientific_record_fingerprint`.
+    Exact run records retain wall-clock timing.  Scientific fingerprints and the
+    stable comparison artifact exclude that volatile timing metric.
     """
 
     _validate_code_sha(code_sha)
@@ -129,12 +143,10 @@ def run_synthetic_mechanism_experiments(
         metadata={"experimentScope": "synthetic-mechanism"},
     )
 
-    # Run the production no-LLM path first.  Its evidence is also the evaluator
-    # for the two controls: verifier outcomes can assess constraint satisfaction
-    # without entering the heuristic decision itself.
-    full_start = perf_counter()
+    production_state = root / "production-state"
+    production_start = perf_counter()
     production_result = TrackDBaselineBackend(
-        state_dir=root / "production-state",
+        state_dir=production_state,
         semantic_backend=DeterministicTrackCSemanticBackend(),
     ).analyze(
         task_id="synthetic-ablation-no-llm",
@@ -142,13 +154,12 @@ def run_synthetic_mechanism_experiments(
         input_path=capture_path,
         config=_semantic_config(),
     )
-    full_elapsed = perf_counter() - full_start
+    production_elapsed = perf_counter() - production_start
     _validate_production_result(production_result, expected_messages=len(corpus.messages))
     production_fields = _schema_fields_from_result(
         production_result,
-        state_dir=root / "production-state",
+        state_dir=production_state,
     )
-
     reference_evidence = tuple(production_result.evidence)
     verification_by_candidate = _verification_status_by_candidate(reference_evidence)
 
@@ -157,7 +168,7 @@ def run_synthetic_mechanism_experiments(
     packets = detect_boundaries(stream)
     candidates = infer_field_candidates(stream, packets)
     heuristic_fields = _heuristic_fields(candidates)
-    heuristic_parse = _parse_coverage(heuristic_fields, corpus)
+    heuristic_schema = _schema_execution(heuristic_fields, corpus)
     heuristic_constraints = _constraint_satisfaction_rate(
         heuristic_fields,
         verification_by_candidate,
@@ -166,14 +177,14 @@ def run_synthetic_mechanism_experiments(
 
     naive_start = perf_counter()
     naive_fields = _naive_vote_fields(production_result.findings, reference_evidence)
-    naive_parse = _parse_coverage(naive_fields, corpus)
+    naive_schema = _schema_execution(naive_fields, corpus)
     naive_constraints = _constraint_satisfaction_rate(
         naive_fields,
         verification_by_candidate,
     )
     naive_elapsed = perf_counter() - naive_start
 
-    production_parse = _parse_coverage(production_fields, corpus)
+    production_schema = _schema_execution(production_fields, corpus)
     production_constraints = _constraint_satisfaction_rate(
         production_fields,
         verification_by_candidate,
@@ -188,7 +199,7 @@ def run_synthetic_mechanism_experiments(
             "heuristic",
             corpus.dataset,
             code_sha=code_sha,
-            parse_coverage=heuristic_parse,
+            schema=heuristic_schema,
             constraint_satisfaction_rate=heuristic_constraints,
             processing_time_seconds=heuristic_elapsed,
             dependencies=dependencies,
@@ -204,7 +215,7 @@ def run_synthetic_mechanism_experiments(
             "naive_vote",
             corpus.dataset,
             code_sha=code_sha,
-            parse_coverage=naive_parse,
+            schema=naive_schema,
             constraint_satisfaction_rate=naive_constraints,
             processing_time_seconds=naive_elapsed,
             dependencies=dependencies,
@@ -219,9 +230,9 @@ def run_synthetic_mechanism_experiments(
             "ablation_no_llm",
             corpus.dataset,
             code_sha=code_sha,
-            parse_coverage=production_parse,
+            schema=production_schema,
             constraint_satisfaction_rate=production_constraints,
-            processing_time_seconds=full_elapsed,
+            processing_time_seconds=production_elapsed,
             dependencies=dependencies,
             config={
                 "decisionPolicy": "production-provenance-aware-fusion",
@@ -262,7 +273,7 @@ def build_stable_comparison(records: Iterable[ExperimentRecord]) -> dict[str, ob
     """Build deterministic same-dataset comparison rows for stable mechanism metrics."""
 
     normalized = tuple(records)
-    if set(record.variant for record in normalized) != set(_EXECUTED_VARIANTS):
+    if {record.variant for record in normalized} != set(_EXECUTED_VARIANTS):
         raise ExperimentValidationError(
             f"expected exactly executed variants {_EXECUTED_VARIANTS!r}"
         )
@@ -443,7 +454,10 @@ def _heuristic_fields(candidates: Iterable[FieldCandidate]) -> tuple[VerifiedFie
     )
 
 
-def _naive_vote_fields(findings: Iterable[Any], evidence: tuple[Evidence, ...]) -> tuple[VerifiedField, ...]:
+def _naive_vote_fields(
+    findings: Iterable[Any],
+    evidence: tuple[Evidence, ...],
+) -> tuple[VerifiedField, ...]:
     evidence_by_id = {item.evidence_id: item for item in evidence}
     fields: list[VerifiedField] = []
     for finding in findings:
@@ -493,13 +507,13 @@ def _naive_vote_fields(findings: Iterable[Any], evidence: tuple[Evidence, ...]) 
     return _non_overlapping_fields(fields)
 
 
-def _group_by_source(evidence: Iterable[Evidence]) -> tuple[tuple[str, tuple[Evidence, ...]], ...]:
+def _group_by_source(
+    evidence: Iterable[Evidence],
+) -> tuple[tuple[str, tuple[Evidence, ...]], ...]:
     grouped: dict[str, list[Evidence]] = {}
     for item in evidence:
         grouped.setdefault(item.source_component, []).append(item)
-    return tuple(
-        (source, tuple(grouped[source])) for source in sorted(grouped)
-    )
+    return tuple((source, tuple(grouped[source])) for source in sorted(grouped))
 
 
 def _source_status(records: tuple[Evidence, ...]) -> str:
@@ -606,19 +620,44 @@ def _verification_status_by_candidate(evidence: Iterable[Evidence]) -> dict[str,
     return statuses
 
 
-def _parse_coverage(fields: tuple[VerifiedField, ...], corpus: SyntheticMechanismCorpus) -> float:
+def _schema_execution(
+    fields: tuple[VerifiedField, ...],
+    corpus: SyntheticMechanismCorpus,
+) -> SchemaExecutionSummary:
+    """Execute the exact emitted schema; structural failure means zero coverage.
+
+    The experiment layer must not prune conflicting production fields to make a
+    method look executable.  Empty or structurally invalid schemas therefore
+    produce zero ParseCoverage and retain an explicit execution error in config.
+    """
+
     if not fields:
-        return 0.0
-    report = execute_provisional_schema(
-        fields,
-        tuple(
-            ParseSample(sample_id=f"message-{index}", payload=message)
-            for index, message in enumerate(corpus.messages)
-        ),
-        corpus_id=corpus.dataset.dataset_id,
-        corpus_kind="synthetic",
+        return SchemaExecutionSummary(
+            parse_coverage=0.0,
+            executable=False,
+            error="no emitted fields; no provisional schema can execute",
+        )
+    try:
+        report = execute_provisional_schema(
+            fields,
+            tuple(
+                ParseSample(sample_id=f"message-{index}", payload=message)
+                for index, message in enumerate(corpus.messages)
+            ),
+            corpus_id=corpus.dataset.dataset_id,
+            corpus_kind="synthetic",
+        )
+    except (TypeError, ValueError) as exc:
+        return SchemaExecutionSummary(
+            parse_coverage=0.0,
+            executable=False,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+    return SchemaExecutionSummary(
+        parse_coverage=report.parse_coverage,
+        executable=True,
+        error=None,
     )
-    return report.parse_coverage
 
 
 def _constraint_satisfaction_rate(
@@ -644,11 +683,11 @@ def _constraint_satisfaction_rate(
 
 
 def _record(
-    variant: str,
+    variant: ExperimentVariant,
     dataset: DatasetIdentity,
     *,
     code_sha: str,
-    parse_coverage: float,
+    schema: SchemaExecutionSummary,
     constraint_satisfaction_rate: float,
     processing_time_seconds: float,
     dependencies: tuple[DependencyVersion, ...],
@@ -659,7 +698,7 @@ def _record(
     ]
     metrics.extend(
         (
-            metric_for_dataset(dataset, "parse_coverage", parse_coverage),
+            metric_for_dataset(dataset, "parse_coverage", schema.parse_coverage),
             metric_for_dataset(
                 dataset,
                 "constraint_satisfaction_rate",
@@ -674,7 +713,7 @@ def _record(
         )
     )
     return ExperimentRecord(
-        variant=variant,  # type: ignore[arg-type]
+        variant=variant,
         result_scope="mechanism",
         dataset=dataset,
         code_sha=code_sha,
@@ -682,6 +721,8 @@ def _record(
             "datasetLayout": "SYN1/type/reserved/seq/length-be/payload",
             "externalGroundTruthUsed": False,
             "formalBenchmark": False,
+            "schemaExecutable": schema.executable,
+            "schemaExecutionError": schema.error,
             **config,
         },
         random_seed=0,
@@ -691,5 +732,7 @@ def _record(
 
 
 def _validate_code_sha(code_sha: str) -> None:
-    if len(code_sha) != 40 or any(character not in "0123456789abcdef" for character in code_sha):
+    if len(code_sha) != 40 or any(
+        character not in "0123456789abcdef" for character in code_sha
+    ):
         raise ExperimentValidationError("code_sha must be a lowercase 40-character Git SHA")

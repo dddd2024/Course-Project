@@ -140,10 +140,10 @@ export function App() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     void subscribeToTaskUpdates((next) => {
-      if (next.id === taskId || taskId === null) setUpdate(next);
+      setUpdate(next);
     }).then((dispose) => { unlisten = dispose; });
     return () => unlisten?.();
-  }, [taskId]);
+  }, []);
 
   useEffect(() => {
     if (!input) {
@@ -215,7 +215,19 @@ export function App() {
     setAnalysisError(null);
     setFindingReviews({});
     setUpdate({ ...initialUpdate, message: input ? "Starting Sidecar analysis." : "Starting contract spike." });
-    setTaskId(await startTask(failureMode, input?.inputRef));
+    try {
+      setTaskId(await startTask(failureMode, input?.inputRef));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAnalysisError(message);
+      setUpdate({
+        ...initialUpdate,
+        status: "FAILED",
+        stage: "start_failed",
+        message: "The analysis task could not be started.",
+        error: { code: "task_start_failed", message },
+      });
+    }
   }
 
   function loadFixture() {
@@ -258,7 +270,12 @@ export function App() {
   }
 
   async function stopTask() {
-    if (taskId) await cancelTask(taskId);
+    if (!taskId) return;
+    try {
+      await cancelTask(taskId);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   return (

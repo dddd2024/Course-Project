@@ -16,15 +16,18 @@ on:
       - "scripts/run_no_provenance_ablation.py"
       - "scripts/run_no_verification_ablation.py"
       - "scripts/run_llm_only_mechanism_baseline.py"
+      - "scripts/run_llm_verification_mechanism_baseline.py"
       - "tests/test_experiment_execution.py"
       - "tests/test_full_evidencegraph_experiment.py"
       - "tests/test_no_provenance_ablation.py"
       - "tests/test_no_verification_ablation.py"
       - "tests/test_llm_only_mechanism.py"
+      - "tests/test_llm_verification_mechanism.py"
       - "experiments/README.md"
       - "experiments/no-provenance-ablation.md"
       - "experiments/no-verification-ablation.md"
       - "experiments/llm-only-mechanism.md"
+      - "experiments/llm-verification-mechanism.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
   push:
     branches: [main]
@@ -41,15 +44,18 @@ on:
       - "scripts/run_no_provenance_ablation.py"
       - "scripts/run_no_verification_ablation.py"
       - "scripts/run_llm_only_mechanism_baseline.py"
+      - "scripts/run_llm_verification_mechanism_baseline.py"
       - "tests/test_experiment_execution.py"
       - "tests/test_full_evidencegraph_experiment.py"
       - "tests/test_no_provenance_ablation.py"
       - "tests/test_no_verification_ablation.py"
       - "tests/test_llm_only_mechanism.py"
+      - "tests/test_llm_verification_mechanism.py"
       - "experiments/README.md"
       - "experiments/no-provenance-ablation.md"
       - "experiments/no-verification-ablation.md"
       - "experiments/llm-only-mechanism.md"
+      - "experiments/llm-verification-mechanism.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
 
 permissions:
@@ -82,7 +88,8 @@ jobs:
             tests/test_full_evidencegraph_experiment.py \
             tests/test_no_provenance_ablation.py \
             tests/test_no_verification_ablation.py \
-            tests/test_llm_only_mechanism.py
+            tests/test_llm_only_mechanism.py \
+            tests/test_llm_verification_mechanism.py
 
       - name: Execute and record mechanism experiments
         env:
@@ -101,6 +108,9 @@ jobs:
             --outdir experiment-results \
             --code-sha "$CODE_SHA"
           python scripts/run_llm_only_mechanism_baseline.py \
+            --outdir experiment-results \
+            --code-sha "$CODE_SHA"
+          python scripts/run_llm_verification_mechanism_baseline.py \
             --outdir experiment-results \
             --code-sha "$CODE_SHA"
 
@@ -124,6 +134,9 @@ jobs:
           llm_only_manifest = json.loads((root / "llm-only-manifest.json").read_text(encoding="utf-8"))
           llm_only_record = json.loads((root / "llm_only.json").read_text(encoding="utf-8"))
           llm_only_audit = json.loads((root / "llm_only.audit.json").read_text(encoding="utf-8"))
+          llm_verification_manifest = json.loads((root / "llm-verification-manifest.json").read_text(encoding="utf-8"))
+          llm_verification_record = json.loads((root / "llm_verification.json").read_text(encoding="utf-8"))
+          llm_verification_audit = json.loads((root / "llm_verification.audit.json").read_text(encoding="utf-8"))
 
           assert legacy_manifest["formalBenchmark"] is False
           assert legacy_manifest["variants"] == ["heuristic", "naive_vote", "ablation_no_llm"]
@@ -198,7 +211,38 @@ jobs:
           assert llm_only_audit["wrongHypothesisMaxConfidence"] > llm_only_audit["correctHypothesisMaxConfidence"]
           assert llm_only_audit["wrongConfidenceRegionWinnerCount"] >= 1
           assert llm_only_audit["selectedWrongHypothesisCount"] >= 1
-          print(json.dumps(llm_only_manifest, indent=2, sort_keys=True))
+
+          assert llm_verification_manifest["formalBenchmark"] is False
+          assert llm_verification_manifest["realLLMBenchmark"] is False
+          assert llm_verification_manifest["variant"] == "llm_verification"
+          assert llm_verification_record["resultScope"] == "mechanism"
+          assert llm_verification_record["model"] == {
+              "provider": "deterministic-evidencegraph-mechanism",
+              "version": "1",
+          }
+          assert llm_verification_record["config"]["llmVerificationBaseline"] is True
+          assert llm_verification_record["config"]["verificationEnabled"] is True
+          assert llm_verification_record["config"]["verificationEvidenceUsed"] is True
+          assert llm_verification_record["config"]["provenanceAwareFusionEnabled"] is False
+          assert llm_verification_record["config"]["provenanceEvidenceUsedForSelection"] is False
+          assert llm_verification_record["config"]["globalSelectionMayAbstainWithoutFusion"] is True
+          llm_verification_constraint = next(
+              metric for metric in llm_verification_record["metrics"]
+              if metric["name"] == "constraint_satisfaction_rate"
+          )
+          assert llm_verification_constraint["evaluable"] is True
+          assert llm_verification_constraint["value"] == llm_verification_audit["constraintSatisfactionRate"]
+          assert 0.0 <= llm_verification_constraint["value"] <= 1.0
+          assert llm_verification_audit["pairedControlVerificationExecuted"] is True
+          assert llm_verification_audit["pairedControlFusionExecuted"] is True
+          assert llm_verification_audit["baselineVerificationExecuted"] is True
+          assert llm_verification_audit["baselineFusionExecuted"] is False
+          assert llm_verification_audit["rejectedWrongHypothesisCount"] >= 1
+          assert llm_verification_audit["acceptedCorrectHypothesisCount"] >= 1
+          assert llm_verification_audit["selectedWrongHypothesisCount"] == 0
+          assert llm_verification_audit["globalAbstainedHypothesisCount"] >= 1
+          assert llm_verification_audit["wrongHypothesisMaxConfidence"] > llm_verification_audit["correctHypothesisMaxConfidence"]
+          print(json.dumps(llm_verification_manifest, indent=2, sort_keys=True))
           PY
 
       - name: Upload canonical experiment evidence

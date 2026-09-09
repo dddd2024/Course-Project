@@ -53,6 +53,31 @@ The #70 fix adds a separate project-native global promotion layer after per-hypo
 
 `processing_time_seconds` is retained in exact run records as operational evidence. It is intentionally excluded from `scientific_record_fingerprint()` and from stable comparison identity, so wall-clock jitter cannot make otherwise identical scientific outcomes appear different. The stable comparison artifact currently compares `parse_coverage` and `constraint_satisfaction_rate` only.
 
+## Live external PRE baseline record
+
+The `netzob_pre` mechanism baseline deliberately **reuses upstream Netzob 2.0.0** through the existing Track D project-native adapter rather than implementing another PRE engine. Netzob remains a GPLv3 experiment/CI-only dependency and is not bundled into the Sidecar or desktop package. The dedicated `Netzob Baseline` workflow owns its isolated compatibility environment.
+
+`course_project.experiments.external_pre` runs the exact existing `synthetic-mechanism-v1` corpus through real `run_netzob_baseline()` and preserves the resulting project-native `FieldCandidate` values as canonical, content-hashed evidence. The raw candidate artifact is `netzob-field-candidates.json`; its SHA-256 is stored both in the `netzob_pre` record and its artifact reference.
+
+PRE field candidates are **pre-semantic**. Their `candidate_types`, scores and backend attributes are hypotheses/structure evidence, not Track C verification. To calculate structural ParseCoverage without changing the public model or pretending that PRE output was semantically accepted, the experiment layer creates an internal parser-only projection with `semantic_type="unknown"`, `verification_score=0.0`, no verification evidence, and `productionPromotion=false`. This projection is never emitted as a production `VerifiedField` result.
+
+The external PRE record therefore follows these metric rules:
+- `parse_coverage`: evaluable only by executing the exact structural ranges through the project provisional/Kaitai parser semantics; it is never hard-coded;
+- `constraint_satisfaction_rate`: explicitly **not evaluable for raw PRE segmentation**, because no project semantic verifier was executed;
+- field-boundary/semantic/restoration/risk metrics: explicit not-evaluable records on the synthetic corpus because the required ground truth is not declared;
+- `processing_time_seconds`: real live upstream execution timing;
+- `token_cost_usd`: zero for this non-LLM baseline.
+
+The live command is intended for the isolated Netzob environment rather than the normal installed application:
+
+```bash
+python scripts/run_netzob_mechanism_experiment.py \
+  --outdir netzob-experiment-results \
+  --code-sha "$(git rev-parse HEAD)"
+```
+
+The `Netzob Baseline` GitHub Actions workflow installs the already documented compatible Netzob environment, runs the existing adapter smoke, runs the live experiment-record smoke, executes the command above, validates the scientific claim scope, and uploads `netzob_pre.json` plus `netzob-field-candidates.json` as canonical evidence. A successful mechanism record closes only the external-PRE execution gate; it does not establish teacher-data accuracy, LLM verification, or full EvidenceGraph-PRE performance.
+
 ## Required V2 research comparisons
 
 Required comparisons when the available ground truth supports them:

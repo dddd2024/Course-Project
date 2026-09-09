@@ -59,11 +59,27 @@ The following environment variables are diagnostic overrides:
 - `COURSE_PROJECT_SIDECAR_COMMAND`: Python interpreter used by the development fallback;
 - `COURSE_PROJECT_STATE_DIR`: exact controlled state directory.
 
+An already packaged or installed Sidecar can be checked independently with:
+
+```powershell
+python scripts/build_sidecar.py --smoke-executable "C:\path\to\course-project-sidecar.exe"
+```
+
 Release builds default the state directory to `%LOCALAPPDATA%\Evidence Workbench\state`, which is
 writable for a per-user NSIS installation. Debug builds retain `.course-project-state` under the
 current working directory.
 
 ## Clean-machine rehearsal gate
+
+The blocking `windows-integration` CI job runs on a newly provisioned GitHub-hosted Windows VM. It
+records `course-project-doctor --json`, silently installs the generated NSIS package into a unique
+runner directory, smokes the installed Sidecar with external Python paths removed, launches the
+installed desktop for eight seconds, verifies silent uninstall, and prints a SHA-256 evidence record between
+`CLEAN_WINDOWS_REHEARSAL_EVIDENCE_BEGIN/END` markers. The workflow fails if any stage fails.
+
+The CI log is the reproducible installation/start evidence for the exact PR merge candidate. Before
+the live course presentation, repeat the following operator-facing checks on the presentation
+machine:
 
 On a clean Windows 10/11 x64 machine or VM:
 
@@ -75,5 +91,5 @@ On a clean Windows 10/11 x64 machine or VM:
 5. retain the installer SHA-256, git SHA, Windows version, screenshots, and observed result status
    in the release/demo evidence directory agreed by the team.
 
-This repository-side packaging work does not by itself complete the clean-machine acceptance item in
-Issue #13. That item closes only after the separate machine/VM rehearsal evidence is retained.
+The automated gate proves installation, process start, and Sidecar operation. Screenshots remain a
+presentation rehearsal aid rather than a merge gate.

@@ -20,7 +20,7 @@ def _make_message(msg_type: int, seq: int, payload: bytes) -> bytes:
 
 def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     sample = tmp_path / "sample.dat"
-    sample_bytes = b"".join(_make_message(0x01, i + 1, b"P" * 8) for i in range(3))
+    sample_bytes = b"".join(_make_message(0x01, i + 1, b"P" * 8) for i in range(4))
     sample.write_bytes(sample_bytes)
     input_ref = f"input-{hashlib.sha256(sample_bytes).hexdigest()[:16]}"
     state_dir = tmp_path / "state"
@@ -97,7 +97,7 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     assert any(
         item.get("event") == "status"
         and item.get("stage") == "task_status"
-        and item.get("data", {}).get("status") == "PARTIAL"
+        and item.get("data", {}).get("status") == "COMPLETED"
         for item in task_messages
     )
     result_message = next(
@@ -111,18 +111,26 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     result_path = state_dir / "tasks" / "task-1" / "analysis-result.json"
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert result["taskId"] == "task-1"
-    assert result["status"] == "PARTIAL"
+    assert result["status"] == "COMPLETED"
     assert result["inputId"] == input_ref
     assert result["resultRef"] == "tasks/task-1/analysis-result.json"
-    assert result["findings"] == []
+    assert result["findings"]
+    assert {finding["status"] for finding in result["findings"]} <= {
+        "ACCEPTED",
+        "REJECTED",
+        "UNCERTAIN",
+    }
     assert result["metrics"]["analysisBackend"] == "track-d-baseline-v1"
     assert result["metrics"]["trackDExecuted"] is True
+    assert result["metrics"]["semanticExecuted"] is True
+    assert result["metrics"]["semanticBackend"] == "track-a-delegated-track-c-semantic-v1"
+    assert result["metrics"]["verifiedFieldCount"] > 0
     assert result["metrics"]["messageCount"] > 0
-    assert result["metrics"]["fieldCandidateCount"] >= 0
-    assert result["limitations"]
+    assert result["metrics"]["fieldCandidateCount"] > 0
+    assert result["limitations"] == []
 
     artifact_types = {artifact["type"] for artifact in result["artifacts"]}
-    assert {"messages", "alignment", "statistics", "behavior"} <= artifact_types
+    assert {"messages", "alignment", "statistics", "behavior", "evidence", "schema"} <= artifact_types
     for artifact in result["artifacts"]:
         artifact_path = state_dir / artifact["ref"]
         assert artifact_path.is_file()

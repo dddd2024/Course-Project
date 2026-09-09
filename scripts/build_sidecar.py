@@ -213,11 +213,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exercise register_input and read_range using the packaged executable",
     )
+    parser.add_argument(
+        "--smoke-executable",
+        type=Path,
+        help="smoke an existing packaged or installed Sidecar without rebuilding it",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.smoke_executable is not None:
+        if args.smoke or args.target:
+            parser.error("--smoke-executable cannot be combined with --smoke or --target")
+        executable = args.smoke_executable.expanduser().resolve()
+        if not executable.is_file():
+            parser.error(f"Sidecar executable does not exist: {executable}")
+        smoke_sidecar(executable)
+        print(executable)
+        return 0
     target = _target_triple(args.target)
     output = build_sidecar(target)
     if args.smoke:

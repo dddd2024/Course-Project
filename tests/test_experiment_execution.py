@@ -41,7 +41,7 @@ def test_harness_executes_honest_variants_and_metric_claims(tmp_path: Path) -> N
 
     for record in bundle.records:
         assert record.result_scope == "mechanism"
-        assert record.formal_benchmark is False
+        assert record.config["formalBenchmark"] is False
         assert record.dataset.corpus_kind == "synthetic"
         assert record.dataset.ground_truth == frozenset()
         assert record.code_sha == CODE_SHA

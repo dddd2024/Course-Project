@@ -16,6 +16,7 @@ import json
 import platform
 from dataclasses import dataclass
 from importlib.metadata import version
+from pathlib import Path
 from time import perf_counter
 
 from course_project.experiments.execution import (
@@ -227,15 +228,9 @@ def build_netzob_experiment_bundle(
 
 
 def write_netzob_experiment_bundle(
-    bundle: ExternalPREExperimentBundle, out_dir: "PathLike"
-) -> str:
-    """Write canonical candidate evidence and ``netzob_pre`` record.
-
-    The return value is the normalized output directory path as a string so the
-    helper remains simple for both CLI use and integration tests.
-    """
-
-    from pathlib import Path
+    bundle: ExternalPREExperimentBundle, out_dir: str | Path
+) -> Path:
+    """Write canonical candidate evidence and the ``netzob_pre`` record."""
 
     if not isinstance(bundle, ExternalPREExperimentBundle):
         raise TypeError("bundle must be ExternalPREExperimentBundle")
@@ -251,10 +246,7 @@ def write_netzob_experiment_bundle(
 
     record_path = root / _RECORD_NAME
     record_path.write_text(canonical_record_json(bundle.record) + "\n", encoding="utf-8")
-    return str(root)
-
-
-PathLike = str | "Path"
+    return root
 
 
 def _packets_for_messages(messages: tuple[bytes, ...]) -> tuple[PacketCandidate, ...]:

@@ -10,8 +10,10 @@ from course_project.evidence.fusion import (
     FusionError,
     FusionPolicy,
     FusionResult,
-    naive_vote,
     provenance_aware_fusion,
+)
+from course_project.evidence.fusion import (
+    naive_vote as _naive_vote,
 )
 from course_project.evidence.global_selection import (
     POLICY_VERSION as GLOBAL_SELECTION_POLICY_VERSION,
@@ -36,6 +38,9 @@ from course_project.evidence.producers import (
     evidence_from_field_candidate,
     evidence_from_llm_hypothesis,
 )
+
+naive_vote = _naive_vote
+
 from course_project.evidence.provenance_fusion import (
     POLICY_VERSION,
     FusionComponent,
@@ -83,5 +88,4 @@ __all__ = [
     "naive_vote",
     "provenance_aware_fusion",
     "select_globally_consistent_fields",
-]
 ]

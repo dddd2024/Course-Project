@@ -54,5 +54,3 @@ __all__ = [
     "materialize_hypotheses",
     "parse_chat_completion_response",
 ]
-
-]

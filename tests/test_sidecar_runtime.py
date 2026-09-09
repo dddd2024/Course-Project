@@ -214,18 +214,28 @@ def test_backend_result_serializes_and_get_result_is_idempotent(tmp_path: Path) 
     assert fetched == [{"protocolVersion": 1, "id": "get-result-001", "resultRef": result_ref}]
 
 
-def test_runtime_rejects_contract_drift_and_version_mismatch(tmp_path: Path) -> None:
+def test_runtime_rejects_contract_drift_label_leakage_and_version_mismatch(
+    tmp_path: Path,
+) -> None:
     runtime = SidecarRuntime(state_dir=tmp_path / "state")
-    drift = runtime.handle(
-        {
-            "protocolVersion": 1,
-            "id": "bad-config",
-            "method": "analyze",
-            "params": {"inputRef": "input-1", "mode": "baseline", "enable_llm": True},
-        }
+    forbidden_params = (
+        {"enable_llm": True},
+        {"groundTruthRef": "answers.json"},
+        {"labels": {"message-1": "header"}},
+        {"answerKey": {"protocol": "example"}},
+        {"expectedProtocol": "SYN1"},
     )
-    _assert_sidecar_messages_validate(drift)
-    assert drift[0]["error"]["code"] == "invalid_input"
+    for index, forbidden in enumerate(forbidden_params):
+        rejected = runtime.handle(
+            {
+                "protocolVersion": 1,
+                "id": f"bad-config-{index}",
+                "method": "analyze",
+                "params": {"inputRef": "input-1", "mode": "baseline", **forbidden},
+            }
+        )
+        _assert_sidecar_messages_validate(rejected)
+        assert rejected[0]["error"]["code"] == "invalid_input"
 
     mismatch = runtime.handle(
         {

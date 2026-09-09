@@ -28,7 +28,11 @@ def _make_message(msg_type: int, seq: int, payload: bytes) -> bytes:
 
 
 def _sample(tmp_path: Path) -> tuple[Path, bytes]:
-    messages = tuple(_make_message(0x01, index + 1, b"P" * (8 + index)) for index in range(5))
+    # Keep the same fixed-size SYN1 framing used by the existing production
+    # semantic regression suite. The total-length field is 0x0013 in every
+    # message, so the correct big-endian interpretation is valid while the
+    # competing little-endian interpretation is deterministically false.
+    messages = tuple(_make_message(0x01, index + 1, b"P" * 8) for index in range(5))
     payload = b"".join(messages)
     path = tmp_path / "sample.dat"
     path.write_bytes(payload)

@@ -11,8 +11,9 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Literal
 
 CorpusKind = Literal["teacher", "synthetic", "other"]
 ResultScope = Literal["formal_benchmark", "mechanism"]
@@ -261,8 +262,7 @@ class ExperimentRecord:
             if self.random_seed < 0:
                 raise ExperimentValidationError("random_seed must be non-negative")
 
-        config = _json_object(self.config, "config")
-        object.__setattr__(self, "config", config)
+        object.__setattr__(self, "config", _json_object(self.config, "config"))
 
         if self.variant in _LLM_VARIANTS:
             object.__setattr__(
@@ -303,8 +303,7 @@ class ExperimentRecord:
         _require_unique((item.artifact_id for item in artifacts), "artifact")
         object.__setattr__(self, "artifacts", artifacts)
 
-        notes = tuple(_text(note, "note") for note in self.notes)
-        object.__setattr__(self, "notes", notes)
+        object.__setattr__(self, "notes", tuple(_text(note, "note") for note in self.notes))
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,12 +318,7 @@ def metric_for_dataset(
     name: MetricName,
     value: float | None,
 ) -> MetricRecord:
-    """Create a metric while enforcing ground-truth evaluability.
-
-    If required ground truth is missing, callers must pass ``None``. The function
-    returns an explicit not-evaluable record. Supplying a number in that case is
-    rejected rather than silently treating it as a benchmark result.
-    """
+    """Create a metric while enforcing ground-truth evaluability."""
 
     if not isinstance(dataset, DatasetIdentity):
         raise TypeError("dataset must be DatasetIdentity")
@@ -375,10 +369,7 @@ def canonical_record(record: ExperimentRecord) -> dict[str, Any]:
         "model": (
             None
             if record.model_provider is None and record.model_version is None
-            else {
-                "provider": record.model_provider,
-                "version": record.model_version,
-            }
+            else {"provider": record.model_provider, "version": record.model_version}
         ),
         "dependencies": [
             {"name": item.name, "version": item.version}
@@ -427,12 +418,7 @@ def compare_metric(
     records: Sequence[ExperimentRecord],
     metric_name: MetricName,
 ) -> tuple[ComparisonRow, ...]:
-    """Compare one metric across variants on exactly the same dataset identity.
-
-    Mixed corpora, duplicate variants, absent metrics and not-evaluable metrics
-    all fail closed. This prevents visually convenient but scientifically invalid
-    tables from combining incomparable runs.
-    """
+    """Compare one metric across variants on exactly the same dataset identity."""
 
     normalized = tuple(records)
     if len(normalized) < 2:
@@ -470,7 +456,10 @@ def compare_metric(
             )
         )
 
-    order = {variant: index for index, variant in enumerate((*BASELINE_VARIANTS, *ABLATION_VARIANTS))}
+    order = {
+        variant: index
+        for index, variant in enumerate((*BASELINE_VARIANTS, *ABLATION_VARIANTS))
+    }
     return tuple(sorted(rows, key=lambda row: order[row.variant]))
 
 
@@ -524,7 +513,7 @@ def _text(value: object, name: str) -> str:
     return normalized
 
 
-def _require_unique(values: Sequence[str] | Any, name: str) -> None:
+def _require_unique(values: Iterable[str], name: str) -> None:
     seen: set[str] = set()
     for value in values:
         if value in seen:

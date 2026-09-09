@@ -6,11 +6,15 @@ on:
     paths:
       - "src/course_project/experiments/**"
       - "src/course_project/evidence/**"
+      - "src/course_project/llm/**"
       - "src/course_project/sidecar/track_c_semantic_backend.py"
+      - "src/course_project/sidecar/track_c_llm_semantic_backend.py"
       - "src/course_project/sidecar/track_d_backend.py"
       - "src/course_project/verification/**"
       - "scripts/run_synthetic_mechanism_experiments.py"
+      - "scripts/run_full_evidencegraph_mechanism_experiment.py"
       - "tests/test_experiment_execution.py"
+      - "tests/test_full_evidencegraph_experiment.py"
       - "experiments/README.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
   push:
@@ -18,11 +22,15 @@ on:
     paths:
       - "src/course_project/experiments/**"
       - "src/course_project/evidence/**"
+      - "src/course_project/llm/**"
       - "src/course_project/sidecar/track_c_semantic_backend.py"
+      - "src/course_project/sidecar/track_c_llm_semantic_backend.py"
       - "src/course_project/sidecar/track_d_backend.py"
       - "src/course_project/verification/**"
       - "scripts/run_synthetic_mechanism_experiments.py"
+      - "scripts/run_full_evidencegraph_mechanism_experiment.py"
       - "tests/test_experiment_execution.py"
+      - "tests/test_full_evidencegraph_experiment.py"
       - "experiments/README.md"
       - ".github/workflows/synthetic-mechanism-experiments.yml"
 
@@ -49,14 +57,20 @@ jobs:
           python -m pip install -e ".[dev]"
           python -m pip check
 
-      - name: Test execution harness
-        run: python -m pytest -q tests/test_experiment_execution.py
+      - name: Test execution harnesses
+        run: |
+          python -m pytest -q \
+            tests/test_experiment_execution.py \
+            tests/test_full_evidencegraph_experiment.py
 
       - name: Execute and record mechanism experiments
         env:
           CODE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           python scripts/run_synthetic_mechanism_experiments.py \
+            --outdir experiment-results \
+            --code-sha "$CODE_SHA"
+          python scripts/run_full_evidencegraph_mechanism_experiment.py \
             --outdir experiment-results \
             --code-sha "$CODE_SHA"
 
@@ -67,11 +81,38 @@ jobs:
           from pathlib import Path
 
           root = Path("experiment-results/records")
-          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-          assert manifest["formalBenchmark"] is False
-          assert manifest["variants"] == ["heuristic", "naive_vote", "ablation_no_llm"]
-          assert not (root / "evidencegraph_pre.json").exists()
-          print(json.dumps(manifest, indent=2, sort_keys=True))
+          legacy_manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          full_manifest = json.loads(
+              (root / "full-method-manifest.json").read_text(encoding="utf-8")
+          )
+          full_record = json.loads(
+              (root / "evidencegraph_pre.json").read_text(encoding="utf-8")
+          )
+          audit = json.loads(
+              (root / "evidencegraph_pre.audit.json").read_text(encoding="utf-8")
+          )
+
+          assert legacy_manifest["formalBenchmark"] is False
+          assert legacy_manifest["variants"] == ["heuristic", "naive_vote", "ablation_no_llm"]
+          assert full_manifest["formalBenchmark"] is False
+          assert full_manifest["realLLMBenchmark"] is False
+          assert full_manifest["variant"] == "evidencegraph_pre"
+          assert full_record["resultScope"] == "mechanism"
+          assert full_record["model"] == {
+              "provider": "deterministic-evidencegraph-mechanism",
+              "version": "1",
+          }
+          assert full_record["config"]["realLLMBenchmark"] is False
+          semantic_metric = next(
+              metric
+              for metric in full_record["metrics"]
+              if metric["name"] == "field_semantic_accuracy"
+          )
+          assert semantic_metric["evaluable"] is False
+          assert semantic_metric["value"] is None
+          assert audit["rejectedWrongHypothesisCount"] >= 1
+          assert audit["wrongHypothesisMaxConfidence"] > audit["correctHypothesisMaxConfidence"]
+          print(json.dumps(full_manifest, indent=2, sort_keys=True))
           PY
 
       - name: Upload canonical experiment evidence

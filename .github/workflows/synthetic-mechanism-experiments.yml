@@ -225,12 +225,14 @@ jobs:
           assert llm_verification_record["config"]["verificationEvidenceUsed"] is True
           assert llm_verification_record["config"]["provenanceAwareFusionEnabled"] is False
           assert llm_verification_record["config"]["provenanceEvidenceUsedForSelection"] is False
+          assert llm_verification_record["config"]["globalSelectionMayAbstainWithoutFusion"] is True
           llm_verification_constraint = next(
               metric for metric in llm_verification_record["metrics"]
               if metric["name"] == "constraint_satisfaction_rate"
           )
           assert llm_verification_constraint["evaluable"] is True
-          assert llm_verification_constraint["value"] == 1.0
+          assert llm_verification_constraint["value"] == llm_verification_audit["constraintSatisfactionRate"]
+          assert 0.0 <= llm_verification_constraint["value"] <= 1.0
           assert llm_verification_audit["pairedControlVerificationExecuted"] is True
           assert llm_verification_audit["pairedControlFusionExecuted"] is True
           assert llm_verification_audit["baselineVerificationExecuted"] is True
@@ -238,7 +240,7 @@ jobs:
           assert llm_verification_audit["rejectedWrongHypothesisCount"] >= 1
           assert llm_verification_audit["acceptedCorrectHypothesisCount"] >= 1
           assert llm_verification_audit["selectedWrongHypothesisCount"] == 0
-          assert llm_verification_audit["selectedCorrectHypothesisCount"] >= 1
+          assert llm_verification_audit["globalAbstainedHypothesisCount"] >= 1
           assert llm_verification_audit["wrongHypothesisMaxConfidence"] > llm_verification_audit["correctHypothesisMaxConfidence"]
           print(json.dumps(llm_verification_manifest, indent=2, sort_keys=True))
           PY

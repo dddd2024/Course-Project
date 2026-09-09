@@ -1,5 +1,14 @@
-"""Experiment records and comparison helpers for EvidenceGraph-PRE."""
+"""Experiment records, execution and comparison helpers for EvidenceGraph-PRE."""
 
+from course_project.experiments.execution import (
+    ExperimentExecutionBundle,
+    SyntheticMechanismCorpus,
+    build_stable_comparison,
+    build_synthetic_mechanism_corpus,
+    run_synthetic_mechanism_experiments,
+    scientific_record_fingerprint,
+    write_experiment_bundle,
+)
 from course_project.experiments.records import (
     ABLATION_VARIANTS,
     BASELINE_VARIANTS,
@@ -26,12 +35,19 @@ __all__ = [
     "ComparisonRow",
     "DatasetIdentity",
     "DependencyVersion",
+    "ExperimentExecutionBundle",
     "ExperimentRecord",
     "ExperimentValidationError",
     "MetricRecord",
+    "SyntheticMechanismCorpus",
+    "build_stable_comparison",
+    "build_synthetic_mechanism_corpus",
     "canonical_record",
     "canonical_record_json",
     "compare_metric",
     "metric_for_dataset",
     "record_fingerprint",
+    "run_synthetic_mechanism_experiments",
+    "scientific_record_fingerprint",
+    "write_experiment_bundle",
 ]

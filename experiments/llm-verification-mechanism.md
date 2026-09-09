@@ -29,11 +29,15 @@ The `llm_verification` projection then:
 - reuses the existing global non-overlap selector and exact provisional-schema execution;
 - keeps `VerifiedField.verification_score` equal to the real verifier score, never the model confidence.
 
-The deterministic provider deliberately ranks a wrong-endian length interpretation at `0.97` and the correct interpretation at `0.61`. The baseline therefore demonstrates whether executable verification can reject the more confident wrong interpretation before any provenance-aware fusion is applied.
+The deterministic provider deliberately ranks a wrong-endian length interpretation at `0.97` and the correct interpretation at `0.61`. The verifier must reject the more confident wrong interpretation before any provenance-aware fusion is applied.
+
+The first exact-head CI execution exposed an important second-stage behavior: correct lower-confidence provider hypotheses can pass executable verification yet still be **globally abstained** when overlapping verifier-accepted fields remain tied or incomparable without provenance-fusion signals. This is retained as experiment evidence rather than hidden. The baseline does not force-select a field simply to make a schema executable. That distinction is part of what separates this verifier-only baseline from full EvidenceGraph-PRE.
 
 ## Metrics and claim boundary
 
-`ParseCoverage` is derived by executing the actual selected schema. `Constraint Satisfaction Rate` is derived from the actual verifier evidence linked to the selected fields. Ground-truth-dependent boundary/semantic/restoration metrics remain explicit not-evaluable on the synthetic corpus.
+`ParseCoverage` is derived by executing the exact globally selected schema. If global selection abstains from all eligible fields, the experiment honestly records a non-executable/empty schema and zero coverage rather than rewriting output.
+
+`Constraint Satisfaction Rate` is derived from the actual verifier evidence linked to the globally selected fields using the same project helper. Ground-truth-dependent boundary/semantic/restoration metrics remain explicit not-evaluable on the synthetic corpus.
 
 This run is **mechanism evidence only**. It is not:
 

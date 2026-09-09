@@ -43,7 +43,11 @@ python scripts/run_synthetic_mechanism_experiments.py \
 
 The command writes canonical per-variant JSON records, `comparison.json`, and `manifest.json` under `experiment-results/records/`. The dedicated `Synthetic Mechanism Experiments` workflow executes the same harness on GitHub Actions and uploads those files as a workflow artifact.
 
-For this corpus no external ground truth is declared. Ground-truth-dependent metrics are therefore present as explicit `not evaluable from declared ground truth` records. `parse_coverage` is calculated by executing the actual emitted field schema through the project provisional parser. `constraint_satisfaction_rate` is calculated from linked executable-verifier evidence. Neither value is prefilled.
+For this corpus no external ground truth is declared. Ground-truth-dependent metrics are therefore present as explicit `not evaluable from declared ground truth` records. `parse_coverage` is calculated by executing the **exact emitted field set** through the project provisional/Kaitai validation path. `constraint_satisfaction_rate` is calculated from linked executable-verifier evidence. Neither value is prefilled.
+
+Schema execution is intentionally fail-closed. The experiment harness does not prune or rewrite a method's output merely to make it parseable. If a variant emits no fields, overlapping accepted fields, or another structurally invalid schema, its record sets `schemaExecutable=false`, retains the exact `schemaExecutionError`, and records `parse_coverage=0.0`. This preserves the distinction between per-hypothesis verification and globally executable schema validity.
+
+The first real harness execution on PR #69 exposed exactly such a production defect: the current no-LLM production path accepted overlapping length hypotheses (for example bytes `9:11` and byte `10`) that cannot coexist in one Kaitai/provisional schema. That defect is tracked separately in #70. The experiment layer records the failure rather than hiding it.
 
 `processing_time_seconds` is retained in exact run records as operational evidence. It is intentionally excluded from `scientific_record_fingerprint()` and from stable comparison identity, so wall-clock jitter cannot make otherwise identical scientific outcomes appear different. The stable comparison artifact currently compares `parse_coverage` and `constraint_satisfaction_rate` only.
 

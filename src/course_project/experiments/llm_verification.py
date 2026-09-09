@@ -180,9 +180,11 @@ def run_llm_verification_mechanism_baseline(
         raise ValueError("LLM+verification baseline accepted no correct provider hypothesis")
     if selected_wrong:
         raise ValueError("LLM+verification baseline selected a verifier-rejected wrong hypothesis")
-    if not selected_correct:
-        raise ValueError("LLM+verification baseline selected no correct provider hypothesis")
 
+    # Global structural selection is deliberately preserved from the production
+    # pipeline. Without provenance-fusion signals, verifier-accepted fields can be
+    # scientifically tied/incomparable and the selector may abstain. Do not rewrite
+    # or force-select a correct hypothesis merely to make the schema executable.
     schema = _schema_execution(fields, corpus)
     constraint_rate = _constraint_satisfaction_rate(fields, result.evidence)
     dependencies = (
@@ -411,6 +413,7 @@ def _llm_verification_record(
             "provenanceEvidenceUsedForSelection": False,
             "selectionPolicy": LLM_VERIFICATION_SELECTION_POLICY_VERSION,
             "globalSelectionEnabled": True,
+            "globalSelectionMayAbstainWithoutFusion": True,
             "providerRequestCount": provider_request_count,
             "providerHypothesisCount": provider_hypothesis_count,
             "acceptedProviderHypothesisCount": accepted_hypothesis_count,
@@ -430,7 +433,8 @@ def _llm_verification_record(
         notes=(
             "Mechanism-only LLM+verification baseline: provider hypotheses are gated by executable verification without provenance-aware fusion.",
             "Model confidence is only a secondary ranking signal among verifier-accepted competing hypotheses and is never relabeled as verification confidence.",
-            "Constraint Satisfaction Rate is derived from actual verifier evidence linked to the selected fields.",
+            "Global structural selection remains fail-closed: verifier-accepted overlapping hypotheses may abstain when the no-fusion baseline lacks a unique scientific dominator.",
+            "ParseCoverage and Constraint Satisfaction Rate are derived from the exact globally selected field set; no field is force-selected to make the schema succeed.",
             "Synthetic deterministic-provider evidence is not a real-LLM or teacher-data benchmark.",
         ),
     )

@@ -14,6 +14,34 @@ The official OpenAI Python SDK and LiteLLM are both valid open-source integratio
 
 For that reason the blocking runtime contains only a small Python-standard-library adapter for an OpenAI-compatible `chat/completions` endpoint. This preserves the existing Windows packaging surface. A future LiteLLM gateway or provider SDK may sit behind the same boundary without changing `ProtocolHypothesis`, verification, fusion, or experiment contracts.
 
+## Production EvidenceGraph-PRE integration
+
+`llmEnabled=true` now makes the production Track C semantic backend invoke the configured `LLMHypothesisProvider`. The provider is resolved lazily: when `llmEnabled=false`, the backend delegates to the deterministic path without loading LLM configuration, reading an API-key environment variable, or performing network work.
+
+The integration is deliberately narrower than a general agent or provider gateway:
+
+1. Track D first emits a project-native `FieldCandidate` and candidate evidence.
+2. The semantic backend builds a bounded structural summary for that exact candidate region.
+3. The provider may propose only `length` or `sequence` hypotheses for the exact candidate offset/size currently supported by executable verification.
+4. A scoped provider hypothesis is recorded as `track-c-llm-provider` evidence whose parent is the original candidate evidence and whose `independence_group` is the same field region. Therefore an LLM interpretation of an existing candidate is derived evidence, not an independent vote.
+5. Every eligible provider hypothesis runs the same deterministic verifier as a non-LLM hypothesis.
+6. A verifier rejection vetoes the hypothesis regardless of `modelConfidence`. Only executable verification followed by provenance-aware fusion and global field selection can produce an accepted finding or exportable verified field.
+
+Provider initialization failures, request failures, unsupported/out-of-region hypotheses, and hypotheses that cannot be translated into a safe executable check remain explicit limitations. The deterministic path continues, but the result is not allowed to fabricate successful LLM execution.
+
+### Structural-context privacy boundary
+
+Whole binary payloads are **not** sent to the provider by default. Each request contains only project-native structural information for one candidate:
+
+- candidate ID, family, offset, size, candidate types, declared endian and a narrow match hint;
+- total message length for at most 16 samples;
+- at most 8 candidate-field bytes per included sample as hex;
+- unsigned big-/little-endian interpretations when the bounded field value fits;
+- an explicit statement that whole payload bytes are absent;
+- the exact region/type constraints that provider output must obey.
+
+This is a data-minimization boundary, not a claim that provider use is anonymous. A live request still sends these structural summaries to the configured external endpoint, so live LLM use remains opt-in.
+
 ## Configuration
 
 Create `OpenAICompatibleProviderConfig` directly or load non-secret configuration with `OpenAICompatibleProviderConfig.from_environment()`.
@@ -48,7 +76,7 @@ The live adapter:
 - never converts `modelConfidence` into executable verification or `ACCEPTED` status;
 - caps provider response size before decoding.
 
-Provider metadata is intentionally sanitized to endpoint hostname, configured/resolved model information, structured-output mode, network-access flag, and numeric usage counters. Credentials and raw request headers are excluded.
+The production semantic layer additionally scopes returned hypotheses to the requested field region/type and sanitizes provider metadata again before exposing it in semantic metrics. Only endpoint/model/output-mode/network flags and finite non-negative numeric usage counters are retained; arbitrary provider metadata is not trusted as secret-safe.
 
 ## Provider compatibility
 
@@ -56,6 +84,10 @@ Provider metadata is intentionally sanitized to endpoint hostname, configured/re
 
 The current adapter intentionally does not implement provider-specific retry, rate-limit, billing, model discovery, or multi-provider routing. If those become requirements, prefer an external SDK/gateway such as LiteLLM behind this boundary rather than duplicating them in project code.
 
+## Claim boundary
+
+A working live-provider path is **mechanism infrastructure**, not an LLM benchmark result. Synthetic fixtures may demonstrate provider→verification→fusion behavior, but they are not teacher-data accuracy evidence. LLM-only, LLM+verification and full EvidenceGraph-PRE experiment records remain separate research gates, and teacher-data metrics remain unavailable until authoritative evaluation data/ground truth is supplied.
+
 ## Testing
 
-CI never calls a real provider. Tests inject a deterministic JSON transport and separately monkeypatch the stdlib `urlopen` call to validate the production HTTPS transport without external network access or credentials.
+CI never calls a real provider. Provider unit tests inject deterministic JSON transports. Production semantic-path tests inject deterministic provider implementations and separately verify that missing live configuration fails closed. The blocking deterministic/desktop path continues to require no external network access or credentials.

@@ -18,8 +18,10 @@ def _make_message(msg_type: int, seq: int, payload: bytes) -> bytes:
     )
 
 
-def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
-    sample = tmp_path / "sample.dat"
+def test_synthetic_placeholder_uses_final_teacher_data_ingress_without_labels(
+    tmp_path: Path,
+) -> None:
+    sample = tmp_path / "teacher-placeholder.dat"
     sample_bytes = b"".join(_make_message(0x01, i + 1, b"P" * 8) for i in range(4))
     sample.write_bytes(sample_bytes)
     input_ref = f"input-{hashlib.sha256(sample_bytes).hexdigest()[:16]}"
@@ -87,7 +89,8 @@ def test_sidecar_module_entrypoint_runtime_smoke(tmp_path: Path) -> None:
     assert registered["event"] == "status"
     assert registered["stage"] == "registered"
     assert registered["data"]["inputRef"] == input_ref
-    assert registered["data"]["sourceName"] == "sample.dat"
+    assert registered["data"]["sourceName"] == "teacher-placeholder.dat"
+    assert registered["data"]["sha256"] == hashlib.sha256(sample_bytes).hexdigest()
 
     inspected = next(item for item in responses if item.get("id") == "inspect-1")
     assert inspected["stage"] == "inspected"

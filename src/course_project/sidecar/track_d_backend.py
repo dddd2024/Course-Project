@@ -18,6 +18,25 @@ from course_project.sidecar.semantic_bridge import (
     validate_semantic_analysis,
 )
 
+_EVALUATION_ONLY_CONFIG_KEYS = frozenset(
+    {
+        "answer",
+        "answerkey",
+        "answerref",
+        "expectedfields",
+        "expectedprotocol",
+        "expectedprotocolstructure",
+        "groundtruth",
+        "groundtruthpath",
+        "groundtruthref",
+        "label",
+        "labelpath",
+        "labelref",
+        "labels",
+        "teacherdataref",
+    }
+)
+
 
 class TrackDBaselineBackend:
     """Run deterministic Track D preprocessing and optionally compose Track C.
@@ -46,6 +65,7 @@ class TrackDBaselineBackend:
         input_path: Path,
         config: Mapping[str, Any],
     ) -> AnalysisResult:
+        _reject_evaluation_only_config(config)
         kind = input_metadata.kind
         if kind == "unknown":
             suffix = input_path.suffix.lower()
@@ -320,3 +340,28 @@ def _semantic_requested(config: Mapping[str, Any], *, requested_stages: set[str]
     if not requested_stages:
         return True
     return bool({"evidence", "llm", "verification", "export"} & requested_stages)
+
+
+def _reject_evaluation_only_config(config: Mapping[str, Any]) -> None:
+    """Keep labels and expected answers outside the inference configuration.
+
+    The public Sidecar contract already rejects every unknown analyze parameter.
+    This recursive check is a defense for direct backend callers and future nested
+    configuration objects, which otherwise bypass the JSONL request validator.
+    """
+
+    pending: list[tuple[str, Mapping[str, Any]]] = [("config", config)]
+    while pending:
+        prefix, current = pending.pop()
+        for key, value in current.items():
+            normalized = "".join(
+                character for character in str(key).lower() if character.isalnum()
+            )
+            path = f"{prefix}.{key}"
+            if normalized in _EVALUATION_ONLY_CONFIG_KEYS:
+                raise ValueError(
+                    f"{path} is evaluation-only; ground truth, labels, and expected "
+                    "answers must not enter Track D inference configuration"
+                )
+            if isinstance(value, Mapping):
+                pending.append((path, value))

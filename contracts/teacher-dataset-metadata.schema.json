@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://course-project.local/contracts/teacher-dataset-metadata.schema.json",
+  "title": "TeacherDatasetMetadata",
+  "description": "Sanitized identity and handling metadata. Raw bytes and ground-truth contents are external.",
+  "type": "object",
+  "required": [
+    "contractVersion",
+    "datasetId",
+    "corpusKind",
+    "version",
+    "sha256",
+    "sizeBytes",
+    "redistributionStatus",
+    "groundTruth"
+  ],
+  "properties": {
+    "contractVersion": {"const": 1},
+    "datasetId": {"type": "string", "minLength": 1},
+    "corpusKind": {"enum": ["teacher", "synthetic", "other"]},
+    "version": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sizeBytes": {"type": "integer", "minimum": 0},
+    "receivedAt": {"type": ["string", "null"], "format": "date-time"},
+    "redistributionStatus": {"enum": ["prohibited", "permitted", "unknown"]},
+    "preprocessing": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "groundTruth": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["reference", "sha256", "capabilities"],
+          "properties": {
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Local evaluation-only reference; never an analyze parameter."
+            },
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "packet_boundaries",
+                  "field_boundaries",
+                  "field_semantics",
+                  "restoration_reference",
+                  "behavior_labels"
+                ]
+              },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,12 @@
+{
+  "contractVersion": 1,
+  "datasetId": "synthetic-ingress-placeholder-v1",
+  "corpusKind": "synthetic",
+  "version": "1",
+  "sha256": "84494718abf2766886b85897ede34397c29cf6370c57635a3a13fde22e34ff3f",
+  "sizeBytes": 76,
+  "receivedAt": null,
+  "redistributionStatus": "permitted",
+  "preprocessing": ["none"],
+  "groundTruth": null
+}

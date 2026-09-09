@@ -48,6 +48,8 @@
 
 除非明确允许再分发，否则老师原始 `.dat` 文件保持在本地并继续受 `.gitignore` 保护。
 
+Full registration, metadata, answer-isolation, and arrival steps are documented in [teacher-data-ingress.md](teacher-data-ingress.md).
+
 ### Synthetic fixtures — engineering only
 
 项目仍可创建很小的 synthetic byte/JSON fixtures，用于：

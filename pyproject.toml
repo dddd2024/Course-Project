@@ -42,3 +42,6 @@ line-length = 100
 # implementations. BLE001 is intentional there; C409/SIM102 are local style
 # findings that do not justify weakening repository-wide lint policy.
 "src/course_project/sidecar/track_c_llm_semantic_backend.py" = ["BLE001", "C409", "SIM102"]
+# Experiment-record notes intentionally use wrapped adjacent literals inside a tuple
+# for readable scientific claim-boundary text. Keep this style exception local.
+"src/course_project/experiments/no_verification.py" = ["ISC004"]

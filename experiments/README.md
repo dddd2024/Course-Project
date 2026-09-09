@@ -20,9 +20,36 @@ It deliberately implements only the project-specific scientific contract:
 - deterministic canonical JSON/fingerprint;
 - fail-closed same-dataset cross-variant metric comparison.
 
-MLflow/Sacred/Aim are not runtime dependencies. They remain optional future presentation/storage layers: normalized project records may be exported to a generic experiment tracker later, but external tracking must not weaken these invariants.
+MLflow, Sacred, Hydra and BenchOpt were evaluated before adding the executable harness. They remain optional future orchestration/presentation layers rather than project dependencies: none encodes this repository's teacher-vs-synthetic claim discipline, canonical variants, ground-truth metric rules or Track D/Track C execution semantics. Project-native records remain authoritative and can be exported to a generic tracker later.
 
-Required V2 comparisons when the available ground truth supports them:
+## Synthetic mechanism execution
+
+`course_project.experiments.execution` and `scripts/run_synthetic_mechanism_experiments.py` execute a tiny redistributable `SYN1` corpus through real project components. The corpus is generated deterministically in code and its exact capture bytes determine the dataset SHA-256/version.
+
+Current honest executable variants are:
+- `heuristic`: real Track D boundary/inference candidates, with a fixed score-threshold control for executable `length`/`sequence` candidate types;
+- `naive_vote`: the project `naive_multi_source_vote` control over real candidate/alignment/verifier evidence materialized by the production semantic path;
+- `ablation_no_llm`: the current production Track D -> executable verification -> provenance-aware fusion path with `llmEnabled=false`.
+
+The current production `DeterministicTrackCSemanticBackend` does **not** call `LLMHypothesisProvider`. Therefore the harness deliberately does not emit an `evidencegraph_pre` record. Full EvidenceGraph-PRE remains unevaluated until a real LLM hypothesis source is connected to the evidence/fusion path. This prevents the no-LLM production path from being mislabeled as the complete proposed method.
+
+Run locally from a Git checkout with a real 40-character commit SHA:
+
+```bash
+python scripts/run_synthetic_mechanism_experiments.py \
+  --outdir experiment-results \
+  --code-sha "$(git rev-parse HEAD)"
+```
+
+The command writes canonical per-variant JSON records, `comparison.json`, and `manifest.json` under `experiment-results/records/`. The dedicated `Synthetic Mechanism Experiments` workflow executes the same harness on GitHub Actions and uploads those files as a workflow artifact.
+
+For this corpus no external ground truth is declared. Ground-truth-dependent metrics are therefore present as explicit `not evaluable from declared ground truth` records. `parse_coverage` is calculated by executing the actual emitted field schema through the project provisional parser. `constraint_satisfaction_rate` is calculated from linked executable-verifier evidence. Neither value is prefilled.
+
+`processing_time_seconds` is retained in exact run records as operational evidence. It is intentionally excluded from `scientific_record_fingerprint()` and from stable comparison identity, so wall-clock jitter cannot make otherwise identical scientific outcomes appear different. The stable comparison artifact currently compares `parse_coverage` and `constraint_satisfaction_rate` only.
+
+## Required V2 research comparisons
+
+Required comparisons when the available ground truth supports them:
 - heuristic baseline;
 - Netzob/BinaryInferno-style baseline;
 - LLM-only;
@@ -35,6 +62,8 @@ Required ablations when evaluable:
 - w/o provenance;
 - w/o LLM;
 - w/o alignment.
+
+The synthetic mechanism harness above proves execution/reproducibility only for the variants it actually runs. It must not be used to claim teacher-data accuracy or completion of unexecuted baselines/ablations.
 
 Every formal experiment should record dataset identifier/hash/version, code commit SHA, configuration, random seed where applicable, model/provider version, dependency versions, metrics, unavailable-ground-truth notes, and output artifact references. Synthetic mechanism fixtures must be explicitly labeled as synthetic and must not be presented as teacher-data benchmark results.
 

@@ -42,6 +42,10 @@ jobs:
           python -m pip install scipy scikit-learn
           python -m pip check
 
+      - name: Print Ruff import normalization diff
+        shell: bash
+        run: ruff check --select I001 --diff tests/unit/test_binaryinferno_adapter.py || true
+
       - name: Verify pinned upstream identity
         shell: bash
         run: |

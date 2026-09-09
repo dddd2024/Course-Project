@@ -356,9 +356,6 @@ def _apply_global_selection(
         finding.evidence_ids = tuple(
             sorted((*finding.evidence_ids, selection_evidence_id))
         )
-        finding.scores["globalSelection"] = (
-            1.0 if decision.decision == "selected" else 0.0
-        )
         if decision.decision == "abstained":
             finding.claim += (
                 " Final schema promotion abstained because the accepted byte range "

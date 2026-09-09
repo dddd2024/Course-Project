@@ -9,6 +9,13 @@ from course_project.experiments.execution import (
     scientific_record_fingerprint,
     write_experiment_bundle,
 )
+from course_project.experiments.external_pre import (
+    PINNED_NETZOB_VERSION,
+    ExternalPREExperimentBundle,
+    build_netzob_experiment_bundle,
+    run_live_netzob_mechanism_experiment,
+    write_netzob_experiment_bundle,
+)
 from course_project.experiments.records import (
     ABLATION_VARIANTS,
     BASELINE_VARIANTS,
@@ -31,6 +38,7 @@ __all__ = [
     "ABLATION_VARIANTS",
     "BASELINE_VARIANTS",
     "METRIC_GROUND_TRUTH",
+    "PINNED_NETZOB_VERSION",
     "ArtifactReference",
     "ComparisonRow",
     "DatasetIdentity",
@@ -38,8 +46,10 @@ __all__ = [
     "ExperimentExecutionBundle",
     "ExperimentRecord",
     "ExperimentValidationError",
+    "ExternalPREExperimentBundle",
     "MetricRecord",
     "SyntheticMechanismCorpus",
+    "build_netzob_experiment_bundle",
     "build_stable_comparison",
     "build_synthetic_mechanism_corpus",
     "canonical_record",
@@ -47,7 +57,9 @@ __all__ = [
     "compare_metric",
     "metric_for_dataset",
     "record_fingerprint",
+    "run_live_netzob_mechanism_experiment",
     "run_synthetic_mechanism_experiments",
     "scientific_record_fingerprint",
     "write_experiment_bundle",
+    "write_netzob_experiment_bundle",
 ]

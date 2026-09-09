@@ -102,10 +102,9 @@ def test_delegated_backend_runs_real_verification_and_global_selection(tmp_path:
     )
     assert all("evidence" in finding.scores for finding in result.findings)
     assert all("verification" in finding.scores for finding in result.findings)
-    assert any(
-        finding.status == "accepted" and finding.scores.get("globalSelection") == 0.0
-        for finding in result.findings
-    )
+    # Sidecar v1 score vocabulary remains frozen; schema-promotion decisions are
+    # exposed through evidence and semantic metrics rather than a new score key.
+    assert all(set(finding.scores) <= {"evidence", "verification"} for finding in result.findings)
 
     candidate_evidence = {
         item.evidence_id: item

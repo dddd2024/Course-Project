@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from course_project.evidence.alignment_producer import produce_alignment_evidence
+from course_project.evidence.global_selection import (
+    POLICY_VERSION as GLOBAL_SELECTION_POLICY_VERSION,
+)
+from course_project.evidence.global_selection import (
+    FieldSelectionCandidate,
+    FieldSelectionDecision,
+    GlobalFieldSelectionResult,
+    select_globally_consistent_fields,
+)
 from course_project.evidence.hypothesis_manager import HypothesisManager
 from course_project.evidence.provenance_fusion import (
     POLICY_VERSION,
@@ -28,12 +38,24 @@ from course_project.sidecar.semantic_bridge import SemanticAnalysis
 from course_project.verification import verification_result, verify_length, verify_sequence
 
 
-class DeterministicTrackCSemanticBackend:
-    """Production Track C adapter with executable verification and final fusion.
+@dataclass(slots=True)
+class _AcceptedPromotion:
+    candidate: FieldCandidate
+    hypothesis: ProtocolHypothesis
+    fusion: ProvenanceFusionResult
+    verification_score: float
+    fused_evidence_ids: tuple[str, ...]
+    sample_ids: tuple[str, ...]
 
-    Length/sequence hypotheses are verified deterministically, then promoted only
-    through the project-native provenance-aware fusion policy. The public Sidecar
-    boundary remains unchanged.
+
+class DeterministicTrackCSemanticBackend:
+    """Production Track C adapter with verification, fusion and schema selection.
+
+    Length/sequence hypotheses are verified deterministically and fused with
+    provenance-aware evidence. Fusion acceptance is a per-hypothesis scientific
+    decision. A separate global-selection layer then decides which accepted byte
+    ranges can be promoted together into one executable ``VerifiedField`` schema.
+    The public Sidecar boundary remains unchanged.
     """
 
     producer = "track-a-delegated-track-c-semantic-v1"
@@ -57,7 +79,11 @@ class DeterministicTrackCSemanticBackend:
             return SemanticAnalysis(
                 producer=self.producer,
                 status="partial",
-                metrics={"verificationExecuted": False, "fusionExecuted": False},
+                metrics={
+                    "verificationExecuted": False,
+                    "fusionExecuted": False,
+                    "globalSelectionExecuted": False,
+                },
                 limitations=(
                     "The deterministic semantic backend requires verification to be enabled.",
                 ),
@@ -131,7 +157,8 @@ class DeterministicTrackCSemanticBackend:
         _register_hypotheses(manager, entries)
 
         findings: list[AnalysisFinding] = []
-        verified_fields: list[VerifiedField] = []
+        findings_by_hypothesis: dict[str, AnalysisFinding] = {}
+        accepted_promotions: list[_AcceptedPromotion] = []
         verification_decision_counts = {"accepted": 0, "rejected": 0, "uncertain": 0}
         decision_counts = {"accepted": 0, "rejected": 0, "uncertain": 0}
         fusion_results: list[ProvenanceFusionResult] = []
@@ -187,31 +214,38 @@ class DeterministicTrackCSemanticBackend:
             )
             fused_evidence_ids = tuple(sorted(item.evidence_id for item in relevant_evidence))
 
-            findings.append(
-                AnalysisFinding(
-                    finding_id=f"finding:{hypothesis.hypothesis_id}",
-                    claim=_finding_claim(hypothesis, fusion.status),
-                    status=fusion.status,
-                    evidence_ids=fused_evidence_ids,
-                    semantic_type=hypothesis.semantic_type,
-                    scores={
-                        "evidence": fusion.support_score,
-                        "verification": result.score,
-                    },
-                )
+            finding = AnalysisFinding(
+                finding_id=f"finding:{hypothesis.hypothesis_id}",
+                claim=_finding_claim(hypothesis, fusion.status),
+                status=fusion.status,
+                evidence_ids=fused_evidence_ids,
+                semantic_type=hypothesis.semantic_type,
+                scores={
+                    "evidence": fusion.support_score,
+                    "verification": result.score,
+                },
             )
+            findings.append(finding)
+            findings_by_hypothesis[hypothesis.hypothesis_id] = finding
+
             if fusion.status == "accepted":
-                verified_fields.append(
-                    VerifiedField(
-                        field_id=f"verified:{candidate.candidate_id}",
-                        offset=hypothesis.offset,
-                        size=hypothesis.size,
-                        semantic_type=hypothesis.semantic_type,
-                        interpretation=hypothesis.interpretation,
+                assert hypothesis.size is not None
+                accepted_promotions.append(
+                    _AcceptedPromotion(
+                        candidate=candidate,
+                        hypothesis=hypothesis,
+                        fusion=fusion,
                         verification_score=result.score,
-                        evidence_ids=fused_evidence_ids,
+                        fused_evidence_ids=fused_evidence_ids,
+                        sample_ids=sample_ids,
                     )
                 )
+
+        verified_fields, selection = _apply_global_selection(
+            accepted_promotions,
+            findings_by_hypothesis=findings_by_hypothesis,
+            evidence=evidence,
+        )
 
         if not entries:
             limitations.append(
@@ -225,13 +259,15 @@ class DeterministicTrackCSemanticBackend:
             status=status,
             findings=tuple(findings),
             evidence=tuple(evidence),
-            verified_fields=tuple(verified_fields),
+            verified_fields=verified_fields,
             metrics={
                 "verificationExecuted": bool(entries),
                 "fusionExecuted": bool(entries),
                 "fusionPolicy": POLICY_VERSION,
                 "fusionAcceptanceSupportThreshold": 0.75,
                 "fusionMaxConflictForAccept": 0.25,
+                "globalSelectionExecuted": bool(entries),
+                "globalSelectionPolicy": GLOBAL_SELECTION_POLICY_VERSION,
                 "semanticSlice": "length-sequence",
                 "hypothesisCount": len(entries),
                 "alignmentEvidenceCount": len(alignment_evidence),
@@ -242,13 +278,109 @@ class DeterministicTrackCSemanticBackend:
                 "fusionEvidenceProducerCount": len(fusion_evidence_producers),
                 "fusionEvidenceProducers": sorted(fusion_evidence_producers),
                 "fusionAudit": [_fusion_metric(item) for item in fusion_results],
+                "fusionAcceptedHypothesisCount": len(accepted_promotions),
+                "globalConflictGroupCount": selection.conflict_group_count,
+                "globalConflictHypothesisCount": selection.conflict_hypothesis_count,
+                "globalAbstainedHypothesisCount": selection.abstained_hypothesis_count,
+                "globalSelectionAudit": [
+                    _selection_metric(item, accepted_promotions)
+                    for item in selection.decisions
+                ],
                 "acceptedFieldCount": len(verified_fields),
+                "globallySelectedFieldCount": len(verified_fields),
                 "verificationDecisionCounts": verification_decision_counts,
                 "decisionCounts": decision_counts,
                 "inputId": input_metadata.input_id,
             },
             limitations=tuple(limitations),
         )
+
+
+def _apply_global_selection(
+    accepted_promotions: list[_AcceptedPromotion],
+    *,
+    findings_by_hypothesis: dict[str, AnalysisFinding],
+    evidence: list[Evidence],
+) -> tuple[tuple[VerifiedField, ...], GlobalFieldSelectionResult]:
+    selection = select_globally_consistent_fields(
+        FieldSelectionCandidate(
+            hypothesis_id=item.hypothesis.hypothesis_id,
+            candidate_id=item.candidate.candidate_id,
+            offset=item.hypothesis.offset,
+            size=item.hypothesis.size or 0,
+            fusion_margin=item.fusion.margin,
+            support_score=item.fusion.support_score,
+            conflict_score=item.fusion.conflict_score,
+            verification_score=item.verification_score,
+        )
+        for item in accepted_promotions
+    )
+    by_hypothesis = {
+        item.hypothesis.hypothesis_id: item for item in accepted_promotions
+    }
+    promoted: list[VerifiedField] = []
+
+    for decision in selection.decisions:
+        item = by_hypothesis[decision.hypothesis_id]
+        selection_evidence_id = f"global-selection:{decision.hypothesis_id}"
+        conflict_group = tuple(
+            sorted({decision.hypothesis_id, *decision.conflict_hypothesis_ids})
+        )
+        evidence.append(
+            Evidence(
+                evidence_id=selection_evidence_id,
+                source_component="track-c-global-selection",
+                method=selection.policy,
+                feature_family="schema-promotion",
+                score=1.0 if decision.decision == "selected" else 0.0,
+                observation={
+                    "hypothesisId": decision.hypothesis_id,
+                    "candidateId": decision.candidate_id,
+                    "decision": decision.decision,
+                    "reason": decision.reason,
+                    "conflictHypothesisIds": list(decision.conflict_hypothesis_ids),
+                    "offset": item.hypothesis.offset,
+                    "size": item.hypothesis.size,
+                    "fusionMargin": item.fusion.margin,
+                    "supportScore": item.fusion.support_score,
+                    "conflictScore": item.fusion.conflict_score,
+                    "verificationScore": item.verification_score,
+                },
+                parent_evidence_ids=item.fused_evidence_ids,
+                independence_group="schema-promotion:" + "|".join(conflict_group),
+                sample_ids=item.sample_ids,
+            )
+        )
+
+        finding = findings_by_hypothesis[decision.hypothesis_id]
+        finding.evidence_ids = tuple(
+            sorted((*finding.evidence_ids, selection_evidence_id))
+        )
+        if decision.decision == "abstained":
+            finding.claim += (
+                " Final schema promotion abstained because the accepted byte range "
+                f"has {decision.reason.replace('_', ' ')}."
+            )
+            continue
+
+        promoted.append(
+            VerifiedField(
+                field_id=f"verified:{item.candidate.candidate_id}",
+                offset=item.hypothesis.offset,
+                size=item.hypothesis.size,
+                semantic_type=item.hypothesis.semantic_type,
+                interpretation=item.hypothesis.interpretation,
+                verification_score=item.verification_score,
+                evidence_ids=tuple(
+                    sorted((*item.fused_evidence_ids, selection_evidence_id))
+                ),
+            )
+        )
+
+    return (
+        tuple(sorted(promoted, key=lambda item: (item.offset, item.field_id))),
+        selection,
+    )
 
 
 def _fusion_evidence(
@@ -304,6 +436,30 @@ def _fusion_metric(result: ProvenanceFusionResult) -> dict[str, object]:
         "directSupportGroups": result.direct_support_groups,
         "derivedSupportRecords": result.derived_support_records,
         "conflictRecords": result.conflict_records,
+    }
+
+
+def _selection_metric(
+    decision: FieldSelectionDecision,
+    accepted_promotions: list[_AcceptedPromotion],
+) -> dict[str, object]:
+    item = next(
+        record
+        for record in accepted_promotions
+        if record.hypothesis.hypothesis_id == decision.hypothesis_id
+    )
+    return {
+        "hypothesisId": decision.hypothesis_id,
+        "candidateId": decision.candidate_id,
+        "decision": decision.decision,
+        "reason": decision.reason,
+        "conflictHypothesisIds": list(decision.conflict_hypothesis_ids),
+        "offset": item.hypothesis.offset,
+        "size": item.hypothesis.size,
+        "fusionMargin": item.fusion.margin,
+        "supportScore": item.fusion.support_score,
+        "conflictScore": item.fusion.conflict_score,
+        "verificationScore": item.verification_score,
     }
 
 

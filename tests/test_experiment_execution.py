@@ -69,11 +69,10 @@ def test_harness_executes_honest_variants_and_metric_claims(tmp_path: Path) -> N
     production = by_variant["ablation_no_llm"]
     assert production.config["llmEnabled"] is False
     assert production.config["verificationEnabled"] is True
-    assert production.config["schemaExecutable"] is False
-    assert "overlaps a previous exported byte range" in str(
-        production.config["schemaExecutionError"]
-    )
-    assert _metric(production, "parse_coverage").value == 0.0
+    assert production.config["schemaExecutable"] is True
+    assert production.config["schemaExecutionError"] is None
+    assert _metric(production, "parse_coverage").value == 1.0
+    assert _metric(production, "constraint_satisfaction_rate").value == 1.0
 
     assert by_variant["heuristic"].config["schemaExecutable"] is True
     assert by_variant["naive_vote"].config["schemaExecutable"] is True

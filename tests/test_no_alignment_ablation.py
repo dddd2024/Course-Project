@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from course_project.experiments.execution import scientific_record_fingerprint
 from course_project.experiments.no_alignment import (
     ALIGNMENT_ABLATION_SCOPE,
     run_no_alignment_ablation,
     write_no_alignment_ablation_execution,
 )
-from course_project.experiments.records import record_fingerprint
 
 _CODE_SHA = "a" * 40
 
@@ -17,7 +17,9 @@ def test_no_alignment_ablation_is_deterministic_and_scoped(tmp_path: Path) -> No
     first = run_no_alignment_ablation(tmp_path / "first", code_sha=_CODE_SHA)
     second = run_no_alignment_ablation(tmp_path / "second", code_sha=_CODE_SHA)
 
-    assert record_fingerprint(first.record) == record_fingerprint(second.record)
+    assert scientific_record_fingerprint(first.record) == scientific_record_fingerprint(
+        second.record
+    )
     assert first.record.variant == "ablation_no_alignment"
     assert first.record.result_scope == "mechanism"
     assert first.record.config["ablationScope"] == ALIGNMENT_ABLATION_SCOPE

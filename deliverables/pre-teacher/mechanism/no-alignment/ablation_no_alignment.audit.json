@@ -1,0 +1,31 @@
+{
+  "ablationAlignmentEvidenceCount": 0,
+  "ablationFusionEvidenceProducers": [
+    "track-c-executable-verifier",
+    "track-c-llm-provider",
+    "track-d-field-candidate"
+  ],
+  "ablationScope": "alignment_evidence_contribution",
+  "constraintSatisfactionRate": 1.0,
+  "controlAlignmentEvidenceCount": 3,
+  "datasetId": "synthetic-mechanism-v1",
+  "datasetSha256": "5eaaf0f216085bdec25998ccd20f3e4242466375158f350740995494c7d8bc3e",
+  "decisionChangedCount": 0,
+  "fusionExecuted": true,
+  "globalSelectionExecuted": true,
+  "networkAccess": false,
+  "parseCoverage": 1.0,
+  "preprocessingAlignmentStillUsed": true,
+  "providerHypothesesMatchControl": true,
+  "providerRequestCount": 3,
+  "realLLMBenchmark": false,
+  "rejectedWrongHypothesisCount": 1,
+  "resultScope": "mechanism",
+  "schemaExecutable": true,
+  "structuralIntermediatesMatchControl": true,
+  "teacherBenchmark": false,
+  "trackCAlignmentInputRemoved": true,
+  "variant": "ablation_no_alignment",
+  "verificationExecuted": true,
+  "verifiedFieldCount": 1
+}

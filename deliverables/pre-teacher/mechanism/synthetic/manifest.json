@@ -1,0 +1,17 @@
+{
+  "datasetId": "synthetic-mechanism-v1",
+  "datasetSha256": "5eaaf0f216085bdec25998ccd20f3e4242466375158f350740995494c7d8bc3e",
+  "datasetVersion": "1",
+  "formalBenchmark": false,
+  "resultScope": "mechanism",
+  "scientificFingerprints": {
+    "ablation_no_llm": "9d1fa8b6546f227d089710347a851997fed12386b880d49bb5cb3aea697caf11",
+    "heuristic": "998683b3b2e518678c0cbcb3cb0e6d18a1d20be30d863f1f7eed9326588bc573",
+    "naive_vote": "b4259f134fefe2a49ac23f6f25e3dbab1c471b9ac803279c042675125a365177"
+  },
+  "variants": [
+    "heuristic",
+    "naive_vote",
+    "ablation_no_llm"
+  ]
+}

@@ -1,0 +1,640 @@
+{
+  "artifacts": [
+    {
+      "artifactId": "track-d-messages",
+      "count": 4,
+      "format": "json",
+      "metadata": {
+        "producer": "track-d-baseline-v1"
+      },
+      "ref": "tasks/task-demo/artifacts/messages.json",
+      "type": "messages"
+    },
+    {
+      "artifactId": "track-d-alignment",
+      "count": 6,
+      "format": "json",
+      "metadata": {
+        "producer": "track-d-baseline-v1"
+      },
+      "ref": "tasks/task-demo/artifacts/alignment.json",
+      "type": "alignment"
+    },
+    {
+      "artifactId": "track-d-behavior",
+      "count": 1,
+      "format": "json",
+      "metadata": {
+        "producer": "track-d-baseline-v1"
+      },
+      "ref": "tasks/task-demo/artifacts/behavior.json",
+      "type": "behavior"
+    },
+    {
+      "artifactId": "track-c-evidence",
+      "count": 12,
+      "format": "json",
+      "metadata": {
+        "producer": "track-a-delegated-track-c-semantic-v1"
+      },
+      "ref": "tasks/task-demo/artifacts/evidence.json",
+      "type": "evidence"
+    },
+    {
+      "artifactId": "verified-protocol-schema",
+      "count": 1,
+      "format": "json",
+      "metadata": {
+        "producer": "track-a-delegated-track-c-semantic-v1"
+      },
+      "ref": "tasks/task-demo/artifacts/protocol-schema.json",
+      "type": "schema"
+    },
+    {
+      "artifactId": "track-d-statistics",
+      "count": 6,
+      "format": "json",
+      "metadata": {
+        "producer": "track-d-baseline-v1"
+      },
+      "ref": "tasks/task-demo/artifacts/statistics.json",
+      "type": "statistics"
+    }
+  ],
+  "evidence": [
+    {
+      "evidenceId": "alignment:family-0:0:8:stable",
+      "featureFamily": "alignment",
+      "independenceGroup": "alignment-family:family-0",
+      "method": "normalized-alignment-region",
+      "observation": {
+        "alignmentMetadata": {
+          "cluster_id": 0,
+          "has_variable_tail": false
+        },
+        "alignmentScore": 0.9375,
+        "familyId": "family-0",
+        "regionEnd": 8,
+        "regionKind": "stable",
+        "regionScore": 1.0,
+        "regionStart": 0,
+        "upstreamEvidenceIds": []
+      },
+      "parentEvidenceIds": [],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-d-alignment"
+    },
+    {
+      "evidenceId": "alignment:family-0:8:9:variable",
+      "featureFamily": "alignment",
+      "independenceGroup": "alignment-family:family-0",
+      "method": "normalized-alignment-region",
+      "observation": {
+        "alignmentMetadata": {
+          "cluster_id": 0,
+          "has_variable_tail": false
+        },
+        "alignmentScore": 0.9375,
+        "familyId": "family-0",
+        "regionEnd": 9,
+        "regionKind": "variable",
+        "regionScore": 0.8125,
+        "regionStart": 8,
+        "upstreamEvidenceIds": []
+      },
+      "parentEvidenceIds": [],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 0.8125,
+      "sourceComponent": "track-d-alignment"
+    },
+    {
+      "evidenceId": "alignment:family-0:9:19:stable",
+      "featureFamily": "alignment",
+      "independenceGroup": "alignment-family:family-0",
+      "method": "normalized-alignment-region",
+      "observation": {
+        "alignmentMetadata": {
+          "cluster_id": 0,
+          "has_variable_tail": false
+        },
+        "alignmentScore": 0.9375,
+        "familyId": "family-0",
+        "regionEnd": 19,
+        "regionKind": "stable",
+        "regionScore": 1.0,
+        "regionStart": 9,
+        "upstreamEvidenceIds": []
+      },
+      "parentEvidenceIds": [],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-d-alignment"
+    },
+    {
+      "evidenceId": "candidate:c0-length-total-10-1-big",
+      "featureFamily": "length",
+      "independenceGroup": "field-region:family-0:10:1",
+      "method": "normalized-field-candidate",
+      "observation": {
+        "attributes": {
+          "cluster_id": 0,
+          "match": "total",
+          "sample_count": 4,
+          "sample_offsets": [
+            10,
+            29,
+            48,
+            67
+          ],
+          "support": 1.0
+        },
+        "candidateId": "c0-length-total-10-1-big",
+        "candidateTypes": [
+          "length"
+        ],
+        "endian": "big",
+        "familyId": "family-0",
+        "offset": 10,
+        "size": 1
+      },
+      "parentEvidenceIds": [],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-d-field-candidate"
+    },
+    {
+      "evidenceId": "candidate:c0-length-total-9-2-big",
+      "featureFamily": "length",
+      "independenceGroup": "field-region:family-0:9:2",
+      "method": "normalized-field-candidate",
+      "observation": {
+        "attributes": {
+          "cluster_id": 0,
+          "match": "total",
+          "sample_count": 4,
+          "sample_offsets": [
+            9,
+            28,
+            47,
+            66
+          ],
+          "support": 1.0
+        },
+        "candidateId": "c0-length-total-9-2-big",
+        "candidateTypes": [
+          "length"
+        ],
+        "endian": "big",
+        "familyId": "family-0",
+        "offset": 9,
+        "size": 2
+      },
+      "parentEvidenceIds": [],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-d-field-candidate"
+    },
+    {
+      "evidenceId": "candidate:c0-sequence-x-8-1-big",
+      "featureFamily": "sequence",
+      "independenceGroup": "field-region:family-0:8:1",
+      "method": "normalized-field-candidate",
+      "observation": {
+        "attributes": {
+          "cluster_id": 0,
+          "first": 1,
+          "last": 4,
+          "sample_count": 4,
+          "sample_offsets": [
+            8,
+            27,
+            46,
+            65
+          ],
+          "step_support": 1.0
+        },
+        "candidateId": "c0-sequence-x-8-1-big",
+        "candidateTypes": [
+          "sequence"
+        ],
+        "endian": "big",
+        "familyId": "family-0",
+        "offset": 8,
+        "size": 1
+      },
+      "parentEvidenceIds": [],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-d-field-candidate"
+    },
+    {
+      "evidenceId": "verification:hypothesis:c0-length-total-10-1-big",
+      "featureFamily": "length",
+      "independenceGroup": "field-region:family-0:10:1",
+      "method": "length",
+      "observation": {
+        "checkId": "check:hypothesis:c0-length-total-10-1-big:length",
+        "hypothesisId": "hypothesis:c0-length-total-10-1-big",
+        "sampleCount": 4,
+        "status": "accepted",
+        "supportCount": 4,
+        "violationCount": 0
+      },
+      "parentEvidenceIds": [
+        "candidate:c0-length-total-10-1-big"
+      ],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-c-executable-verifier"
+    },
+    {
+      "evidenceId": "verification:hypothesis:c0-length-total-9-2-big",
+      "featureFamily": "length",
+      "independenceGroup": "field-region:family-0:9:2",
+      "method": "length",
+      "observation": {
+        "checkId": "check:hypothesis:c0-length-total-9-2-big:length",
+        "hypothesisId": "hypothesis:c0-length-total-9-2-big",
+        "sampleCount": 4,
+        "status": "accepted",
+        "supportCount": 4,
+        "violationCount": 0
+      },
+      "parentEvidenceIds": [
+        "candidate:c0-length-total-9-2-big"
+      ],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-c-executable-verifier"
+    },
+    {
+      "evidenceId": "verification:hypothesis:c0-sequence-x-8-1-big",
+      "featureFamily": "sequence",
+      "independenceGroup": "field-region:family-0:8:1",
+      "method": "sequence",
+      "observation": {
+        "checkId": "check:hypothesis:c0-sequence-x-8-1-big:sequence",
+        "hypothesisId": "hypothesis:c0-sequence-x-8-1-big",
+        "sampleCount": 3,
+        "status": "accepted",
+        "supportCount": 3,
+        "violationCount": 0
+      },
+      "parentEvidenceIds": [
+        "candidate:c0-sequence-x-8-1-big"
+      ],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-c-executable-verifier"
+    },
+    {
+      "evidenceId": "global-selection:hypothesis:c0-sequence-x-8-1-big",
+      "featureFamily": "schema-promotion",
+      "independenceGroup": "schema-promotion:hypothesis:c0-sequence-x-8-1-big",
+      "method": "pareto-overlap-abstention-v1",
+      "observation": {
+        "candidateId": "c0-sequence-x-8-1-big",
+        "conflictHypothesisIds": [],
+        "conflictScore": 0.0,
+        "decision": "selected",
+        "fusionMargin": 0.90625,
+        "hypothesisId": "hypothesis:c0-sequence-x-8-1-big",
+        "offset": 8,
+        "reason": "no_overlap_conflict",
+        "size": 1,
+        "supportScore": 0.90625,
+        "verificationScore": 1.0
+      },
+      "parentEvidenceIds": [
+        "alignment:family-0:8:9:variable",
+        "candidate:c0-sequence-x-8-1-big",
+        "verification:hypothesis:c0-sequence-x-8-1-big"
+      ],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 1.0,
+      "sourceComponent": "track-c-global-selection"
+    },
+    {
+      "evidenceId": "global-selection:hypothesis:c0-length-total-9-2-big",
+      "featureFamily": "schema-promotion",
+      "independenceGroup": "schema-promotion:hypothesis:c0-length-total-10-1-big|hypothesis:c0-length-total-9-2-big",
+      "method": "pareto-overlap-abstention-v1",
+      "observation": {
+        "candidateId": "c0-length-total-9-2-big",
+        "conflictHypothesisIds": [
+          "hypothesis:c0-length-total-10-1-big"
+        ],
+        "conflictScore": 0.0,
+        "decision": "abstained",
+        "fusionMargin": 1.0,
+        "hypothesisId": "hypothesis:c0-length-total-9-2-big",
+        "offset": 9,
+        "reason": "ambiguous_overlap_conflict",
+        "size": 2,
+        "supportScore": 1.0,
+        "verificationScore": 1.0
+      },
+      "parentEvidenceIds": [
+        "alignment:family-0:9:19:stable",
+        "candidate:c0-length-total-9-2-big",
+        "verification:hypothesis:c0-length-total-9-2-big"
+      ],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 0.0,
+      "sourceComponent": "track-c-global-selection"
+    },
+    {
+      "evidenceId": "global-selection:hypothesis:c0-length-total-10-1-big",
+      "featureFamily": "schema-promotion",
+      "independenceGroup": "schema-promotion:hypothesis:c0-length-total-10-1-big|hypothesis:c0-length-total-9-2-big",
+      "method": "pareto-overlap-abstention-v1",
+      "observation": {
+        "candidateId": "c0-length-total-10-1-big",
+        "conflictHypothesisIds": [
+          "hypothesis:c0-length-total-9-2-big"
+        ],
+        "conflictScore": 0.0,
+        "decision": "abstained",
+        "fusionMargin": 1.0,
+        "hypothesisId": "hypothesis:c0-length-total-10-1-big",
+        "offset": 10,
+        "reason": "ambiguous_overlap_conflict",
+        "size": 1,
+        "supportScore": 1.0,
+        "verificationScore": 1.0
+      },
+      "parentEvidenceIds": [
+        "alignment:family-0:9:19:stable",
+        "candidate:c0-length-total-10-1-big",
+        "verification:hypothesis:c0-length-total-10-1-big"
+      ],
+      "sampleIds": [
+        "input-84494718abf27668-m0",
+        "input-84494718abf27668-m1",
+        "input-84494718abf27668-m2",
+        "input-84494718abf27668-m3"
+      ],
+      "score": 0.0,
+      "sourceComponent": "track-c-global-selection"
+    }
+  ],
+  "findings": [
+    {
+      "claim": "Message-relative bytes 10:11 as big-endian total message length were accepted after executable verification and provenance-aware fusion. Final schema promotion abstained because the accepted byte range has ambiguous overlap conflict.",
+      "evidenceIds": [
+        "alignment:family-0:9:19:stable",
+        "candidate:c0-length-total-10-1-big",
+        "global-selection:hypothesis:c0-length-total-10-1-big",
+        "verification:hypothesis:c0-length-total-10-1-big"
+      ],
+      "findingId": "finding:hypothesis:c0-length-total-10-1-big",
+      "scores": {
+        "evidence": 1.0,
+        "verification": 1.0
+      },
+      "semanticType": "length",
+      "status": "ACCEPTED"
+    },
+    {
+      "claim": "Message-relative bytes 9:11 as big-endian total message length were accepted after executable verification and provenance-aware fusion. Final schema promotion abstained because the accepted byte range has ambiguous overlap conflict.",
+      "evidenceIds": [
+        "alignment:family-0:9:19:stable",
+        "candidate:c0-length-total-9-2-big",
+        "global-selection:hypothesis:c0-length-total-9-2-big",
+        "verification:hypothesis:c0-length-total-9-2-big"
+      ],
+      "findingId": "finding:hypothesis:c0-length-total-9-2-big",
+      "scores": {
+        "evidence": 1.0,
+        "verification": 1.0
+      },
+      "semanticType": "length",
+      "status": "ACCEPTED"
+    },
+    {
+      "claim": "Message-relative bytes 8:9 as big-endian sequence increment by one were accepted after executable verification and provenance-aware fusion.",
+      "evidenceIds": [
+        "alignment:family-0:8:9:variable",
+        "candidate:c0-sequence-x-8-1-big",
+        "global-selection:hypothesis:c0-sequence-x-8-1-big",
+        "verification:hypothesis:c0-sequence-x-8-1-big"
+      ],
+      "findingId": "finding:hypothesis:c0-sequence-x-8-1-big",
+      "scores": {
+        "evidence": 0.90625,
+        "verification": 1.0
+      },
+      "semanticType": "sequence",
+      "status": "ACCEPTED"
+    }
+  ],
+  "inputId": "input-84494718abf27668",
+  "limitations": [],
+  "metrics": {
+    "alignmentCount": 1,
+    "analysisBackend": "track-d-baseline-v1",
+    "behaviorComputed": true,
+    "evidenceCount": 12,
+    "familyCount": 1,
+    "fieldCandidateCount": 6,
+    "findingCount": 3,
+    "inputSizeBytes": 76,
+    "messageCount": 4,
+    "mode": "baseline",
+    "packetCount": 4,
+    "semanticBackend": "track-a-delegated-track-c-semantic-v1",
+    "semanticExecuted": true,
+    "semanticMetrics": {
+      "acceptedFieldCount": 1,
+      "alignmentEvidenceCount": 3,
+      "candidateEvidenceCount": 3,
+      "decisionCounts": {
+        "accepted": 3,
+        "rejected": 0,
+        "uncertain": 0
+      },
+      "evidenceProducerCount": 4,
+      "evidenceProducers": [
+        "track-c-executable-verifier",
+        "track-c-global-selection",
+        "track-d-alignment",
+        "track-d-field-candidate"
+      ],
+      "fusionAcceptanceSupportThreshold": 0.75,
+      "fusionAcceptedHypothesisCount": 3,
+      "fusionAudit": [
+        {
+          "conflictRecords": 0,
+          "conflictScore": 0.0,
+          "derivedSupportRecords": 1,
+          "directSupportGroups": 2,
+          "effectiveComponentCount": 2,
+          "hypothesisId": "hypothesis:c0-length-total-10-1-big",
+          "margin": 1.0,
+          "rawEvidenceCount": 3,
+          "status": "accepted",
+          "supportScore": 1.0,
+          "verificationStatus": "accepted"
+        },
+        {
+          "conflictRecords": 0,
+          "conflictScore": 0.0,
+          "derivedSupportRecords": 1,
+          "directSupportGroups": 2,
+          "effectiveComponentCount": 2,
+          "hypothesisId": "hypothesis:c0-length-total-9-2-big",
+          "margin": 1.0,
+          "rawEvidenceCount": 3,
+          "status": "accepted",
+          "supportScore": 1.0,
+          "verificationStatus": "accepted"
+        },
+        {
+          "conflictRecords": 0,
+          "conflictScore": 0.0,
+          "derivedSupportRecords": 1,
+          "directSupportGroups": 2,
+          "effectiveComponentCount": 2,
+          "hypothesisId": "hypothesis:c0-sequence-x-8-1-big",
+          "margin": 0.90625,
+          "rawEvidenceCount": 3,
+          "status": "accepted",
+          "supportScore": 0.90625,
+          "verificationStatus": "accepted"
+        }
+      ],
+      "fusionEvidenceProducerCount": 3,
+      "fusionEvidenceProducers": [
+        "track-c-executable-verifier",
+        "track-d-alignment",
+        "track-d-field-candidate"
+      ],
+      "fusionExecuted": true,
+      "fusionMaxConflictForAccept": 0.25,
+      "fusionPolicy": "transparent-component-mean-v1",
+      "globalAbstainedHypothesisCount": 2,
+      "globalConflictGroupCount": 1,
+      "globalConflictHypothesisCount": 2,
+      "globalSelectionAudit": [
+        {
+          "candidateId": "c0-sequence-x-8-1-big",
+          "conflictHypothesisIds": [],
+          "conflictScore": 0.0,
+          "decision": "selected",
+          "fusionMargin": 0.90625,
+          "hypothesisId": "hypothesis:c0-sequence-x-8-1-big",
+          "offset": 8,
+          "reason": "no_overlap_conflict",
+          "size": 1,
+          "supportScore": 0.90625,
+          "verificationScore": 1.0
+        },
+        {
+          "candidateId": "c0-length-total-9-2-big",
+          "conflictHypothesisIds": [
+            "hypothesis:c0-length-total-10-1-big"
+          ],
+          "conflictScore": 0.0,
+          "decision": "abstained",
+          "fusionMargin": 1.0,
+          "hypothesisId": "hypothesis:c0-length-total-9-2-big",
+          "offset": 9,
+          "reason": "ambiguous_overlap_conflict",
+          "size": 2,
+          "supportScore": 1.0,
+          "verificationScore": 1.0
+        },
+        {
+          "candidateId": "c0-length-total-10-1-big",
+          "conflictHypothesisIds": [
+            "hypothesis:c0-length-total-9-2-big"
+          ],
+          "conflictScore": 0.0,
+          "decision": "abstained",
+          "fusionMargin": 1.0,
+          "hypothesisId": "hypothesis:c0-length-total-10-1-big",
+          "offset": 10,
+          "reason": "ambiguous_overlap_conflict",
+          "size": 1,
+          "supportScore": 1.0,
+          "verificationScore": 1.0
+        }
+      ],
+      "globalSelectionExecuted": true,
+      "globalSelectionPolicy": "pareto-overlap-abstention-v1",
+      "globallySelectedFieldCount": 1,
+      "hypothesisCount": 3,
+      "inputId": "input-84494718abf27668",
+      "semanticSlice": "length-sequence",
+      "verificationDecisionCounts": {
+        "accepted": 3,
+        "rejected": 0,
+        "uncertain": 0
+      },
+      "verificationEvidenceCount": 3,
+      "verificationExecuted": true
+    },
+    "trackDExecuted": true,
+    "verifiedFieldCount": 1
+  },
+  "protocolVersion": 1,
+  "resultRef": "tasks/task-demo/analysis-result.json",
+  "status": "COMPLETED",
+  "taskId": "task-demo"
+}

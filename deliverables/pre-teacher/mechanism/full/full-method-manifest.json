@@ -1,0 +1,14 @@
+{
+  "datasetId": "synthetic-mechanism-v1",
+  "datasetSha256": "5eaaf0f216085bdec25998ccd20f3e4242466375158f350740995494c7d8bc3e",
+  "datasetVersion": "1",
+  "formalBenchmark": false,
+  "model": {
+    "provider": "deterministic-evidencegraph-mechanism",
+    "version": "1"
+  },
+  "realLLMBenchmark": false,
+  "resultScope": "mechanism",
+  "scientificFingerprint": "5b0d5773b018ee04f3524461c2175a407939d1f07408cac64273cbdaaae4b1e1",
+  "variant": "evidencegraph_pre"
+}

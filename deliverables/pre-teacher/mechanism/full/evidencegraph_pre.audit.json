@@ -1,0 +1,21 @@
+{
+  "acceptedProviderHypothesisCount": 2,
+  "constraintSatisfactionRate": 1.0,
+  "correctHypothesisMaxConfidence": 0.61,
+  "datasetId": "synthetic-mechanism-v1",
+  "datasetSha256": "5eaaf0f216085bdec25998ccd20f3e4242466375158f350740995494c7d8bc3e",
+  "modelVersion": "1",
+  "networkAccess": false,
+  "parseCoverage": 1.0,
+  "provider": "deterministic-evidencegraph-mechanism",
+  "providerHypothesisCount": 3,
+  "providerRequestCount": 3,
+  "realLLMBenchmark": false,
+  "rejectedWrongHypothesisCount": 1,
+  "resultScope": "mechanism",
+  "schemaExecutable": true,
+  "teacherBenchmark": false,
+  "variant": "evidencegraph_pre",
+  "verifiedFieldCount": 1,
+  "wrongHypothesisMaxConfidence": 0.97
+}

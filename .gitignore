@@ -54,6 +54,8 @@ data/raw/*
 outputs/
 artifacts/
 results/
+!deliverables/pre-teacher/synthetic-analysis/tasks/task-demo/artifacts/
+!deliverables/pre-teacher/synthetic-analysis/tasks/task-demo/artifacts/*.json
 *.pcap
 *.pcapng
 *.dat

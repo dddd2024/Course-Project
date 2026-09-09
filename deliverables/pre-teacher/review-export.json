@@ -1,0 +1,24 @@
+{
+  "protocolVersion": 1,
+  "taskId": "task-demo-001",
+  "sourceResultRef": "results/task-demo-001/analysis-result.json",
+  "sourceStatus": "PARTIAL",
+  "reviews": [
+    {
+      "findingId": "field-length-001",
+      "sourceStatus": "ACCEPTED",
+      "review": {
+        "decision": "ACCEPTED",
+        "correction": "bytes 4-5 are consistent with a big-endian packet-length field"
+      }
+    },
+    {
+      "findingId": "field-time-001",
+      "sourceStatus": "UNCERTAIN",
+      "review": null
+    }
+  ],
+  "limitations": [
+    "Local review export contains no raw bytes and is not an accepted protocol result."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "evidence_ids": [],
+  "flow_id": "input-84494718abf27668-flow-0",
+  "sample_ids": [
+    "input-84494718abf27668-flow-0-p0",
+    "input-84494718abf27668-flow-0-p1",
+    "input-84494718abf27668-flow-0-p2",
+    "input-84494718abf27668-flow-0-p3"
+  ],
+  "values": {
+    "burst_count": 0,
+    "direction_switches": 0,
+    "down_bytes": 0,
+    "down_count": 0,
+    "duration": null,
+    "flow_id": "input-84494718abf27668-flow-0",
+    "inter_arrival_mean": null,
+    "inter_arrival_std": null,
+    "packet_count": 4,
+    "size_max": 19,
+    "size_mean": 19,
+    "size_min": 19,
+    "size_std": 0.0,
+    "total_bytes": 76,
+    "up_bytes": 0,
+    "up_count": 0,
+    "up_down_ratio": null
+  }
+}

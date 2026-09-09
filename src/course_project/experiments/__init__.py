@@ -24,6 +24,13 @@ from course_project.experiments.full_evidencegraph import (
     run_full_evidencegraph_mechanism_experiment,
     write_full_evidencegraph_mechanism_execution,
 )
+from course_project.experiments.no_provenance import (
+    NO_PROVENANCE_POLICY_VERSION,
+    NoProvenanceAblationExecution,
+    fuse_hypothesis_evidence_without_provenance,
+    run_no_provenance_ablation,
+    write_no_provenance_ablation_execution,
+)
 from course_project.experiments.records import (
     ABLATION_VARIANTS,
     BASELINE_VARIANTS,
@@ -53,6 +60,7 @@ __all__ = [
     "DETERMINISTIC_MECHANISM_MODEL_VERSION",
     "DETERMINISTIC_MECHANISM_PROVIDER",
     "METRIC_GROUND_TRUTH",
+    "NO_PROVENANCE_POLICY_VERSION",
     "PINNED_NETZOB_VERSION",
     "ArtifactReference",
     "ComparisonRow",
@@ -66,6 +74,7 @@ __all__ = [
     "ExternalPREExperimentBundle",
     "FullEvidenceGraphMechanismExecution",
     "MetricRecord",
+    "NoProvenanceAblationExecution",
     "SyntheticMechanismCorpus",
     "WrongHypothesisEngineeringDemo",
     "build_netzob_experiment_bundle",
@@ -74,14 +83,17 @@ __all__ = [
     "canonical_record",
     "canonical_record_json",
     "compare_metric",
+    "fuse_hypothesis_evidence_without_provenance",
     "metric_for_dataset",
     "record_fingerprint",
     "run_full_evidencegraph_mechanism_experiment",
     "run_live_netzob_mechanism_experiment",
+    "run_no_provenance_ablation",
     "run_synthetic_mechanism_experiments",
     "run_wrong_hypothesis_engineering_demo",
     "scientific_record_fingerprint",
     "write_experiment_bundle",
     "write_full_evidencegraph_mechanism_execution",
     "write_netzob_experiment_bundle",
+    "write_no_provenance_ablation_execution",
 ]

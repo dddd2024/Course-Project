@@ -13,7 +13,7 @@ The paired control first executes the same fixed `synthetic-mechanism-v1` corpus
 The LLM-only projection then uses only provider hypothesis metadata for semantic selection:
 
 - provider hypotheses are grouped by exact `(offset, size, semantic type)` region;
-- the unique highest `modelConfidence` hypothesis wins each region; a confidence tie fails closed;
+- the unique highest `modelConfidence` hypothesis wins each region; an exact confidence tie fails closed instead of being broken by ID or insertion order;
 - executable-verifier evidence and verifier decisions are not used;
 - provenance-aware fusion is not used;
 - Track D candidate/alignment evidence does not contribute a selection score;

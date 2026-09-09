@@ -112,7 +112,7 @@ class SubprocessBinaryInfernoRunner:
             *config.detectors,
         ]
         try:
-            completed = subprocess.run(  # noqa: S603 - fixed executable/args, shell=False
+            completed = subprocess.run(
                 command,
                 cwd=script.parent,
                 input=stdin_text,

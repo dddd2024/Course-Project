@@ -62,10 +62,21 @@ def test_harness_executes_honest_variants_and_metric_claims(tmp_path: Path) -> N
         assert processing_time.value >= 0.0
         assert boundary_f1.evaluable is False
         assert boundary_f1.value is None
-        assert boundary_f1.reason == "not evaluable from declared ground truth"
+        assert boundary_f1.unavailable_reason == (
+            "not evaluable from declared ground truth; missing: field_boundaries"
+        )
 
-    assert by_variant["ablation_no_llm"].config["llmEnabled"] is False
-    assert by_variant["ablation_no_llm"].config["verificationEnabled"] is True
+    production = by_variant["ablation_no_llm"]
+    assert production.config["llmEnabled"] is False
+    assert production.config["verificationEnabled"] is True
+    assert production.config["schemaExecutable"] is False
+    assert "overlaps a previous exported byte range" in str(
+        production.config["schemaExecutionError"]
+    )
+    assert _metric(production, "parse_coverage").value == 0.0
+
+    assert by_variant["heuristic"].config["schemaExecutable"] is True
+    assert by_variant["naive_vote"].config["schemaExecutable"] is True
 
 
 def test_scientific_fingerprint_excludes_only_wall_clock_timing(tmp_path: Path) -> None:

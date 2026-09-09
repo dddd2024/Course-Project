@@ -1,7 +1,7 @@
 # Pre-teacher-data release freeze
 
-> Freeze date: 2026-09-09  
-> Scope: all repository work that does not require authoritative teacher data  
+> Freeze date: 2026-09-09
+> Scope: all repository work that does not require authoritative teacher data
 > Application version: `0.1.0`
 
 ## Release decision

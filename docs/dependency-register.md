@@ -8,7 +8,7 @@ This register separates **candidate technology choices** from **accepted project
 |---|---|---:|---|---|---|---|
 | Python stdlib | core runtime | yes | A/C/D | Python 3.11.x | PSF | active |
 | jsonschema | contract fixture validation | dev/CI | A | pinned by installer resolution until lock introduced | upstream verification required | active in CI |
-| Scapy | PCAP normalization | optional until integrated | D | TBD | TBD | not integrated |
+| Scapy | PCAP/PCAPNG normalization (transport-payload extraction) | optional (`pcap` extra) | D | 2.7.0 | GPL-2.0-only | `io/scapy_adapter.py` + `dependency_unavailable` fallback; live path unit-tested where Scapy is installed |
 | NFStream public test corpus | public flow labels and reproducible PCAP inputs; no runtime library | experiment data | cross-Track | commit `1426d78597bbb8dcf556d65e9b413208c898444f` | LGPL-3.0 declared by upstream repository | 12 allowlisted captures/result CSVs, exact size/SHA-256 validation; raw files remain ignored |
 | dpkt | PCAP/PCAPNG parsing behind project-native adapter | public benchmark only | cross-Track | 1.9.8 | BSD (PyPI/upstream classifier) | pinned optional extra; deterministic fixture tests; missing dependency fails the benchmark without affecting runtime |
 | Netzob | PRE/alignment research baseline | experiment/CI only | D, delegated live-smoke slice A (#46) | 2.0.0 (PyPI sdist) | GPLv3 (upstream setup/COPYING) | **live upstream validated** through project-native adapter in `Netzob Baseline`; normal runtime retains `dependency_unavailable` fallback |

@@ -30,6 +30,9 @@ public-benchmark = [
   "dpkt==1.9.8",
   "scikit-learn==1.7.2",
 ]
+pcap = [
+  "scapy==2.7.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -3,6 +3,26 @@
 Track B packages the Python analyzer as a single-file executable and embeds it in the Tauri NSIS
 installer. An installed Evidence Workbench therefore does not require a separate Python runtime.
 
+## Download a CI-verified installer
+
+For ordinary manual testing, you do **not** need to rebuild the desktop package locally.
+
+Open the repository's **Actions -> CI** page, select a successful run for the exact `main` commit or
+pull request you want to test, then download the artifact named:
+
+```text
+evidence-workbench-windows-<source-git-sha>
+```
+
+The artifact contains the exact `*-setup.exe` that passed the blocking clean-Windows
+install/start/uninstall rehearsal plus `clean-windows-rehearsal.json`. The evidence JSON records both
+`sourceSha` and the GitHub Actions `testedSha`, installer/desktop/Sidecar SHA-256 values, Windows
+version, and the rehearsal results. PR runs use the pull-request head as `sourceSha`; push runs use
+the pushed commit. CI retains these artifacts for 14 days.
+
+Use local packaging only when changing packaging code, reproducing a packaging failure, or preparing
+an operator-controlled final build.
+
 ## Build prerequisites
 
 - Windows 10/11 x64;
@@ -51,8 +71,9 @@ Sidecar, repeats the smoke, and creates the NSIS installer under:
 src-tauri/target/release/bundle/nsis/*-setup.exe
 ```
 
-Both outputs are generated artifacts and are excluded from Git. Always build them from the PR or
-commit being rehearsed.
+Both local outputs are generated artifacts and are excluded from Git. Build them from the exact PR
+or commit being rehearsed; for ordinary manual testing, prefer the CI-verified artifact above so the
+binary and rehearsal evidence remain tied to the same source SHA.
 
 ## Runtime selection
 
@@ -81,16 +102,18 @@ current working directory.
 The blocking `windows-integration` CI job runs on a newly provisioned GitHub-hosted Windows VM. It
 records `course-project-doctor --json`, silently installs the generated NSIS package into a unique
 runner directory, smokes the installed Sidecar with external Python paths removed, launches the
-installed desktop for eight seconds, verifies silent uninstall, and prints a SHA-256 evidence record between
-`CLEAN_WINDOWS_REHEARSAL_EVIDENCE_BEGIN/END` markers. The workflow fails if any stage fails.
+installed desktop for eight seconds, verifies silent uninstall, writes the evidence record to
+`clean-windows-rehearsal.json`, and also prints the same record between
+`CLEAN_WINDOWS_REHEARSAL_EVIDENCE_BEGIN/END` markers. The workflow fails if any stage or artifact
+publication step fails.
 
-The CI log is the reproducible installation/start evidence for the exact PR merge candidate. Before
-the live course presentation, repeat the following operator-facing checks on the presentation
-machine:
+The successful CI artifact is the reproducible installation/start evidence for the exact PR or
+`main` commit. Before the live course presentation, repeat the following operator-facing checks on
+the presentation machine:
 
 On a clean Windows 10/11 x64 machine or VM:
 
-1. copy only the generated `*-setup.exe` and an authorized test `.dat` file;
+1. copy only the verified `*-setup.exe` and an authorized test `.dat` file;
 2. install and launch Evidence Workbench;
 3. select the `.dat` file, inspect a Hex range, start analysis, and open the returned evidence and
    artifact views;

@@ -8,7 +8,11 @@ from course_project.behavior import (
     predict_behavior,
 )
 from course_project.boundary import detect_boundaries, to_message_candidates
-from course_project.inference import family_analysis, infer_field_candidates
+from course_project.inference import (
+    family_analysis,
+    infer_field_candidates,
+    refine_boundaries,
+)
 from course_project.io import input_metadata, load_raw
 from course_project.models import (
     AlignmentResult,
@@ -154,3 +158,37 @@ def test_boundary_and_inference_chain_join() -> None:
     assert {m.message_id for m in messages_dto} == {
         id_ for f in families for id_ in f.message_ids
     }
+
+
+def test_refine_boundaries_annotates_and_preserves_positions() -> None:
+    messages = [make_message(0x01, i + 1, b"P" * 8) for i in range(6)]
+    stream = load_raw(b"".join(messages), source_id="s", format="dat")
+    packets = detect_boundaries(stream)
+    refined = refine_boundaries(stream, packets)
+
+    # positions and order are never changed
+    assert [r.start_offset for r in refined] == [p.start_offset for p in packets]
+    assert [r.end_offset for r in refined] == [p.end_offset for p in packets]
+
+    # alignment evidence + family id are attached, confidence stays in range
+    for r in refined:
+        assert "alignment_gain" in r.evidence
+        assert "family_id" in r.evidence
+        assert 0.0 <= r.confidence <= 1.0
+
+    # clean, well-aligned families keep high confidence
+    assert all(r.confidence >= 0.5 for r in refined)
+    assert len({r.evidence["family_id"] for r in refined}) == 1
+
+
+def test_refine_boundaries_is_deterministic() -> None:
+    messages = [make_message(0x01, i + 1, b"P" * 8) for i in range(6)]
+    stream = load_raw(b"".join(messages), source_id="s", format="dat")
+    packets = detect_boundaries(stream)
+    assert refine_boundaries(stream, packets) == refine_boundaries(stream, packets)
+
+
+def test_refine_boundaries_rejects_bad_blend() -> None:
+    stream = load_raw(b"\x00" * 8, source_id="s")
+    with pytest.raises(ValueError):
+        refine_boundaries(stream, [], blend=1.5)

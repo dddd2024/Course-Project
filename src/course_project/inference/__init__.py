@@ -33,6 +33,7 @@ from course_project.inference.netzob_adapter import (
 from course_project.inference.public import (
     family_analysis,
     infer_field_candidates,
+    refine_boundaries,
     to_field_candidate,
 )
 
@@ -56,6 +57,7 @@ __all__ = [
     "is_netzob_available",
     "message_similarity",
     "parse_binaryinferno_spec",
+    "refine_boundaries",
     "run_binaryinferno_baseline",
     "run_netzob_baseline",
     "to_field_candidate",

@@ -29,6 +29,7 @@ from course_project.models import FieldHypothesis, PacketCandidate
 
 Endian = Literal["big", "little"]
 _ENUM_MAX_CARDINALITY = 8
+_NUMERIC_SIZES = (1, 2, 4, 8)
 _LENGTH_SUPPORT = 0.9
 _SEQUENCE_STEP_SUPPORT = 0.9
 _TIMESTAMP_MAX_DELTA = 1_000_000
@@ -271,7 +272,7 @@ def _length_candidates(
     """Emit length candidates; return accepted ``(offset, size, support)``
     triples for the ``total`` match so callers can derive the payload start."""
     accepted: list[tuple[int, int, float]] = []
-    for size in (1, 2, 4):
+    for size in _NUMERIC_SIZES:
         if family.min_length < size:
             continue
         for endian in ("big", "little"):
@@ -332,7 +333,7 @@ def _sequence_candidates(
     messages: list[bytes],
     add: Callable[..., None],
 ) -> None:
-    for size in (1, 2, 4):
+    for size in _NUMERIC_SIZES:
         if family.min_length < size:
             continue
         for endian in ("big", "little"):
@@ -344,10 +345,11 @@ def _sequence_candidates(
                 values = _read_values(messages, offset, size, endian)
                 if len(values) < 2:
                     continue
-                steps = [b - a for a, b in pairwise(values)]
-                if all(step == 0 for step in steps):
+                modulus = 1 << (8 * size)
+                increments = [(b - a) % modulus for a, b in pairwise(values)]
+                if all(step == 0 for step in increments):
                     continue
-                step_support = sum(step == 1 for step in steps) / len(steps)
+                step_support = sum(step == 1 for step in increments) / len(increments)
                 if step_support >= _SEQUENCE_STEP_SUPPORT:
                     add(
                         "sequence",
@@ -369,40 +371,40 @@ def _timestamp_candidates(
     messages: list[bytes],
     add: Callable[..., None],
 ) -> None:
-    size = 4
-    if family.min_length < size:
-        return
-    for endian in ("big", "little"):
-        for offset in range(family.min_length - size + 1):
-            if _starts_or_ends_on_constant(family, offset, size):
-                continue  # padded wide reading
-            values = _read_values(messages, offset, size, endian)
-            if len(values) < 2:
-                continue
-            diffs = [b - a for a, b in pairwise(values)]
-            if not diffs or all(diff == 0 for diff in diffs):
-                continue
-            if any(diff < 0 for diff in diffs):
-                continue
-            plausible = sum(
-                1 <= diff <= _TIMESTAMP_MAX_DELTA for diff in diffs
-            ) / len(diffs)
-            if plausible >= _TIMESTAMP_PLAUSIBLE_RATIO and any(
-                diff > 1 for diff in diffs
-            ):
-                add(
-                    "timestamp",
-                    offset,
-                    size,
-                    endian,
-                    plausible,
-                    {
-                        "monotonic": True,
-                        "plausible_ratio": plausible,
-                        "first": values[0],
-                        "last": values[-1],
-                    },
-                )
+    for size in (4, 8):
+        if family.min_length < size:
+            continue
+        for endian in ("big", "little"):
+            for offset in range(family.min_length - size + 1):
+                if _starts_or_ends_on_constant(family, offset, size):
+                    continue  # padded wide reading
+                values = _read_values(messages, offset, size, endian)
+                if len(values) < 2:
+                    continue
+                diffs = [b - a for a, b in pairwise(values)]
+                if not diffs or all(diff == 0 for diff in diffs):
+                    continue
+                if any(diff < 0 for diff in diffs):
+                    continue
+                plausible = sum(
+                    1 <= diff <= _TIMESTAMP_MAX_DELTA for diff in diffs
+                ) / len(diffs)
+                if plausible >= _TIMESTAMP_PLAUSIBLE_RATIO and any(
+                    diff > 1 for diff in diffs
+                ):
+                    add(
+                        "timestamp",
+                        offset,
+                        size,
+                        endian,
+                        plausible,
+                        {
+                            "monotonic": True,
+                            "plausible_ratio": plausible,
+                            "first": values[0],
+                            "last": values[-1],
+                        },
+                    )
 
 
 def _starts_or_ends_on_constant(

@@ -196,3 +196,88 @@ def _column_score(kind: ColumnKind, cardinality: int) -> float:
     if kind == "enum":
         return 1.0 - (cardinality - 1) / 16.0
     return 0.5
+
+
+def refine_boundaries(
+    stream: ByteStream,
+    packets: list[PacketCandidate],
+    *,
+    header_len: int = 8,
+    cluster_threshold: float = 0.9,
+    blend: float = 0.4,
+) -> list[PacketCandidate]:
+    """Adjust boundary confidence with alignment gain (design-v1 §5.3).
+
+    Clusters and aligns the current segmentation, then recalibrates each
+    packet's confidence: packets belonging to families with stable column
+    structure get a boost, garbage-like families get a penalty. Positions are
+    never changed — this only recalibrates confidence and annotates
+    ``evidence["alignment_gain"]`` / ``evidence["family_id"]``.
+    """
+    if not 0.0 <= blend <= 1.0:
+        raise ValueError("blend must be in [0, 1]")
+
+    base = stream.offset_base
+    valid: list[tuple[int, bytes]] = []
+    for index, packet in enumerate(packets):
+        start = packet.start_offset - base
+        end = packet.end_offset - base
+        if 0 <= start < end <= len(stream.data):
+            valid.append((index, stream.data[start:end]))
+    if not valid:
+        return list(packets)
+
+    labels = cluster_messages(
+        [message for _, message in valid],
+        header_len=header_len,
+        threshold=cluster_threshold,
+    )
+    families: dict[int, list[int]] = {}
+    for j, label in enumerate(labels):
+        families.setdefault(label, []).append(j)
+
+    gain_by_label: dict[int, float] = {}
+    for label, member_js in families.items():
+        profile = align_family([valid[j][1] for j in member_js], cluster_id=label)
+        gain_by_label[label] = _alignment_gain(profile)
+
+    label_by_index = {valid[j][0]: labels[j] for j in range(len(labels))}
+
+    adjusted: list[PacketCandidate] = []
+    for index, packet in enumerate(packets):
+        label = label_by_index.get(index)
+        if label is None:
+            adjusted.append(packet)
+            continue
+        gain = gain_by_label[label]
+        confidence = round(
+            max(0.0, min(1.0, (1.0 - blend) * packet.confidence + blend * gain)),
+            6,
+        )
+        adjusted.append(
+            PacketCandidate(
+                start_offset=packet.start_offset,
+                end_offset=packet.end_offset,
+                confidence=confidence,
+                direction=packet.direction,
+                timestamp=packet.timestamp,
+                evidence={
+                    **packet.evidence,
+                    "alignment_gain": round(gain, 6),
+                    "family_id": f"family-{label}",
+                },
+            )
+        )
+    return adjusted
+
+
+def _alignment_gain(profile: FamilyProfile) -> float:
+    """Stability score of a family's columns: 1.0 = fully structured."""
+    if profile.message_count < 2:
+        return 0.5  # singletons prove nothing about alignment
+    if not profile.regions:
+        return 0.5
+    weights = {"constant": 1.0, "enum": 0.5, "variable": 0.0}
+    return sum(weights[region.kind] for region in profile.regions) / len(
+        profile.regions
+    )

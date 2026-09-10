@@ -186,3 +186,33 @@ def test_cross_family_no_candidates_for_single_family() -> None:
     data, packets = make_packets(messages)
     hypotheses = infer_fields(load_raw(data, source_id="s"), packets)
     assert not any(h.evidence.get("cross_family") for h in hypotheses)
+
+
+def test_sequence_wrap_detection() -> None:
+    messages = [make_message(0x01, seq, b"P" * 8) for seq in (254, 255, 0, 1, 2)]
+    data, packets = make_packets(messages)
+    hypotheses = infer_fields(load_raw(data, source_id="s", format="dat"), packets)
+    seq = [
+        h
+        for h in hypotheses
+        if h.semantic_type == "sequence" and h.offset == 8 and h.size == 1
+    ]
+    assert seq, "wrapped 8-bit sequence (254, 255, 0, 1, 2) should be detected"
+    assert seq[0].evidence["step_support"] == pytest.approx(1.0)
+
+
+def test_eight_byte_length_detection() -> None:
+    def make_8byte(payload: bytes) -> bytes:
+        return b"SYN8" + (12 + len(payload)).to_bytes(8, "big") + payload
+
+    messages = [make_8byte(b"A" * (i + 1)) for i in range(5)]
+    data, packets = make_packets(messages)
+    hypotheses = infer_fields(load_raw(data, source_id="s", format="dat"), packets)
+    assert any(
+        h.semantic_type == "length"
+        and h.size == 8
+        and h.offset == 4
+        and h.endian == "big"
+        and h.evidence["match"] == "total"
+        for h in hypotheses
+    )

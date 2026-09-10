@@ -131,6 +131,33 @@ def test_infer_fields_families() -> None:
     assert magic_starts == {0, 46}
 
 
+def test_infer_fields_disambiguates_two_byte_total_length() -> None:
+    messages = [
+        make_message(0x01, 1, b"A" * 8),
+        make_message(0x01, 2, b"B" * 300),
+        make_message(0x01, 3, b"C" * 520),
+    ]
+    data, packets = make_packets(messages)
+    assert [len(message) for message in messages] == [19, 311, 531]
+    assert [message[10] for message in messages] == [19, 55, 19]
+
+    hypotheses = infer_fields(load_raw(data, source_id="s", format="dat"), packets)
+    total_length = [
+        h
+        for h in hypotheses
+        if h.semantic_type == "length" and h.evidence.get("match") == "total"
+    ]
+
+    assert any(
+        h.offset == 9
+        and h.size == 2
+        and h.endian == "big"
+        and h.confidence == pytest.approx(1.0)
+        for h in total_length
+    )
+    assert not any(h.offset == 10 and h.size == 1 for h in total_length)
+
+
 def test_infer_fields_no_packets_is_empty() -> None:
     assert infer_fields(load_raw(b"whatever", source_id="s"), []) == []
 

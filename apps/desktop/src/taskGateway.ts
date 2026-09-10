@@ -223,6 +223,20 @@ export async function exportRestoredArtifact(taskId: string, artifactId: string)
   return fileName;
 }
 
+export async function exportReviewJson(payload: unknown, suggestedName: string): Promise<string | null> {
+  if (hasTauriRuntime()) {
+    return invoke<string | null>("export_review_json", { payload, suggestedName });
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = suggestedName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  return suggestedName;
+}
+
 export async function cancelTask(id: string): Promise<void> {
   if (hasTauriRuntime()) {
     await invoke("cancel_contract_spike", { id });

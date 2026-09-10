@@ -10,8 +10,14 @@ from course_project.behavior import extract_behavior_features, from_packet_candi
 from course_project.boundary import detect_boundaries, to_message_candidates
 from course_project.exporters.protocol_schema import build_protocol_schema
 from course_project.inference import family_analysis, infer_field_candidates
-from course_project.io import load_bin, load_dat
-from course_project.models import AnalysisResult, ArtifactRef, ArtifactType, InputMetadata
+from course_project.io import ExtractedPacket, load_bin, load_dat, load_raw, preprocess
+from course_project.models import (
+    AnalysisResult,
+    ArtifactRef,
+    ArtifactType,
+    InputMetadata,
+    PacketCandidate,
+)
 from course_project.sidecar.semantic_bridge import (
     SemanticAnalysis,
     SemanticBackend,
@@ -73,8 +79,12 @@ class TrackDBaselineBackend:
                 kind = "dat"
             elif suffix == ".bin":
                 kind = "bin"
+            elif suffix == ".pcap":
+                kind = "pcap"
+            elif suffix == ".pcapng":
+                kind = "pcapng"
 
-        if kind not in {"dat", "bin"}:
+        if kind not in {"dat", "bin", "pcap", "pcapng"}:
             return AnalysisResult(
                 task_id=task_id,
                 status="partial",
@@ -88,29 +98,83 @@ class TrackDBaselineBackend:
                 },
                 limitations=(
                     (
-                        f"Track D baseline currently accepts raw .dat/.bin inputs; "
+                        "Track D baseline accepts .dat/.bin/PCAP/PCAPNG inputs; "
                         f"registered kind {input_metadata.kind!r} was not analyzed."
                     ),
                 ),
             )
 
-        stream = (
-            load_dat(input_path, source_id=input_metadata.input_id)
-            if kind == "dat"
-            else load_bin(input_path, source_id=input_metadata.input_id)
-        )
-        packets = detect_boundaries(stream)
+        if kind == "dat":
+            source_stream = load_dat(input_path, source_id=input_metadata.input_id)
+        elif kind == "bin":
+            source_stream = load_bin(input_path, source_id=input_metadata.input_id)
+        else:
+            source_stream = load_raw(
+                input_path.read_bytes(),
+                source_id=input_metadata.input_id,
+                format="raw",
+            )
+
+        prepared = preprocess(source_stream)
+        if prepared.container in {"pcap", "pcapng"}:
+            # The content-derived container is authoritative for analysis. This also
+            # updates the registered metadata object held by the Sidecar so later
+            # inspect_file calls report the real container even when the filename is
+            # misleading (for example a PCAP stored with a .dat suffix).
+            input_metadata.kind = prepared.container
+            input_metadata.metadata["container"] = prepared.container
+            input_metadata.metadata.setdefault("declaredKind", kind)
+
+        if prepared.error_category is not None:
+            if config.get("optionalDependencyPolicy", "degrade") == "fail":
+                raise RuntimeError(
+                    f"{prepared.error_category}: {prepared.detail or 'input preprocessing failed'}"
+                )
+            preprocess_limitation = (
+                "Container preprocessing failed before unknown-protocol inference; "
+                "the raw capture was not blind-scanned. "
+                f"{prepared.detail or prepared.error_category}"
+            )
+            return AnalysisResult(
+                task_id=task_id,
+                status="partial",
+                input_id=input_metadata.input_id,
+                metrics={
+                    "analysisBackend": "track-d-baseline-v1",
+                    "inputSizeBytes": input_metadata.size_bytes,
+                    "mode": config["mode"],
+                    "trackDExecuted": False,
+                    "semanticExecuted": False,
+                    "preprocessContainer": prepared.container,
+                    "preprocessErrorCategory": prepared.error_category,
+                    "genericInferenceGated": True,
+                },
+                limitations=(preprocess_limitation,),
+            )
+
+        stream = prepared.stream
+        if prepared.packets:
+            packets = _transport_packet_candidates(prepared.packets)
+        else:
+            packets = detect_boundaries(stream)
         messages = to_message_candidates(
             stream,
             packets,
             input_id=input_metadata.input_id,
         )
-        families, alignments = family_analysis(
-            stream,
-            packets,
-            input_id=input_metadata.input_id,
-        )
-        field_candidates = infer_field_candidates(stream, packets)
+
+        known_protocol_gated = prepared.protocol_hint is not None
+        if known_protocol_gated:
+            families = []
+            alignments = []
+            field_candidates = []
+        else:
+            families, alignments = family_analysis(
+                stream,
+                packets,
+                input_id=input_metadata.input_id,
+            )
+            field_candidates = infer_field_candidates(stream, packets)
 
         artifact_dir = self.state_dir / "tasks" / task_id / "artifacts"
         artifacts = [
@@ -164,17 +228,23 @@ class TrackDBaselineBackend:
             )
 
         semantic_requested = _semantic_requested(config, requested_stages=requested_stages)
-        semantic = self._run_semantic_backend(
-            input_metadata=input_metadata,
-            input_path=input_path,
-            packets=tuple(packets),
-            messages=tuple(messages),
-            families=tuple(families),
-            alignments=tuple(alignments),
-            field_candidates=tuple(field_candidates),
-            behavior=behavior,
-            config=config,
-        ) if semantic_requested and self.semantic_backend is not None else None
+        semantic = (
+            self._run_semantic_backend(
+                input_metadata=input_metadata,
+                input_path=input_path,
+                packets=tuple(packets),
+                messages=tuple(messages),
+                families=tuple(families),
+                alignments=tuple(alignments),
+                field_candidates=tuple(field_candidates),
+                behavior=behavior,
+                config=config,
+            )
+            if semantic_requested
+            and not known_protocol_gated
+            and self.semantic_backend is not None
+            else None
+        )
 
         if semantic is not None and semantic.evidence:
             artifacts.append(
@@ -216,6 +286,10 @@ class TrackDBaselineBackend:
             "findingCount": len(semantic.findings) if semantic is not None else 0,
             "evidenceCount": len(semantic.evidence) if semantic is not None else 0,
             "verifiedFieldCount": len(semantic.verified_fields) if semantic is not None else 0,
+            "preprocessContainer": prepared.container,
+            "protocolHint": prepared.protocol_hint,
+            "transportPacketCount": len(prepared.packets),
+            "genericInferenceGated": known_protocol_gated,
         }
         artifacts.append(
             self._write_artifact(
@@ -230,7 +304,13 @@ class TrackDBaselineBackend:
         )
 
         limitations = list(semantic.limitations if semantic is not None else ())
-        if semantic_requested and semantic is None:
+        if known_protocol_gated:
+            limitations.append(
+                f"Known protocol {prepared.protocol_hint!r} was structurally identified after "
+                "container preprocessing. Generic unknown-protocol field inference and semantic "
+                "promotion were gated; encrypted payload is not claimed as recoverable plaintext."
+            )
+        elif semantic_requested and semantic is None:
             limitations.append(
                 "Track D deterministic analysis ran successfully, but Track C semantic "
                 "evidence/verification is not connected; field candidates are not promoted "
@@ -262,7 +342,9 @@ class TrackDBaselineBackend:
         status = (
             semantic.status
             if semantic is not None
-            else "partial" if semantic_requested else "completed"
+            else "partial"
+            if semantic_requested or known_protocol_gated
+            else "completed"
         )
         return AnalysisResult(
             task_id=task_id,
@@ -330,6 +412,36 @@ class TrackDBaselineBackend:
             count=count,
             metadata={"producer": producer},
         )
+
+
+def _transport_packet_candidates(
+    extracted_packets: tuple[ExtractedPacket, ...],
+) -> list[PacketCandidate]:
+    """Map extracted transport payloads onto the concatenated preprocess stream."""
+    candidates: list[PacketCandidate] = []
+    offset = 0
+    for packet in extracted_packets:
+        if not packet.payload:
+            continue
+        end = offset + len(packet.payload)
+        candidates.append(
+            PacketCandidate(
+                start_offset=offset,
+                end_offset=end,
+                confidence=1.0,
+                evidence={
+                    "source": "pcap-transport-payload",
+                    "packetIndex": packet.index,
+                    "transport": packet.transport,
+                    "src": packet.src,
+                    "dst": packet.dst,
+                },
+                direction=packet.direction,
+                timestamp=packet.timestamp,
+            )
+        )
+        offset = end
+    return candidates
 
 
 def _semantic_requested(config: Mapping[str, Any], *, requested_stages: set[str]) -> bool:

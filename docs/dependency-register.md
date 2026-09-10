@@ -8,9 +8,9 @@ This register separates **candidate technology choices** from **accepted project
 |---|---|---:|---|---|---|---|
 | Python stdlib | core runtime | yes | A/C/D | Python 3.11.x | PSF | active |
 | jsonschema | contract fixture validation | dev/CI | A | pinned by installer resolution until lock introduced | upstream verification required | active in CI |
-| Scapy | PCAP/PCAPNG normalization (transport-payload extraction) | optional (`pcap` extra) | D | 2.7.0 | GPL-2.0-only | `io/scapy_adapter.py` + `dependency_unavailable` fallback; live path unit-tested where Scapy is installed |
+| Scapy | optional richer PCAP/PCAPNG normalization backend | optional (`pcap` extra) | D | 2.7.0 | GPL-2.0-only | `io/scapy_adapter.py`; preferred when installed, but no longer required by the packaged desktop because the same adapter falls back to core `dpkt` |
 | NFStream public test corpus | public flow labels and reproducible PCAP inputs; no runtime library | experiment data | cross-Track | commit `1426d78597bbb8dcf556d65e9b413208c898444f` | LGPL-3.0 declared by upstream repository | 12 allowlisted captures/result CSVs, exact size/SHA-256 validation; raw files remain ignored |
-| dpkt | PCAP/PCAPNG parsing behind project-native adapter | public benchmark only | cross-Track | 1.9.8 | BSD (PyPI/upstream classifier) | pinned optional extra; deterministic fixture tests; missing dependency fails the benchmark without affecting runtime |
+| dpkt | production PCAP/PCAPNG parsing plus public benchmark parsing | yes for packaged capture analysis | D / cross-Track | 1.9.8 | BSD (PyPI/upstream classifier) | core Python dependency; `io/scapy_adapter.py` packaged fallback emits project-native `ExtractedPacket`; public benchmark reuses the same pinned version |
 | Netzob | PRE/alignment research baseline | experiment/CI only | D, delegated live-smoke slice A (#46) | 2.0.0 (PyPI sdist) | GPLv3 (upstream setup/COPYING) | **live upstream validated** through project-native adapter in `Netzob Baseline`; normal runtime retains `dependency_unavailable` fallback |
 | BinaryInferno | semantic field-inference research baseline | experiment/CI only | D, delegated core integration A (#66) | upstream commit `cb42a63ada74737c10d01e2c22f4502ba3983976` | GPL-3.0-or-later (upstream `LICENSE` and source headers) | isolated subprocess adapter + pinned live-smoke workflow; normal runtime retains `dependency_unavailable` fallback |
 | Kaitai Struct | `.ksy` schema/parser export backend | optional V1/V2 backend | A | emitted `ks-version: 0.10`; compiler version not pinned until compiler invocation lands | compiler license verification required before invocation | project-native `.ksy` exporter active; external compiler invocation not yet integrated |
@@ -20,7 +20,7 @@ This register separates **candidate technology choices** from **accepted project
 | Tauri 2 | desktop shell | required for desktop MVP | B | 2.11.5 (Cargo.lock) | Apache-2.0 OR MIT | active; cargo check |
 | tauri-plugin-dialog | controlled file picker | required for desktop MVP | B | 2.7.3 (Cargo.lock) / Rust plugin | Apache-2.0 OR MIT | active; Rust-owned dialog smoke path |
 | serde_json | Rust JSONL sidecar envelope | required for desktop MVP | B | 1.0.151 (Cargo.lock) | MIT OR Apache-2.0 | active; sidecar proxy serialization |
-| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Windows Sidecar executable builder | build-only for desktop package | B | 6.22.2 (PyPI/GitHub tag) | GPL-2.0-or-later WITH Bootloader-exception; embedded run-time hooks Apache-2.0 | `python -m pip install -e ".[package]"`; Windows x64 + Python 3.11 packaging path; JSONL executable smoke; missing/wrong version fails the package build with an install instruction; no installed-app runtime dependency |
+| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Windows Sidecar executable builder | build-only for desktop package | B | 6.22.2 (PyPI/GitHub tag) | GPL-2.0-or-later WITH Bootloader-exception; embedded run-time hooks Apache-2.0 | `python -m pip install -e ".[package]"`; Windows x64 + Python 3.11 packaging path; JSONL executable smoke; missing/wrong version fails the package build with an install instruction; core runtime dependencies (including `dpkt`) are collected into the Sidecar |
 
 ## Netzob 2.0.0 baseline reproduction
 
@@ -72,14 +72,16 @@ Because BinaryInferno is GPL-3.0-or-later, it remains an isolated research/CI ba
 
 Decision: reuse NFStream's published fixtures and scikit-learn's RandomForest
 instead of creating private traffic, inventing labels, or implementing a custom
-classifier. `dpkt==1.9.8` is the bounded parsing adapter; no third-party object
-crosses the project contract. Python 3.10/3.11 and Windows/Linux are supported.
+classifier. Core `dpkt==1.9.8` is reused as the bounded parsing adapter; no
+third-party object crosses the project contract. Python 3.10/3.11 and
+Windows/Linux are supported.
 
-Install with `python -m pip install -e ".[dev,public-benchmark]"`. Missing `dpkt`
-or scikit-learn produces a direct experiment dependency error and does not affect
-the Python Sidecar or packaged desktop. Blocking CI installs the extra to run the
-deterministic adapter tests; it does not download public captures. Live download
-is an explicit reproduction step in `docs/public-data-benchmark.md`.
+Install with `python -m pip install -e ".[dev,public-benchmark]"`. The core project
+installation already includes `dpkt`; the extra adds scikit-learn for the behavior
+benchmark. Missing scikit-learn produces a direct experiment dependency error and
+does not affect the normal Python Sidecar or packaged desktop. Blocking CI runs
+the deterministic adapter tests; it does not download public captures. Live
+download is an explicit reproduction step in `docs/public-data-benchmark.md`.
 
 ## Acceptance gate for a new dependency
 

@@ -25,6 +25,9 @@ dev = [
 ]
 package = [
   "pyinstaller==6.22.2",
+  # The distributed desktop Sidecar must carry the same PCAP parser used by
+  # production preprocessing; otherwise PCAP/PCAPNG inputs would only degrade.
+  "scapy==2.7.0",
 ]
 public-benchmark = [
   "dpkt==1.9.8",

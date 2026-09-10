@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import IO, Any
 
 PYINSTALLER_VERSION = "6.22.2"
+DPKT_VERSION = "1.9.8"
 SIDECAR_NAME = "course-project-sidecar"
 
 
@@ -47,19 +48,19 @@ def _require_windows_target(target: str) -> None:
         )
 
 
-def _installed_pyinstaller_version() -> str | None:
+def _installed_distribution_version(distribution: str) -> str | None:
     try:
-        return metadata.version("pyinstaller")
+        return metadata.version(distribution)
     except metadata.PackageNotFoundError:
         return None
 
 
-def _bootstrap_pyinstaller() -> None:
+def _bootstrap_packaging_environment() -> None:
     root = _repo_root()
     requirement = f"{root}[package]"
     print(
-        f"PyInstaller {PYINSTALLER_VERSION} is required; installing the repository packaging extra "
-        f"with {sys.executable}",
+        "The Sidecar packaging environment is incomplete; installing the repository "
+        f"packaging extra with {sys.executable}",
         file=sys.stderr,
     )
     try:
@@ -77,16 +78,18 @@ def _bootstrap_pyinstaller() -> None:
         )
     except (OSError, subprocess.CalledProcessError) as exc:
         raise RuntimeError(
-            "Could not install the pinned packaging dependency automatically. "
+            "Could not install the pinned packaging/runtime dependencies automatically. "
             f"Run {sys.executable} -m pip install -e \"{requirement}\" and retry."
         ) from exc
 
 
 def _load_pyinstaller() -> Any:
-    installed = _installed_pyinstaller_version()
-    if installed != PYINSTALLER_VERSION:
-        _bootstrap_pyinstaller()
-        installed = _installed_pyinstaller_version()
+    installed_pyinstaller = _installed_distribution_version("pyinstaller")
+    installed_dpkt = _installed_distribution_version("dpkt")
+    if installed_pyinstaller != PYINSTALLER_VERSION or installed_dpkt != DPKT_VERSION:
+        _bootstrap_packaging_environment()
+        installed_pyinstaller = _installed_distribution_version("pyinstaller")
+        installed_dpkt = _installed_distribution_version("dpkt")
 
     try:
         import PyInstaller  # type: ignore[import-not-found]
@@ -96,10 +99,13 @@ def _load_pyinstaller() -> Any:
             "PyInstaller could not be imported after installing the repository packaging extra"
         ) from exc
 
-    if installed != PYINSTALLER_VERSION or PyInstaller.__version__ != PYINSTALLER_VERSION:
+    if installed_pyinstaller != PYINSTALLER_VERSION or PyInstaller.__version__ != PYINSTALLER_VERSION:
         raise RuntimeError(
-            f"PyInstaller {PYINSTALLER_VERSION} is required, found "
-            f"{PyInstaller.__version__}"
+            f"PyInstaller {PYINSTALLER_VERSION} is required, found {PyInstaller.__version__}"
+        )
+    if installed_dpkt != DPKT_VERSION:
+        raise RuntimeError(
+            f"dpkt {DPKT_VERSION} is required for packaged PCAP support, found {installed_dpkt!r}"
         )
     return PyInstaller.__main__
 

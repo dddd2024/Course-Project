@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import io
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.util import find_spec
-from typing import Callable, Literal
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)

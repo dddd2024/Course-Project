@@ -75,6 +75,7 @@ def record(
 def test_canonical_v2_baseline_and_ablation_vocabulary_is_fixed() -> None:
     assert BASELINE_VARIANTS == (
         "heuristic",
+        "random_forest",
         "netzob_pre",
         "llm_only",
         "llm_verification",
@@ -99,6 +100,16 @@ def test_teacher_formal_benchmark_with_declared_ground_truth_is_valid() -> None:
     assert run.dataset.corpus_kind == "teacher"
     assert run.metrics[0].evaluable is True
     assert run.metrics[0].value == 0.875
+
+
+def test_pinned_public_corpus_can_support_formal_benchmark_claims() -> None:
+    data = dataset(kind="public", ground_truth=frozenset({"behavior_labels"}))
+    metric = metric_for_dataset(data, "behavior_accuracy", 0.75)
+
+    run = record("random_forest", data, metric, scope="formal_benchmark")
+
+    assert run.dataset.corpus_kind == "public"
+    assert run.metrics[0].value == 0.75
 
 
 def test_synthetic_result_cannot_masquerade_as_formal_teacher_benchmark() -> None:

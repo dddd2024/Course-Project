@@ -1,0 +1,119 @@
+{
+  "blindInference": {
+    "artifactTypes": [
+      "messages",
+      "alignment",
+      "evidence",
+      "statistics"
+    ],
+    "fieldCandidateCount": 154,
+    "findingCount": 125,
+    "groundTruthPassedToInference": false,
+    "limitations": [],
+    "messageCount": 27,
+    "status": "completed",
+    "verifiedFieldCount": 0
+  },
+  "boundaryEvaluation": {
+    "exactBoundaryF1": 0.409448818898,
+    "predictedInternalBoundaries": 26,
+    "trueInternalBoundaries": 101
+  },
+  "dat": {
+    "committed": false,
+    "payloadChunkCount": 102,
+    "sha256": "41ffbf8930edc17d3c5f64bc49fca897797759cf4869b632dd33d17bb289e9c4",
+    "sizeBytes": 1173
+  },
+  "protocolRecognitionAndRestoration": {
+    "confidence": 1.0,
+    "detectedProtocol": "Modbus/TCP",
+    "functionCodes": [
+      3
+    ],
+    "method": "MBAP protocol-id and length invariants plus function-code structure",
+    "readHoldingRegisterRequests": 51,
+    "readHoldingRegisterResponses": 51,
+    "restoredRegisterValueCount": 51,
+    "totalMessageCount": 102,
+    "validatedMessageCount": 102
+  },
+  "record": {
+    "artifacts": [],
+    "codeSha": "74db15a8436717ed6e8d48e92d83f37d13bfbaf2",
+    "config": {
+      "groundTruthIsolation": true,
+      "input": "transport payloads exported to .dat",
+      "llmEnabled": false
+    },
+    "dataset": {
+      "corpusKind": "public",
+      "datasetId": "nfstream-public-modbus-payloads",
+      "groundTruth": [
+        "packet_boundaries"
+      ],
+      "redistributionAllowed": null,
+      "sha256": "41ffbf8930edc17d3c5f64bc49fca897797759cf4869b632dd33d17bb289e9c4",
+      "sizeBytes": 1173,
+      "version": "nfstream-1426d78597bb"
+    },
+    "dependencies": [
+      {
+        "name": "course-project",
+        "version": "0.1.0"
+      },
+      {
+        "name": "dpkt",
+        "version": "1.9.8"
+      },
+      {
+        "name": "python",
+        "version": "3.11.15"
+      }
+    ],
+    "metrics": [
+      {
+        "evaluable": false,
+        "name": "field_boundary_f1",
+        "unavailableReason": "not evaluable from declared ground truth; missing: field_boundaries",
+        "value": null
+      },
+      {
+        "evaluable": false,
+        "name": "field_semantic_accuracy",
+        "unavailableReason": "not evaluable from declared ground truth; missing: field_semantics",
+        "value": null
+      },
+      {
+        "evaluable": true,
+        "name": "packet_boundary_f1",
+        "unavailableReason": null,
+        "value": 0.409448818898
+      },
+      {
+        "evaluable": false,
+        "name": "restoration_accuracy",
+        "unavailableReason": "not evaluable from declared ground truth; missing: restoration_reference",
+        "value": null
+      }
+    ],
+    "model": {
+      "provider": "mock",
+      "version": "offline-v1"
+    },
+    "notes": [
+      "Packet boundaries come from independently extracted transport payload chunks.",
+      "The upstream corpus has no field-boundary, field-semantic, or restoration reference; those metrics remain unavailable."
+    ],
+    "randomSeed": 0,
+    "resultScope": "formal_benchmark",
+    "variant": "evidencegraph_pre"
+  },
+  "source": {
+    "capture": "modbus.pcap",
+    "captureSha256": "9e055a2d15a8e447be131002137341ae5f8f8b91b64576cd2fdbd854e141373e",
+    "commit": "1426d78597bbb8dcf556d65e9b413208c898444f",
+    "license": "LGPL-3.0",
+    "repository": "https://github.com/nfstream/nfstream"
+  }
+}

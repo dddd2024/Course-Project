@@ -111,3 +111,25 @@ def test_analysis_result_artifact_ids_are_unique() -> None:
     result = load_json(FIXTURES / "analysis-result.json")
     artifact_ids = [item["artifactId"] for item in result["artifacts"]]
     assert len(artifact_ids) == len(set(artifact_ids))
+
+
+def test_evaluation_metadata_contract_accepts_pinned_public_corpus() -> None:
+    schema = load_json(CONTRACTS / "teacher-dataset-metadata.schema.json")
+    validator = Draft202012Validator(schema)
+    public_metadata = {
+        "contractVersion": 1,
+        "datasetId": "nfstream-public-behavior-v1",
+        "corpusKind": "public",
+        "version": "nfstream-1426d78597bb",
+        "sha256": "a" * 64,
+        "sizeBytes": 1,
+        "redistributionStatus": "unknown",
+        "preprocessing": ["verify exact object hashes", "extract flow observations"],
+        "groundTruth": {
+            "reference": "pinned upstream expected-result CSV files",
+            "sha256": "b" * 64,
+            "capabilities": ["behavior_labels"],
+        },
+    }
+
+    assert not list(validator.iter_errors(public_metadata))

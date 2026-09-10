@@ -6,7 +6,11 @@ This repository is a four-person cybersecurity course project for unknown binary
 
 ## Scope
 
-The system is for coursework, controlled datasets, teacher-provided evaluation files, and authorized laboratory traffic only. It does not claim to break correctly implemented modern cryptography without keys. Encrypted-flow analysis focuses on observable structure, metadata, timing, packet sizes, direction, and controlled/test data.
+The system is for coursework, pinned public datasets, controlled datasets,
+teacher-provided evaluation files, and authorized laboratory traffic only. It does
+not claim to break correctly implemented modern cryptography without keys.
+Encrypted-flow analysis focuses on observable structure, metadata, timing, packet
+sizes, direction, and controlled/test data.
 
 ## Current Architecture
 
@@ -102,8 +106,12 @@ Before parallel implementation:
 - [`docs/repository-settings.md`](docs/repository-settings.md) — required `main` protection settings;
 - [`docs/dependency-register.md`](docs/dependency-register.md) — dependency/version/license acceptance gate;
 - [`docs/delivery-checklist.md`](docs/delivery-checklist.md) — final course delivery and freeze checklist.
+- [`docs/public-data-benchmark.md`](docs/public-data-benchmark.md) — pinned public
+  PCAP sources, `.dat` conversion, behavior benchmark and measured limitations.
 
-Teacher-provided `.dat` evaluation files are intentionally **not** fabricated as a prerequisite. When they arrive, record only the metadata/hashes that are safe and permitted to store; do not commit raw files unless redistribution is explicitly allowed.
+The current delivery uses fixed, hash-verified public data instead of teacher data.
+Raw public PCAPs and the generated `.dat` remain ignored; only sanitized identities
+and results are committed. The teacher-compatible ingress remains available.
 
 ## Day-0 Contract Baseline
 
@@ -153,4 +161,6 @@ If the PR head or `main` changes after the valid CI evaluation, synchronize and 
 
 ## Current Status
 
-**Phase: Day-0 shared contracts and pre-implementation readiness are established; four Track implementations are active. `main` ruleset still needs a server-side update from review-gated to CI-only enforcement.**
+**Phase: implementation, desktop packaging, mechanism evidence and the pinned
+public-data `.dat`/behavior benchmark are complete for the owner-approved delivery
+scope. PPT and teacher-data execution are excluded by that scope.**

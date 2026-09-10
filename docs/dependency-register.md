@@ -9,11 +9,12 @@ This register separates **candidate technology choices** from **accepted project
 | Python stdlib | core runtime | yes | A/C/D | Python 3.11.x | PSF | active |
 | jsonschema | contract fixture validation | dev/CI | A | pinned by installer resolution until lock introduced | upstream verification required | active in CI |
 | Scapy | PCAP normalization | optional until integrated | D | TBD | TBD | not integrated |
-| NFStream | flow feature baseline | optional | D | TBD | TBD | not integrated |
+| NFStream public test corpus | public flow labels and reproducible PCAP inputs; no runtime library | experiment data | cross-Track | commit `1426d78597bbb8dcf556d65e9b413208c898444f` | LGPL-3.0 declared by upstream repository | 12 allowlisted captures/result CSVs, exact size/SHA-256 validation; raw files remain ignored |
+| dpkt | PCAP/PCAPNG parsing behind project-native adapter | public benchmark only | cross-Track | 1.9.8 | BSD (PyPI/upstream classifier) | pinned optional extra; deterministic fixture tests; missing dependency fails the benchmark without affecting runtime |
 | Netzob | PRE/alignment research baseline | experiment/CI only | D, delegated live-smoke slice A (#46) | 2.0.0 (PyPI sdist) | GPLv3 (upstream setup/COPYING) | **live upstream validated** through project-native adapter in `Netzob Baseline`; normal runtime retains `dependency_unavailable` fallback |
 | BinaryInferno | semantic field-inference research baseline | experiment/CI only | D, delegated core integration A (#66) | upstream commit `cb42a63ada74737c10d01e2c22f4502ba3983976` | GPL-3.0-or-later (upstream `LICENSE` and source headers) | isolated subprocess adapter + pinned live-smoke workflow; normal runtime retains `dependency_unavailable` fallback |
 | Kaitai Struct | `.ksy` schema/parser export backend | optional V1/V2 backend | A | emitted `ks-version: 0.10`; compiler version not pinned until compiler invocation lands | compiler license verification required before invocation | project-native `.ksy` exporter active; external compiler invocation not yet integrated |
-| scikit-learn | behavior / BinaryInferno experiment dependency | optional, experiment-only for BinaryInferno | D/C | workflow-resolved until upstream compatibility pin is required | BSD-3-Clause upstream | installed only in isolated BinaryInferno research workflow, not runtime |
+| scikit-learn | behavior / BinaryInferno experiment dependency | optional, experiment-only | cross-Track | 1.7.2 for public behavior benchmark; workflow-resolved in isolated BinaryInferno job | BSD-3-Clause upstream | `RandomForestClassifier` public baseline with fixed seed/worker count; not an installed-app runtime dependency |
 | React | desktop UI | required for desktop MVP | B | 18.3.1 (package-lock.json) | MIT | active; Vite build |
 | Vite + `@vitejs/plugin-react` | desktop frontend build and development server | build-only for desktop MVP | B | 8.2.2 / 6.1.1 (package-lock.json) | MIT / MIT | active; Node 22 baseline; production build and `npm audit` pass |
 | Tauri 2 | desktop shell | required for desktop MVP | B | 2.11.5 (Cargo.lock) | Apache-2.0 OR MIT | active; cargo check |
@@ -66,6 +67,19 @@ Integration boundary:
 The upstream README lists `scikit-learn` and `scipy` as Python requirements and GNU `parallel` for serialization-pattern search. It also states that a standalone integration algorithm and refactored detector interface remain roadmap work; this is why the project integrates the documented CLI/SPEC boundary instead of depending on an unstable in-process API.
 
 Because BinaryInferno is GPL-3.0-or-later, it remains an isolated research/CI baseline. Any future bundling, redistribution or source modification requires a fresh license review and appropriate notices.
+
+## Public-corpus benchmark reproduction
+
+Decision: reuse NFStream's published fixtures and scikit-learn's RandomForest
+instead of creating private traffic, inventing labels, or implementing a custom
+classifier. `dpkt==1.9.8` is the bounded parsing adapter; no third-party object
+crosses the project contract. Python 3.10/3.11 and Windows/Linux are supported.
+
+Install with `python -m pip install -e ".[dev,public-benchmark]"`. Missing `dpkt`
+or scikit-learn produces a direct experiment dependency error and does not affect
+the Python Sidecar or packaged desktop. Blocking CI installs the extra to run the
+deterministic adapter tests; it does not download public captures. Live download
+is an explicit reproduction step in `docs/public-data-benchmark.md`.
 
 ## Acceptance gate for a new dependency
 

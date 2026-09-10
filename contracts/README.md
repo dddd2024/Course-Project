@@ -8,6 +8,9 @@ Current schemas:
 - `sidecar-message.schema.json` — versioned request/progress/status/result/error envelopes and the canonical v1 command vocabulary;
 - `analysis-result.schema.json` — task-level analysis result, findings, evidence records and artifact manifest;
 - `agent-response.schema.json` — human-readable answer plus structured evidence-linked findings.
+- `teacher-dataset-metadata.schema.json` — sanitized evaluation-corpus identity;
+  `corpusKind` also permits a pinned `public` corpus under the migration in
+  `docs/public-data-benchmark.md`.
 
 Golden fixtures in `contracts/fixtures/` include request examples plus runtime response examples for registration, inspection, bounded byte-range reads, task status/progress, result refs and errors. `analysis-result.json` and `agent-response.json` remain the structured result examples.
 

@@ -1,0 +1,384 @@
+{
+  "dataset": {
+    "corpusKind": "public",
+    "datasetId": "nfstream-public-behavior-v1",
+    "groundTruth": [
+      "behavior_labels"
+    ],
+    "redistributionAllowed": null,
+    "sha256": "b0d20c9c65efa632b7f86e237b67ae4c559ca9bf313d7d75eb880326c5195d5a",
+    "sizeBytes": 1049973,
+    "version": "nfstream-1426d78597bb"
+  },
+  "evaluations": {
+    "randomForest": {
+      "accuracy": 0.6,
+      "labeled_sample_count": 5,
+      "macro_f1": 0.375,
+      "metrics_evaluable": true,
+      "observed_labels": [
+        "DOWNLOAD",
+        "QUERY",
+        "STREAM",
+        "UPLOAD"
+      ],
+      "sample_count": 5,
+      "split_unit": "session",
+      "unavailable_reason": null
+    },
+    "rule": {
+      "accuracy": 0.0,
+      "labeled_sample_count": 5,
+      "macro_f1": 0.0,
+      "metrics_evaluable": true,
+      "observed_labels": [
+        "DOWNLOAD",
+        "QUERY",
+        "STREAM",
+        "UPLOAD"
+      ],
+      "sample_count": 5,
+      "split_unit": "session",
+      "unavailable_reason": null
+    }
+  },
+  "labels": [
+    "DOWNLOAD",
+    "QUERY",
+    "STREAM",
+    "STREAM",
+    "UPLOAD"
+  ],
+  "records": [
+    {
+      "artifacts": [],
+      "codeSha": "74db15a8436717ed6e8d48e92d83f37d13bfbaf2",
+      "config": {
+        "classifier": "course-project deterministic rule baseline"
+      },
+      "dataset": {
+        "corpusKind": "public",
+        "datasetId": "nfstream-public-behavior-v1",
+        "groundTruth": [
+          "behavior_labels"
+        ],
+        "redistributionAllowed": null,
+        "sha256": "b0d20c9c65efa632b7f86e237b67ae4c559ca9bf313d7d75eb880326c5195d5a",
+        "sizeBytes": 1049973,
+        "version": "nfstream-1426d78597bb"
+      },
+      "dependencies": [
+        {
+          "name": "course-project",
+          "version": "0.1.0"
+        },
+        {
+          "name": "dpkt",
+          "version": "1.9.8"
+        },
+        {
+          "name": "python",
+          "version": "3.11.15"
+        },
+        {
+          "name": "scikit-learn",
+          "version": "1.7.2"
+        }
+      ],
+      "metrics": [
+        {
+          "evaluable": true,
+          "name": "behavior_accuracy",
+          "unavailableReason": null,
+          "value": 0.0
+        },
+        {
+          "evaluable": true,
+          "name": "behavior_macro_f1",
+          "unavailableReason": null,
+          "value": 0.0
+        }
+      ],
+      "model": null,
+      "notes": [
+        "Labels are derived by a declared mapping from pinned NFStream expected-result rows.",
+        "Train and test captures are disjoint; no packet from one capture appears on both sides."
+      ],
+      "randomSeed": 20260910,
+      "resultScope": "formal_benchmark",
+      "variant": "heuristic"
+    },
+    {
+      "artifacts": [],
+      "codeSha": "74db15a8436717ed6e8d48e92d83f37d13bfbaf2",
+      "config": {
+        "classWeight": "balanced",
+        "classifier": "sklearn.ensemble.RandomForestClassifier",
+        "featureNames": [
+          "packet_count",
+          "total_bytes",
+          "up_bytes",
+          "down_bytes",
+          "up_count",
+          "down_count",
+          "up_down_ratio",
+          "size_mean",
+          "size_std",
+          "size_min",
+          "size_max",
+          "direction_switches",
+          "burst_count",
+          "inter_arrival_mean",
+          "inter_arrival_std",
+          "duration"
+        ],
+        "nEstimators": 200
+      },
+      "dataset": {
+        "corpusKind": "public",
+        "datasetId": "nfstream-public-behavior-v1",
+        "groundTruth": [
+          "behavior_labels"
+        ],
+        "redistributionAllowed": null,
+        "sha256": "b0d20c9c65efa632b7f86e237b67ae4c559ca9bf313d7d75eb880326c5195d5a",
+        "sizeBytes": 1049973,
+        "version": "nfstream-1426d78597bb"
+      },
+      "dependencies": [
+        {
+          "name": "course-project",
+          "version": "0.1.0"
+        },
+        {
+          "name": "dpkt",
+          "version": "1.9.8"
+        },
+        {
+          "name": "python",
+          "version": "3.11.15"
+        },
+        {
+          "name": "scikit-learn",
+          "version": "1.7.2"
+        }
+      ],
+      "metrics": [
+        {
+          "evaluable": true,
+          "name": "behavior_accuracy",
+          "unavailableReason": null,
+          "value": 0.6
+        },
+        {
+          "evaluable": true,
+          "name": "behavior_macro_f1",
+          "unavailableReason": null,
+          "value": 0.375
+        }
+      ],
+      "model": null,
+      "notes": [
+        "Labels are derived by a declared mapping from pinned NFStream expected-result rows.",
+        "Train and test captures are disjoint; no packet from one capture appears on both sides."
+      ],
+      "randomSeed": 20260910,
+      "resultScope": "formal_benchmark",
+      "variant": "random_forest"
+    }
+  ],
+  "sampleCounts": {
+    "test": 5,
+    "train": 8
+  },
+  "splitPolicy": {
+    "packetLeakage": false,
+    "testCaptures": [
+      "bittorrent_utp.pcap",
+      "mpegts.pcap",
+      "quic_q43.pcap",
+      "quic_q46_b.pcap",
+      "rtsp_setup_http.pcapng"
+    ],
+    "trainCaptures": [
+      "dns_doh.pcap",
+      "dns_dot.pcap",
+      "exe_download.pcap",
+      "mpeg.pcap",
+      "quic046.pcap",
+      "youtubeupload.pcap"
+    ],
+    "unit": "source capture/session"
+  },
+  "testPredictions": {
+    "randomForest": [
+      {
+        "confidence": 0.385,
+        "features": {
+          "model": "RandomForestClassifier",
+          "split": "test"
+        },
+        "flow_id": "bittorrent_utp.pcap:flow-0",
+        "label": "UPLOAD"
+      },
+      {
+        "confidence": 0.43,
+        "features": {
+          "model": "RandomForestClassifier",
+          "split": "test"
+        },
+        "flow_id": "mpegts.pcap:flow-0",
+        "label": "STREAM"
+      },
+      {
+        "confidence": 0.515,
+        "features": {
+          "model": "RandomForestClassifier",
+          "split": "test"
+        },
+        "flow_id": "quic_q43.pcap:flow-0",
+        "label": "UPLOAD"
+      },
+      {
+        "confidence": 0.495,
+        "features": {
+          "model": "RandomForestClassifier",
+          "split": "test"
+        },
+        "flow_id": "quic_q46_b.pcap:flow-0",
+        "label": "UPLOAD"
+      },
+      {
+        "confidence": 0.375,
+        "features": {
+          "model": "RandomForestClassifier",
+          "split": "test"
+        },
+        "flow_id": "rtsp_setup_http.pcapng:flow-0",
+        "label": "STREAM"
+      }
+    ],
+    "rule": [
+      {
+        "confidence": 0.940393,
+        "features": {
+          "burst_count": 56,
+          "direction_switches": 55,
+          "down_bytes": 4836,
+          "down_count": 39,
+          "duration": 19.215929985046387,
+          "flow_id": "bittorrent_utp.pcap:flow-0",
+          "inter_arrival_mean": 0.2260697645299575,
+          "inter_arrival_std": 0.7480156477697076,
+          "packet_count": 86,
+          "size_max": 1514,
+          "size_mean": 482.43023255813955,
+          "size_min": 62,
+          "size_std": 562.1621370995365,
+          "total_bytes": 41489,
+          "up_bytes": 36653,
+          "up_count": 47,
+          "up_down_ratio": 7.5791976840363935
+        },
+        "flow_id": "bittorrent_utp.pcap:flow-0",
+        "label": "UPLOAD"
+      },
+      {
+        "confidence": 0.7625,
+        "features": {
+          "burst_count": 1,
+          "direction_switches": 0,
+          "down_bytes": 0,
+          "down_count": 0,
+          "duration": null,
+          "flow_id": "mpegts.pcap:flow-0",
+          "inter_arrival_mean": null,
+          "inter_arrival_std": null,
+          "packet_count": 1,
+          "size_max": 1362,
+          "size_mean": 1362,
+          "size_min": 1362,
+          "size_std": 0.0,
+          "total_bytes": 1362,
+          "up_bytes": 1362,
+          "up_count": 1,
+          "up_down_ratio": null
+        },
+        "flow_id": "mpegts.pcap:flow-0",
+        "label": "UPLOAD"
+      },
+      {
+        "confidence": 0.775,
+        "features": {
+          "burst_count": 2,
+          "direction_switches": 1,
+          "down_bytes": 72,
+          "down_count": 1,
+          "duration": 0.04844498634338379,
+          "flow_id": "quic_q43.pcap:flow-0",
+          "inter_arrival_mean": 0.04844498634338379,
+          "inter_arrival_std": 0.0,
+          "packet_count": 2,
+          "size_max": 1392,
+          "size_mean": 732,
+          "size_min": 72,
+          "size_std": 660.0,
+          "total_bytes": 1464,
+          "up_bytes": 1392,
+          "up_count": 1,
+          "up_down_ratio": 19.333333333333332
+        },
+        "flow_id": "quic_q43.pcap:flow-0",
+        "label": "UPLOAD"
+      },
+      {
+        "confidence": 0.675012,
+        "features": {
+          "burst_count": 8,
+          "direction_switches": 7,
+          "down_bytes": 4104,
+          "down_count": 14,
+          "duration": 3.093803882598877,
+          "flow_id": "quic_q46_b.pcap:flow-0",
+          "inter_arrival_mean": 0.16283178329467773,
+          "inter_arrival_std": 0.2447195804230785,
+          "packet_count": 20,
+          "size_max": 1440,
+          "size_mean": 351,
+          "size_min": 106,
+          "size_std": 395.1511103362864,
+          "total_bytes": 7020,
+          "up_bytes": 2916,
+          "up_count": 6,
+          "up_down_ratio": 0.7105263157894737
+        },
+        "flow_id": "quic_q46_b.pcap:flow-0",
+        "label": "QUERY"
+      },
+      {
+        "confidence": 0.569385,
+        "features": {
+          "burst_count": 1,
+          "direction_switches": 0,
+          "down_bytes": 0,
+          "down_count": 0,
+          "duration": null,
+          "flow_id": "rtsp_setup_http.pcapng:flow-0",
+          "inter_arrival_mean": null,
+          "inter_arrival_std": null,
+          "packet_count": 1,
+          "size_max": 233,
+          "size_mean": 233,
+          "size_min": 233,
+          "size_std": 0.0,
+          "total_bytes": 233,
+          "up_bytes": 233,
+          "up_count": 1,
+          "up_down_ratio": null
+        },
+        "flow_id": "rtsp_setup_http.pcapng:flow-0",
+        "label": "UPLOAD"
+      }
+    ]
+  }
+}

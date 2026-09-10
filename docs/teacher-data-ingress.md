@@ -1,5 +1,10 @@
 # Teacher-data ingress and ground-truth isolation
 
+> Current delivery note (2026-09-10): the repository owner chose not to use
+> teacher `.dat` data and authorized the pinned public-data replacement in
+> `docs/public-data-benchmark.md`. This document remains the compatible future
+> ingress procedure, not an unfinished gate for the current delivery.
+
 This contract prepares the project for the teacher-provided .dat file without
 claiming that the authoritative dataset has been received or evaluated. Synthetic
 inputs use the same registration and analysis interface, but remain engineering
@@ -30,7 +35,7 @@ Record one JSON object that validates against
 contracts/teacher-dataset-metadata.schema.json:
 
 - datasetId, version, sha256, and sizeBytes identify the exact input;
-- corpusKind distinguishes teacher, synthetic, and other corpora;
+- corpusKind distinguishes teacher, public, synthetic, and other corpora;
 - receivedAt records receipt time when applicable;
 - redistributionStatus is prohibited, permitted, or unknown;
 - preprocessing records transformations, using none when bytes are unchanged;

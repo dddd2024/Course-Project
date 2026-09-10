@@ -130,6 +130,11 @@ class TrackDBaselineBackend:
                 raise RuntimeError(
                     f"{prepared.error_category}: {prepared.detail or 'input preprocessing failed'}"
                 )
+            preprocess_limitation = (
+                "Container preprocessing failed before unknown-protocol inference; "
+                "the raw capture was not blind-scanned. "
+                f"{prepared.detail or prepared.error_category}"
+            )
             return AnalysisResult(
                 task_id=task_id,
                 status="partial",
@@ -144,11 +149,7 @@ class TrackDBaselineBackend:
                     "preprocessErrorCategory": prepared.error_category,
                     "genericInferenceGated": True,
                 },
-                limitations=(
-                    "Container preprocessing failed before unknown-protocol inference; "
-                    "the raw capture was not blind-scanned. "
-                    f"{prepared.detail or prepared.error_category}",
-                ),
+                limitations=(preprocess_limitation,),
             )
 
         stream = prepared.stream

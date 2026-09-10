@@ -10,7 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "For educational use in this course repository"}
 authors = [{name = "Course Project Team"}]
-dependencies = []
+dependencies = [
+  # Production PCAP/PCAPNG preprocessing must also work in the packaged Sidecar.
+  # dpkt is small and permissively licensed; Scapy remains an optional adapter.
+  "dpkt==1.9.8",
+]
 
 [project.scripts]
 course-project-sidecar = "course_project.sidecar.cli:main"
@@ -25,12 +29,8 @@ dev = [
 ]
 package = [
   "pyinstaller==6.22.2",
-  # The distributed desktop Sidecar must carry the same PCAP parser used by
-  # production preprocessing; otherwise PCAP/PCAPNG inputs would only degrade.
-  "scapy==2.7.0",
 ]
 public-benchmark = [
-  "dpkt==1.9.8",
   "scikit-learn==1.7.2",
 ]
 pcap = [

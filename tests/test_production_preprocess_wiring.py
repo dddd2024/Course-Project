@@ -6,8 +6,8 @@ import pytest
 
 from course_project.io import ExtractedPacket, PreprocessResult, load_raw
 from course_project.models import InputMetadata
+from course_project.sidecar import track_d_backend
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
-import course_project.sidecar.track_d_backend as track_d_backend
 
 
 def _config(**overrides: object) -> dict[str, object]:

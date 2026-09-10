@@ -11,11 +11,19 @@ Sidecar analyze
   -> io.preprocess.preprocess
      -> content-based PCAP/PCAPNG detection
      -> transport payload extraction
+        -> optional Scapy backend when installed
+        -> packaged dpkt==1.9.8 fallback
      -> known-protocol classification (currently DTLS)
   -> exact transport-payload packet boundaries when available
   -> known protocol: gate generic unknown-protocol field inference and semantic promotion
   -> unknown raw protocol: continue the existing boundary/family/field inference path
 ```
+
+Production packaging:
+
+- `dpkt==1.9.8` is a core Python runtime dependency and is therefore included when the Windows Sidecar is packaged;
+- Scapy remains an optional `pcap` extra and is preferred by the adapter when explicitly installed;
+- both parsers are normalized to project-native `ExtractedPacket` records before data crosses the input-adapter boundary.
 
 Fail-closed behavior:
 

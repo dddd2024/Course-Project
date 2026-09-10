@@ -56,6 +56,7 @@ from course_project.boundary import detect_boundaries
 from course_project.inference import infer_field_candidates
 from course_project.io import load_dat
 from course_project.models import FieldCandidate, PacketCandidate
+from course_project.report import behavior_zh, identified_fields_zh
 
 RUNNER_NAME = "examples/run_trackd_baseline.py"
 
@@ -129,7 +130,9 @@ def _field_metrics(gt: dict, candidates: list[FieldCandidate]) -> dict:
     }
 
 
-def _run_analysis(data_path: Path, gt: dict) -> tuple[dict, float]:
+def _run_analysis(
+    data_path: Path, gt: dict
+) -> tuple[dict, float, list[FieldCandidate]]:
     actual_sha = hashlib.sha256(data_path.read_bytes()).hexdigest()
     if actual_sha != gt["sha256"]:
         raise SystemExit(
@@ -141,16 +144,36 @@ def _run_analysis(data_path: Path, gt: dict) -> tuple[dict, float]:
     candidates = infer_field_candidates(stream, packets)
     elapsed = time.perf_counter() - t0
     metrics = {**_boundary_metrics(gt, packets), **_field_metrics(gt, candidates)}
-    return metrics, elapsed
+    return metrics, elapsed, candidates
+
+
+def _chinese_summary(
+    dataset_id: str,
+    metrics: dict,
+    candidates: list[FieldCandidate],
+    behavior_label: str | None = None,
+) -> str:
+    lines = [f"分析结论（{dataset_id}）"]
+    lines.append(
+        f"  边界检测：精确率 {metrics['boundary_precision']:.3f} / "
+        f"召回率 {metrics['boundary_recall']:.3f} / F1 {metrics['boundary_f1']:.3f}"
+    )
+    lines.append(f"  字段语义准确率：{metrics['field_semantic_accuracy']:.3f}")
+    fields = identified_fields_zh(candidates)
+    lines.append(f"  识别字段：{'、'.join(fields) if fields else '（无）'}")
+    if behavior_label is not None:
+        lines.append(f"  行为分类：{behavior_zh(behavior_label)}")
+    return "\n".join(lines)
 
 
 def run_dataset(dataset_dir: Path) -> dict:
     gt_path = dataset_dir / "ground_truth.json"
     gt = json.loads(gt_path.read_text(encoding="utf-8"))
-    metrics, elapsed = _run_analysis(dataset_dir / "capture.dat", gt)
+    metrics, elapsed, candidates = _run_analysis(dataset_dir / "capture.dat", gt)
     return {
         "dataset_id": gt["dataset_id"],
         "metrics": metrics,
+        "summary_zh": _chinese_summary(gt["dataset_id"], metrics, candidates),
         "run": {
             "runner": RUNNER_NAME,
             "python_version": sys.version.split()[0],
@@ -160,9 +183,11 @@ def run_dataset(dataset_dir: Path) -> dict:
     }
 
 
-def _run_flow(flow_dir: Path, flow: dict) -> dict:
+def _run_flow(
+    flow_dir: Path, flow: dict
+) -> tuple[dict, float, list[FieldCandidate]]:
     gt = json.loads((flow_dir / f"{flow['flow']}.meta.json").read_text(encoding="utf-8"))
-    metrics, elapsed = _run_analysis(flow_dir / f"{flow['flow']}.dat", gt)
+    metrics, elapsed, candidates = _run_analysis(flow_dir / f"{flow['flow']}.dat", gt)
 
     sizes = [m["end"] - m["start"] for m in gt["messages"]]
     flow_meta = gt["flow"]
@@ -176,24 +201,34 @@ def _run_flow(flow_dir: Path, flow: dict) -> dict:
     metrics["behavior_label_ground_truth"] = flow_meta["label"]
     metrics["behavior_label_predicted"] = prediction.label
     metrics["behavior_correct"] = prediction.label == flow_meta["label"]
-    return metrics, elapsed
+    return metrics, elapsed, candidates
 
 
 def run_dataset_c(dataset_dir: Path) -> dict:
     flows = json.loads((dataset_dir / "flows.json").read_text(encoding="utf-8"))
     per_flow = {}
+    summary_lines = ["分析结论（synthetic-c）"]
     total_elapsed = 0.0
     for flow in flows["flows"]:
-        metrics, elapsed = _run_flow(dataset_dir, flow)
+        metrics, elapsed, candidates = _run_flow(dataset_dir, flow)
         per_flow[flow["flow"]] = metrics
         total_elapsed += elapsed
+        fields = "、".join(identified_fields_zh(candidates)) or "（无）"
+        summary_lines.append(
+            f"  {flow['flow']}：边界 F1 {metrics['boundary_f1']:.3f}，"
+            f"字段准确率 {metrics['field_semantic_accuracy']:.3f}，识别字段 {fields}，"
+            f"行为 {behavior_zh(metrics['behavior_label_predicted'])}"
+            f"（真值 {behavior_zh(metrics['behavior_label_ground_truth'])}）"
+        )
     correct = sum(1 for m in per_flow.values() if m["behavior_correct"])
+    summary_lines.append(f"  行为分类准确率：{correct}/{len(per_flow)}")
     return {
         "dataset_id": "synthetic-c",
         "metrics": {
             "behavior_accuracy": round(correct / len(per_flow), 6) if per_flow else 0.0,
             "flows": per_flow,
         },
+        "summary_zh": "\n".join(summary_lines),
         "run": {
             "runner": RUNNER_NAME,
             "python_version": sys.version.split()[0],
@@ -214,6 +249,8 @@ def main(argv: list[str] | None = None) -> int:
         result = run_dataset(dataset_dir)
     out_path = dataset_dir / "baseline-metrics.json"
     out_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    print(result["summary_zh"])
+    print()
     print(json.dumps(result["metrics"], indent=2))
     print(f"wrote {out_path}")
     return 0

@@ -6,7 +6,9 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
+from importlib import metadata
 from pathlib import Path
 from typing import IO, Any
 
@@ -44,19 +46,59 @@ def _require_windows_target(target: str) -> None:
         )
 
 
+def _installed_pyinstaller_version() -> str | None:
+    try:
+        return metadata.version("pyinstaller")
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _bootstrap_pyinstaller() -> None:
+    root = _repo_root()
+    requirement = f"{root}[package]"
+    print(
+        f"PyInstaller {PYINSTALLER_VERSION} is required; installing the repository packaging extra "
+        f"with {sys.executable}",
+        file=sys.stderr,
+    )
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "-e",
+                requirement,
+            ],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "Could not install the pinned packaging dependency automatically. "
+            f"Run {sys.executable} -m pip install -e \"{requirement}\" and retry."
+        ) from exc
+
+
 def _load_pyinstaller() -> Any:
+    installed = _installed_pyinstaller_version()
+    if installed != PYINSTALLER_VERSION:
+        _bootstrap_pyinstaller()
+        installed = _installed_pyinstaller_version()
+
     try:
         import PyInstaller  # type: ignore[import-not-found]
         import PyInstaller.__main__  # type: ignore[import-not-found]
     except ImportError as exc:
         raise RuntimeError(
-            'PyInstaller is missing; install the packaging extra with '
-            'python -m pip install -e ".[package]"'
+            "PyInstaller could not be imported after installing the repository packaging extra"
         ) from exc
 
-    if PyInstaller.__version__ != PYINSTALLER_VERSION:
+    if installed != PYINSTALLER_VERSION or PyInstaller.__version__ != PYINSTALLER_VERSION:
         raise RuntimeError(
-            f"PyInstaller {PYINSTALLER_VERSION} is required, found {PyInstaller.__version__}"
+            f"PyInstaller {PYINSTALLER_VERSION} is required, found "
+            f"{PyInstaller.__version__}"
         )
     return PyInstaller.__main__
 

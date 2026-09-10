@@ -4,7 +4,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "test-data" / "dat"
 SOURCE_METADATA = FIXTURE_DIR / "public-dtls-snakeoil.source.json"

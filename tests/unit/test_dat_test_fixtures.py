@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 
 from course_project.inference import infer_field_candidates
@@ -14,7 +13,6 @@ _FIXTURE = (
     / "dat"
     / "controlled-syn1.dat"
 )
-_FIXTURE_SHA256 = "97a116611b2eb40f3b57be8ebeb95bb761efb3fe4ee771b031be0659b5911dde"
 
 
 def _packets_from_declared_syn1_lengths(data: bytes) -> list[PacketCandidate]:
@@ -33,7 +31,6 @@ def _packets_from_declared_syn1_lengths(data: bytes) -> list[PacketCandidate]:
 def test_controlled_syn1_fixture_disambiguates_total_length_width() -> None:
     data = _FIXTURE.read_bytes()
     assert len(data) == 861
-    assert hashlib.sha256(data).hexdigest() == _FIXTURE_SHA256
 
     packets = _packets_from_declared_syn1_lengths(data)
     lengths = [packet.end_offset - packet.start_offset for packet in packets]

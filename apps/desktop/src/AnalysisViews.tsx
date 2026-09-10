@@ -16,14 +16,20 @@ import {
 } from "./taskGateway";
 
 const labels: Record<AnalysisViewName, string> = {
-  findings: "Findings",
-  evidence: "Evidence",
-  artifacts: "Artifacts",
-  packets: "Packets",
-  alignment: "Alignment",
-  statistics: "Statistics",
-  behavior: "Behavior",
-  restoration: "Restoration",
+  findings: "结论",
+  evidence: "证据",
+  artifacts: "产物",
+  packets: "数据包",
+  alignment: "对齐",
+  statistics: "统计",
+  behavior: "行为",
+  restoration: "还原",
+};
+
+const decisionLabels: Record<AnalysisFinding["status"], string> = {
+  ACCEPTED: "已接受",
+  REJECTED: "已拒绝",
+  UNCERTAIN: "待确认",
 };
 
 const artifactTypes: Partial<Record<AnalysisViewName, string[]>> = {
@@ -37,19 +43,19 @@ const artifactTypes: Partial<Record<AnalysisViewName, string[]>> = {
 type RestorationState = "complete" | "unavailable" | "failed" | "incomplete" | "not-required" | "unknown";
 
 const restorationStages = [
-  { key: "extractionStatus", label: "Extract" },
-  { key: "decryptionStatus", label: "Decrypt" },
-  { key: "decompressionStatus", label: "Decompress" },
-  { key: "reassemblyStatus", label: "Reassemble" },
+  { key: "extractionStatus", label: "提取" },
+  { key: "decryptionStatus", label: "解密" },
+  { key: "decompressionStatus", label: "解压" },
+  { key: "reassemblyStatus", label: "重组" },
 ] as const;
 
 const restorationStateLabels: Record<RestorationState, string> = {
-  complete: "Complete",
-  unavailable: "Unavailable",
-  failed: "Failed",
-  incomplete: "Incomplete",
-  "not-required": "Not required",
-  unknown: "Unknown",
+  complete: "完成",
+  unavailable: "不可用",
+  failed: "失败",
+  incomplete: "不完整",
+  "not-required": "无需执行",
+  unknown: "未知",
 };
 
 function normalizeRestorationState(value: unknown): RestorationState {
@@ -81,7 +87,7 @@ function BinaryArtifactPreview({ preview }: { preview: RestoredArtifactPreview }
     };
   });
   return (
-    <div className="restoration-hex" role="table" aria-label="Restored binary preview">
+    <div className="restoration-hex" role="table" aria-label="还原后二进制预览">
       {rows.map((row) => (
         <div className="restoration-hex-row" role="row" key={row.offset}>
           <code>{row.offset.toString(16).padStart(8, "0")}</code>
@@ -90,7 +96,7 @@ function BinaryArtifactPreview({ preview }: { preview: RestoredArtifactPreview }
         </div>
       ))}
       {preview.bytes.length > visibleBytes.length && (
-        <p className="artifact-note">Hex rendering is limited to the first 512 preview bytes.</p>
+        <p className="artifact-note">十六进制渲染仅显示预览中的前 512 字节。</p>
       )}
     </div>
   );
@@ -138,10 +144,10 @@ function RestorationView({ result }: { result: AnalysisResult }) {
   if (!selected) {
     return (
       <div className="artifact-backed">
-        <p className="view-intro">Restored content appears only when the analyzer advertises a controlled restored artifact.</p>
+        <p className="view-intro">只有分析器发布受控还原产物后，才会显示还原内容。</p>
         <div className="result-empty">
-          <strong>No restored artifact advertised</strong>
-          <p>{result.limitations?.[0] || "The analyzer did not produce extracted, decrypted, decompressed or reassembled output."}</p>
+          <strong>没有可用的还原产物</strong>
+          <p>{result.limitations?.[0] || "分析器没有生成提取、解密、解压或重组后的输出。"}</p>
         </div>
       </div>
     );
@@ -155,7 +161,7 @@ function RestorationView({ result }: { result: AnalysisResult }) {
     setExportError(null);
     try {
       const destination = await exportRestoredArtifact(result.taskId, selected.artifactId);
-      if (destination) setExportMessage(`Exported as ${destination}`);
+      if (destination) setExportMessage("已导出为 " + destination);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : String(error));
     }
@@ -163,23 +169,23 @@ function RestorationView({ result }: { result: AnalysisResult }) {
 
   return (
     <div className="restoration-view">
-      <p className="view-intro">Preview and export are restricted to restored artifacts registered by this task.</p>
+      <p className="view-intro">预览和导出仅限当前任务登记的受控还原产物。</p>
       <div className="restoration-heading">
         <div>
           <span className="finding-id">{selected.artifactId}</span>
-          <h4>{String(metadata.contentDescription || "Restored output")}</h4>
+          <h4>{String(metadata.contentDescription || "还原输出")}</h4>
         </div>
         <span className="restoration-state" data-state={overallState}>{restorationStateLabels[overallState]}</span>
       </div>
       {artifacts.length > 1 && (
         <label className="artifact-selector">
-          <span>Artifact</span>
+          <span>产物</span>
           <select value={selected.artifactId} onChange={(event) => setSelectedId(event.target.value)}>
             {artifacts.map((artifact) => <option key={artifact.artifactId} value={artifact.artifactId}>{artifact.artifactId}</option>)}
           </select>
         </label>
       )}
-      <div className="restoration-track" aria-label="Restoration stage status">
+      <div className="restoration-track" aria-label="还原阶段状态">
         {restorationStages.map((stage, index) => {
           const state = normalizeRestorationState(metadata[stage.key]);
           return (
@@ -193,21 +199,21 @@ function RestorationView({ result }: { result: AnalysisResult }) {
       </div>
       <div className="restoration-preview-heading">
         <div>
-          <strong>Controlled preview</strong>
-          <span>{selected.format} / {preview ? formatArtifactBytes(preview.totalBytes) : "size pending"}</span>
+          <strong>受控预览</strong>
+          <span>{selected.format} / {preview ? formatArtifactBytes(preview.totalBytes) : "正在读取大小"}</span>
         </div>
-        <button className="secondary compact" onClick={() => void handleExport()}>Export artifact</button>
+        <button className="secondary compact" onClick={() => void handleExport()}>导出产物</button>
       </div>
-      {loading && <p className="range-state">Reading the bounded artifact preview…</p>}
-      {previewError && <p className="error">Preview unavailable: {previewError}</p>}
+      {loading && <p className="range-state">正在读取受限大小的产物预览…</p>}
+      {previewError && <p className="error">无法预览： {previewError}</p>}
       {preview?.text !== undefined && <pre className="restoration-text-preview">{preview.text}</pre>}
       {preview && preview.text === undefined && <BinaryArtifactPreview preview={preview} />}
       {preview && !preview.eof && (
-        <p className="artifact-note">Preview shows {formatArtifactBytes(preview.previewBytes)} of {formatArtifactBytes(preview.totalBytes)}. Export copies the complete artifact.</p>
+        <p className="artifact-note">当前预览显示 {formatArtifactBytes(preview.previewBytes)}，完整产物大小为 {formatArtifactBytes(preview.totalBytes)}。导出操作会复制完整产物。</p>
       )}
       {exportMessage && <p className="export-status" role="status">{exportMessage}</p>}
-      {exportError && <p className="error">Export failed: {exportError}</p>}
-      <p className="restoration-safety">Restored content stays local. The preview is bounded and the original artifact is not written to application logs.</p>
+      {exportError && <p className="error">导出失败： {exportError}</p>}
+      <p className="restoration-safety">还原内容始终保留在本地；预览有大小限制，原始产物不会写入应用日志。</p>
     </div>
   );
 }
@@ -215,14 +221,14 @@ function RestorationView({ result }: { result: AnalysisResult }) {
 function EmptyResult() {
   return (
     <div className="result-empty">
-      <strong>No analysis result loaded</strong>
-      <p>Load the synthetic contract fixture or run the sidecar analysis task.</p>
+      <strong>尚未载入分析结果</strong>
+      <p>载入合成合同示例，或运行 Sidecar 分析任务。</p>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: AnalysisFinding["status"] }) {
-  return <span className={"decision decision-" + status.toLowerCase()}>{status}</span>;
+  return <span className={"decision decision-" + status.toLowerCase()}>{decisionLabels[status]}</span>;
 }
 
 function FindingCard({
@@ -247,36 +253,36 @@ function FindingCard({
       </div>
       <p className="finding-claim">{finding.claim}</p>
       <div className="finding-meta">
-        <span>model {scoreLabel(finding.scores?.model)}</span>
-        <span>evidence {scoreLabel(finding.scores?.evidence)}</span>
-        <span>verification {scoreLabel(finding.scores?.verification)}</span>
-        <span>{finding.evidenceIds.length} evidence link{finding.evidenceIds.length === 1 ? "" : "s"}</span>
+        <span>模型 {scoreLabel(finding.scores?.model)}</span>
+        <span>证据 {scoreLabel(finding.scores?.evidence)}</span>
+        <span>验证 {scoreLabel(finding.scores?.verification)}</span>
+        <span>{finding.evidenceIds.length} 证据 link{finding.evidenceIds.length === 1 ? "" : "s"}</span>
       </div>
       {finding.location && (
         <button className="link-button" onClick={() => onJump(finding.location as ByteLocation)}>
-          Inspect offset +{finding.location.offset} ({finding.location.length} bytes)
+          查看偏移 +{finding.location.offset} ({finding.location.length} 字节)
         </button>
       )}
       <div className="finding-review">
         <div className="review-heading">
-          <span>Local review</span>
+          <span>本地复核</span>
           {review && <StatusBadge status={review.decision} />}
         </div>
-        <div className="review-actions" role="group" aria-label={`Review ${finding.findingId}`}>
+        <div className="review-actions" role="group" aria-label={`复核 ${finding.findingId}`}>
           {(["ACCEPTED", "REJECTED", "UNCERTAIN"] as const).map((decision) => (
             <button
               className={review?.decision === decision ? "review-button selected" : "review-button"}
-              key={decision}
+              key={decisionLabels[decision]}
               onClick={() => setDecision(decision)}
               aria-pressed={review?.decision === decision}
               type="button"
             >
-              {decision}
+              {decisionLabels[decision]}
             </button>
           ))}
         </div>
         <label className="review-correction">
-          <span>Correction draft (local, not an accepted protocol fact)</span>
+          <span>修正草稿（仅保存在本地，不代表已接受的协议事实）</span>
           <textarea
             value={review?.correction ?? finding.claim}
             onChange={(event) => onReviewChange({
@@ -296,13 +302,13 @@ function EvidenceCard({ evidence }: { evidence: EvidenceRecord }) {
     <article className="evidence-card">
       <div className="finding-heading">
         <span className="finding-id">{evidence.evidenceId}</span>
-        {evidence.score !== undefined && <span className="evidence-score">score {evidence.score.toFixed(2)}</span>}
+        {evidence.score !== undefined && <span className="evidence-score">得分 {evidence.score.toFixed(2)}</span>}
       </div>
       <p className="evidence-source">{evidence.sourceComponent} / {evidence.method}</p>
       <dl className="evidence-facts">
-        <div><dt>Feature family</dt><dd>{evidence.featureFamily}</dd></div>
-        <div><dt>Samples</dt><dd>{evidence.sampleIds?.join(", ") || "—"}</dd></div>
-        <div><dt>Parents</dt><dd>{evidence.parentEvidenceIds?.join(", ") || "none"}</dd></div>
+        <div><dt>特征族</dt><dd>{evidence.featureFamily}</dd></div>
+        <div><dt>样本</dt><dd>{evidence.sampleIds?.join(", ") || "—"}</dd></div>
+        <div><dt>父证据</dt><dd>{evidence.parentEvidenceIds?.join(", ") || "无"}</dd></div>
       </dl>
       {evidence.observation && <pre className="observation">{JSON.stringify(evidence.observation, null, 2)}</pre>}
     </article>
@@ -333,11 +339,11 @@ function ArtifactCard({ artifact }: { artifact: ArtifactRef }) {
       </div>
       <p className="artifact-ref">{artifact.ref}</p>
       <div className="finding-meta">
-        <span>format {artifact.format}</span>
-        {artifact.count !== undefined && <span>{artifact.count} records</span>}
+        <span>格式 {artifact.format}</span>
+        {artifact.count !== undefined && <span>{artifact.count} 条记录</span>}
       </div>
       {artifact.metadata && <ArtifactMetadata metadata={artifact.metadata} />}
-      <p className="artifact-note">Controlled result reference; the UI does not inline the artifact.</p>
+      <p className="artifact-note">受控结果引用；界面不会直接内联大型产物。</p>
     </article>
   );
 }
@@ -347,9 +353,9 @@ function ArtifactBackedView({ view, artifacts }: { view: AnalysisViewName; artif
   const matches = artifacts.filter((artifact) => acceptedTypes.includes(artifact.type));
   return (
     <div className="artifact-backed">
-      <p className="view-intro">This view is backed by controlled result artifacts. Large tables stay outside the sidecar message.</p>
+      <p className="view-intro">此视图由受控结果产物提供数据，大型表格不会进入 Sidecar 消息。</p>
       {matches.length > 0 ? matches.map((artifact) => <ArtifactCard key={artifact.artifactId} artifact={artifact} />) : (
-        <div className="result-empty"><strong>No {labels[view].toLowerCase()} artifact advertised</strong><p>The analyzer has not returned a controlled artifact for this view.</p></div>
+        <div className="result-empty"><strong>没有{labels[view]}产物</strong><p>分析器尚未为此视图返回受控产物。</p></div>
       )}
     </div>
   );
@@ -365,7 +371,7 @@ export function AnalysisTabs({
   hasResult: boolean;
 }) {
   return (
-    <nav className="analysis-tabs" aria-label="Analysis result views">
+    <nav className="analysis-tabs" aria-label="分析结果视图">
       {(Object.keys(labels) as AnalysisViewName[]).map((view) => (
         <button className={active === view ? "tab active" : "tab"} key={view} disabled={!hasResult} onClick={() => onChange(view)}>
           {labels[view]}
@@ -400,17 +406,17 @@ export function AnalysisViewContent({
             review={reviews[finding.findingId]}
             onReviewChange={(review) => onReviewChange(finding.findingId, review)}
           />
-        )) : <div className="result-empty"><strong>No findings</strong><p>The result contains no protocol claims.</p></div>}
+        )) : <div className="result-empty"><strong>没有结论</strong><p>当前结果不包含协议结论。</p></div>}
       </div>
     );
   }
   if (view === "evidence") {
     const evidence = result.evidence || [];
-    return <div className="result-list">{evidence.length > 0 ? evidence.map((item) => <EvidenceCard key={item.evidenceId} evidence={item} />) : <div className="result-empty"><strong>No evidence records</strong><p>Evidence will appear when the analyzer publishes provenance.</p></div>}</div>;
+    return <div className="result-list">{evidence.length > 0 ? evidence.map((item) => <EvidenceCard key={item.evidenceId} evidence={item} />) : <div className="result-empty"><strong>没有证据记录</strong><p>分析器发布来源信息后，证据会显示在这里。</p></div>}</div>;
   }
   if (view === "artifacts") {
     const artifacts = result.artifacts || [];
-    return <div className="result-list">{artifacts.length > 0 ? artifacts.map((artifact) => <ArtifactCard key={artifact.artifactId} artifact={artifact} />) : <div className="result-empty"><strong>No artifacts</strong><p>The result contains no large-view references.</p></div>}</div>;
+    return <div className="result-list">{artifacts.length > 0 ? artifacts.map((artifact) => <ArtifactCard key={artifact.artifactId} artifact={artifact} />) : <div className="result-empty"><strong>没有产物</strong><p>当前结果不包含大型视图引用。</p></div>}</div>;
   }
   if (view === "restoration") return <RestorationView result={result} />;
   return <ArtifactBackedView view={view} artifacts={result.artifacts || []} />;

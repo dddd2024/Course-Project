@@ -11,7 +11,7 @@ installer. An installed Evidence Workbench therefore does not require a separate
 - current stable Rust with the `x86_64-pc-windows-msvc` host toolchain;
 - Visual Studio C++ build tools and WebView2 prerequisites required by Tauri.
 
-Install the project and packaging dependencies from the repository root:
+Recommended setup from the repository root:
 
 ```powershell
 python -m venv .venv
@@ -22,8 +22,15 @@ cd apps\desktop
 npm ci
 ```
 
-`PyInstaller==6.22.2` is intentionally exact. The build fails with an actionable message when it is
-missing or a different version is active.
+`PyInstaller==6.22.2` is intentionally exact. The desktop packaging script now checks the active
+`python` interpreter before every Sidecar build. If PyInstaller is missing or is a different
+version, it automatically installs the repository `[package]` extra into that same interpreter and
+then continues. This makes both `npm run sidecar:smoke` and `npm run bundle:windows` recover from the
+common `ModuleNotFoundError: No module named 'PyInstaller'` setup failure.
+
+If automatic installation itself fails, run the command printed by the script from the repository
+root (normally `python -m pip install -e ".[package]"`) and retry. Using the repository `.venv` is
+still recommended so packaging dependencies do not modify an unrelated global Python environment.
 
 ## Build and verify
 

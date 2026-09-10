@@ -26,6 +26,10 @@ dev = [
 package = [
   "pyinstaller==6.22.2",
 ]
+public-benchmark = [
+  "dpkt==1.9.8",
+  "scikit-learn==1.7.2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

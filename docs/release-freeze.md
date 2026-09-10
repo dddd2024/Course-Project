@@ -116,3 +116,22 @@ Only the following work remains outside this freeze:
 
 The arrival procedure and leakage controls are frozen in
 [`docs/teacher-data-ingress.md`](teacher-data-ingress.md).
+
+## 2026-09-10 public-data completion addendum
+
+The owner subsequently replaced teacher-data execution with a pinned public-data
+benchmark for the current delivery. This does not rewrite the historical
+`v0.1.0-pre-teacher` evidence above. The new runner verifies 12 NFStream
+capture/result pairs at commit
+`1426d78597bbb8dcf556d65e9b413208c898444f`, exports 102 public Modbus/TCP
+payloads to a 1,173-byte `.dat`, and runs the unchanged Sidecar analysis path.
+
+The executed behavior comparison is rule accuracy/macro-F1 `0.000/0.000` versus
+RandomForest `0.600/0.375` on a capture-disjoint 8-flow train / 5-flow test split.
+The protocol-specific structural recognizer validates 102/102 Modbus messages and
+restores 51 register values. The blind generic boundary F1 is
+`0.409448818898`; field-boundary, semantic and independent restoration metrics
+remain not evaluable because the public fixture does not provide that ground
+truth. Full identities and claim boundaries are in
+[`docs/public-data-benchmark.md`](public-data-benchmark.md) and
+`deliverables/public-benchmark/`.

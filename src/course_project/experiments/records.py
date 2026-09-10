@@ -2,7 +2,7 @@
 
 This module intentionally provides only the project-specific scientific contract.
 Generic experiment dashboards/storage can be layered on top later without changing
-teacher/synthetic claim discipline or metric evaluability semantics.
+public/teacher/synthetic claim discipline or metric evaluability semantics.
 """
 
 from __future__ import annotations
@@ -15,10 +15,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-CorpusKind = Literal["teacher", "synthetic", "other"]
+CorpusKind = Literal["teacher", "public", "synthetic", "other"]
 ResultScope = Literal["formal_benchmark", "mechanism"]
 ExperimentVariant = Literal[
     "heuristic",
+    "random_forest",
     "netzob_pre",
     "llm_only",
     "llm_verification",
@@ -48,10 +49,13 @@ MetricName = Literal[
     "risk_coverage",
     "processing_time_seconds",
     "token_cost_usd",
+    "behavior_accuracy",
+    "behavior_macro_f1",
 ]
 
 BASELINE_VARIANTS: tuple[ExperimentVariant, ...] = (
     "heuristic",
+    "random_forest",
     "netzob_pre",
     "llm_only",
     "llm_verification",
@@ -87,6 +91,8 @@ METRIC_GROUND_TRUTH: dict[MetricName, frozenset[GroundTruthCapability]] = {
     "risk_coverage": frozenset({"field_semantics"}),
     "processing_time_seconds": frozenset(),
     "token_cost_usd": frozenset(),
+    "behavior_accuracy": frozenset({"behavior_labels"}),
+    "behavior_macro_f1": frozenset({"behavior_labels"}),
 }
 
 _RATE_METRICS = frozenset(
@@ -100,6 +106,8 @@ _RATE_METRICS = frozenset(
         "restoration_accuracy",
         "accepted_field_coverage",
         "risk_coverage",
+        "behavior_accuracy",
+        "behavior_macro_f1",
     }
 )
 _LLM_VARIANTS = frozenset(
@@ -136,7 +144,7 @@ class DatasetIdentity:
         dataset_id = _text(self.dataset_id, "dataset_id")
         version = _text(self.version, "version")
         digest = self.sha256.strip().lower()
-        if self.corpus_kind not in {"teacher", "synthetic", "other"}:
+        if self.corpus_kind not in {"teacher", "public", "synthetic", "other"}:
             raise ExperimentValidationError(f"unsupported corpus_kind: {self.corpus_kind!r}")
         if not _HEX_64.fullmatch(digest):
             raise ExperimentValidationError("dataset sha256 must be exactly 64 lowercase hex digits")
@@ -246,9 +254,13 @@ class ExperimentRecord:
             raise ExperimentValidationError(f"unsupported result_scope: {self.result_scope!r}")
         if not isinstance(self.dataset, DatasetIdentity):
             raise TypeError("dataset must be DatasetIdentity")
-        if self.result_scope == "formal_benchmark" and self.dataset.corpus_kind != "teacher":
+        if self.result_scope == "formal_benchmark" and self.dataset.corpus_kind not in {
+            "teacher",
+            "public",
+        }:
             raise ExperimentValidationError(
-                "formal benchmark claims require a teacher corpus; synthetic/other results are mechanism evidence"
+                "formal benchmark claims require a teacher or pinned public corpus; "
+                "synthetic/other results are mechanism evidence"
             )
 
         code_sha = self.code_sha.strip().lower()

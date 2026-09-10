@@ -372,9 +372,12 @@ Unavailable metrics must be reported as `not evaluable from provided ground trut
 
 ## 13. Evaluation data policy
 
-### 13.1 Teacher-provided `.dat` — authoritative course evaluation input
+### 13.1 Auditable `.dat` evaluation input
 
-The official course evaluation input is the `.dat` data supplied by the teacher. After receipt, record only permitted metadata such as dataset identifier/hash/version, file size, redistribution status, preprocessing, and the labels/ground truth actually provided.
+The original plan used teacher-supplied `.dat`. For the 2026-09-10 delivery, the
+owner instead authorized pinned public data: NFStream PCAP payloads are exported to
+`.dat`, and source commit/hash/preprocessing plus only available ground truth are
+recorded. A later teacher file can still enter through the unchanged ingress.
 
 The inference pipeline must never read evaluation ground truth as an input feature.
 
@@ -407,7 +410,8 @@ V2 research implementation is considered minimally complete when:
 7. `LLM-only`, `LLM+verification`, and full `EvidenceGraph-PRE` are compared where the available data supports the comparison;
 8. one example shows an initially plausible but wrong hypothesis being rejected or downgraded;
 9. uncertainty/abstention is preserved rather than forcing a label;
-10. results can be reproduced from the teacher dataset metadata/configuration and, where used, explicitly identified controlled research fixtures.
+10. results can be reproduced from pinned teacher/public dataset metadata and
+configuration and, where used, explicitly identified controlled research fixtures.
 
 ## 15. Implementation priority
 

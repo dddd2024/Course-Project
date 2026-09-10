@@ -21,8 +21,8 @@ The result is intentionally:
 - `macro_f1 = null`;
 - an explicit `unavailable_reason`.
 
-Synthetic fixtures may test code correctness, but must not be presented as teacher
-behavior-classification benchmark results.
+Synthetic fixtures may test code correctness, but must not be presented as
+teacher/public behavior-classification benchmark results.
 
 ## Label-backed supervised evaluation
 
@@ -41,7 +41,7 @@ accuracy and macro-F1 over the observed true/predicted label set.
 
 ## Open-source policy
 
-Do not implement a custom RandomForest. If labeled teacher/session data becomes
+Do not implement a custom RandomForest. When labeled teacher/public session data is
 available and a supervised baseline is justified, prefer the mature open-source
 `scikit-learn` implementation, with flow/session-level or stronger splitting.
 
@@ -49,5 +49,7 @@ NFStream may be used as an optional upstream flow-feature source when real traff
 format and environment make it appropriate, but third-party objects must still stop
 at the adapter boundary and be normalized into project-native DTOs.
 
-This guard intentionally adds **no new runtime dependency**. Its purpose is to
-prevent unsupported metric claims, not to replace mature ML libraries.
+The runtime guard intentionally adds no installed-app dependency. The isolated
+`public-benchmark` extra now pins scikit-learn 1.7.2 and dpkt 1.9.8. The completed
+NFStream benchmark uses a capture/session-level 8/5 split and reports measured
+test accuracy/macro-F1 of 0.600/0.375; see `docs/public-data-benchmark.md`.

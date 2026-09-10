@@ -33,6 +33,15 @@ For Track B Windows installer work, install the separately pinned packaging extr
 python -m pip install -e ".[dev,package]"
 ```
 
+For the reproducible public-data experiment, install the isolated benchmark extra:
+
+```bash
+python -m pip install -e ".[dev,public-benchmark]"
+```
+
+This adds `dpkt==1.9.8` and `scikit-learn==1.7.2`; neither is required by the
+installed desktop runtime.
+
 The installed application does not require Python. PyInstaller is a build-time dependency used only
 to produce its bundled Sidecar executable. See `docs/windows-packaging.md`.
 
@@ -96,7 +105,9 @@ rustc --version
 cargo --version
 ```
 
-Formal experiments additionally record git SHA, dataset identifier supplied by the course, random seed, model/provider configuration and dependency versions as required by `docs/testing-plan.md`.
+Formal experiments additionally record git SHA, pinned teacher/public dataset
+identity, random seed, model/provider configuration and dependency versions as
+required by `docs/testing-plan.md`.
 
 ## Clean-machine gate
 

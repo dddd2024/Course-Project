@@ -10,10 +10,10 @@ The project-native experiment record API lives in `course_project.experiments`.
 
 It deliberately implements only the project-specific scientific contract:
 - canonical V2 baseline and ablation names;
-- dataset identity (`teacher / synthetic / other`, SHA-256, version and size);
+- dataset identity (`teacher / public / synthetic / other`, SHA-256, version and size);
 - declared ground-truth capabilities;
 - explicit `formal_benchmark` versus `mechanism` result scope;
-- teacher-only formal benchmark claims;
+- teacher or hash-pinned public formal benchmark claims;
 - metric evaluability derived from declared ground truth;
 - explicit not-evaluable metric records instead of fabricated numbers;
 - exact code SHA, configuration, seed, model/provider/version, dependency versions and artifact references;
@@ -21,6 +21,19 @@ It deliberately implements only the project-specific scientific contract:
 - fail-closed same-dataset cross-variant metric comparison.
 
 MLflow, Sacred, Hydra and BenchOpt were evaluated before adding the executable harness. They remain optional future orchestration/presentation layers rather than project dependencies: none encodes this repository's teacher-vs-synthetic claim discipline, canonical variants, ground-truth metric rules or Track D/Track C execution semantics. Project-native records remain authoritative and can be exported to a generic tracker later.
+
+## Public-data benchmark
+
+`scripts/run_public_benchmark.py` downloads or verifies an allowlisted subset of
+NFStream fixtures, extracts project-native flow features with dpkt, compares the
+existing rule baseline with scikit-learn RandomForest, exports public Modbus/TCP
+payloads into the required `.dat` form, and runs the production analysis path.
+
+The canonical sanitized results are in `deliverables/public-benchmark/`; source,
+split, metrics, limitations and reproduction steps are documented in
+`docs/public-data-benchmark.md`. Raw captures and generated `.dat` files remain
+ignored. This run is a small public formal benchmark, not a claim about unavailable
+teacher data or broad deployment performance.
 
 ## Synthetic mechanism execution
 

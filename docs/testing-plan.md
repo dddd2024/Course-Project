@@ -30,11 +30,13 @@
 - sidecar -> desktop fixture consumer。
 
 ### End-to-End Tests
-从老师提供的 `.dat` 输入到结构化解析输出；当老师同时提供答案、说明、协议 ground truth 或可验证还原结果时，再基于其实际提供内容计算可计算的 accuracy/F1/restoration 指标。
+从可审计的 `.dat` 输入到结构化解析输出；当前交付使用固定公开 PCAP 导出的
+Modbus/TCP 明文负载 `.dat`。只有数据同时提供答案、说明、协议 ground truth 或
+可验证还原结果时，才计算对应 accuracy/F1/restoration 指标。
 
 ## 2. Data Strategy
 
-### Teacher-provided evaluation data — authoritative course input
+### Auditable public/teacher evaluation data
 
 课程验收数据由老师提供，因此**开工前不人为制作一个假想的“正式测试数据集”来替代老师数据**。
 
@@ -48,7 +50,9 @@
 
 除非明确允许再分发，否则老师原始 `.dat` 文件保持在本地并继续受 `.gitignore` 保护。
 
-Full registration, metadata, answer-isolation, and arrival steps are documented in [teacher-data-ingress.md](teacher-data-ingress.md).
+2026-09-10 的交付决定以固定提交和哈希的 NFStream 公开数据替代未提供的老师
+数据；来源、划分和结果见 [public-data-benchmark.md](public-data-benchmark.md)。
+老师数据兼容入口仍保留，步骤见 [teacher-data-ingress.md](teacher-data-ingress.md)。
 
 ### Synthetic fixtures — engineering only
 
@@ -80,7 +84,8 @@ Full registration, metadata, answer-isolation, and arrival steps are documented 
 - Constraint Satisfaction Rate
 - Processing Time
 
-如果老师数据没有提供某项 ground truth，就明确标为 `not evaluable from provided ground truth`，不要自行杜撰标签。
+如果选定的老师/公开数据没有提供某项 ground truth，就明确标为
+`not evaluable from provided ground truth`，不要自行杜撰标签。
 
 ## 4. Behavior Metrics
 
@@ -90,7 +95,10 @@ Full registration, metadata, answer-isolation, and arrival steps are documented 
 - Confusion Matrix
 - per-class F1
 
-训练/测试必须至少按 flow/session 切分，禁止把同一 flow 的 packet 随机拆到 train 与 test 两侧。如果老师只给单一 `.dat` 且没有可用于监督分类的标签，则行为模块输出统计/聚类/候选类型证据，不虚构 supervised accuracy。
+训练/测试必须至少按 flow/session 切分，禁止把同一 flow 的 packet 随机拆到
+train 与 test 两侧。公开完成实验按源 capture/session 划分，比较规则基线与
+scikit-learn RandomForest。如果输入没有监督标签，则只输出统计/聚类/候选类型
+证据，不虚构 supervised accuracy。
 
 ## 5. Baselines
 
@@ -142,10 +150,11 @@ LLM + verifier + provenance-aware evidence fusion
 ## 8. Demo Gate
 
 进入最终演示候选前必须通过：
-1. 老师提供的 `.dat` 可以由统一 loader 读入，不需要改源码；
+1. 公开或老师提供的 `.dat` 可以由统一 loader 读入，不需要改源码；
 2. 至少一条 deterministic analysis path 在无 LLM/无网络时可运行并给出明确结果或限制；
 3. 至少一个 verifier 能对候选 hypothesis 给出可复现的 ACCEPTED/REJECTED/UNCERTAIN 证据；
 4. 若行为标签存在，行为分析输出可复现；若不存在，明确展示统计/聚类证据而不是伪造准确率；
 5. LLM/可选依赖不可用时系统明确报告降级状态；
 6. README 中最小运行步骤由非原作者成员复现一次；
-7. Desktop -> sidecar -> result contract 至少通过 fixed fixture 和一次真实老师数据演示链路。
+7. Desktop -> sidecar -> result contract 至少通过 fixed fixture 和一次真实公开
+   `.dat` 演示链路。

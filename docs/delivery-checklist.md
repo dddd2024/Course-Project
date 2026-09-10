@@ -15,6 +15,10 @@ The repository owner fixed the pre-teacher-data closure scope on 2026-09-09:
 
 These are explicit scope decisions, not evidence that omitted work occurred.
 
+On 2026-09-10 the owner superseded the data part of that decision: teacher `.dat`
+is not used for this delivery; a hash-pinned public corpus and a derived plaintext
+`.dat` complete the experiment path. The PPT exclusion remains unchanged.
+
 ## Product / demo
 
 - [x] V1 deterministic analysis produces inspectable results with LLM/network off.
@@ -46,7 +50,7 @@ teacher `.dat` import/execution test appears under the deferred section below.
 - [x] Open-source dependency/version/license register.
 - [x] Known limitations and scientific claim boundaries.
 
-The teacher-data testing/experiment report is deferred.
+- [x] Public-data testing/experiment report: `docs/public-data-benchmark.md`.
 
 ## Experiment evidence
 
@@ -60,8 +64,8 @@ The teacher-data testing/experiment report is deferred.
 - [x] Failures, abstention and uncertainty retained rather than deleted.
 - [x] Result table is regenerated from and linked to canonical records.
 
-All frozen records are under `deliverables/pre-teacher/`. Teacher dataset identity
-and formal benchmark metrics remain deferred.
+Frozen mechanism records remain under `deliverables/pre-teacher/`; public formal
+behavior and `.dat` E2E records are under `deliverables/public-benchmark/`.
 
 ## Submission / presentation assets
 
@@ -79,18 +83,19 @@ and formal benchmark metrics remain deferred.
 
 The user explicitly excluded a PPT from this delivery.
 
-## Deferred teacher-data work
+## Public-data replacement completion
 
-- [ ] Import and execute the authoritative teacher `.dat` through the unchanged
-  ingress.
-- [ ] Record the permitted teacher dataset identifier/hash and supplied
-  ground-truth capabilities.
-- [ ] Produce the teacher-data baseline/proposed comparison and only the metrics
-  supported by supplied ground truth.
-- [ ] Complete the formal teacher-data testing/experiment report and figures.
-- [ ] Run supervised behavior evaluation only if suitable flow/session labels exist.
-- [ ] Run a real-model semantic-quality/cost comparison only if the final report
-  chooses to include that claim.
+- [x] Download and verify public upstream captures and expected-result labels.
+- [x] Export public Modbus/TCP application payloads to the required `.dat` path.
+- [x] Execute inference, evidence, verification and structured artifact generation.
+- [x] Run rule versus RandomForest behavior evaluation with a capture/session split.
+- [x] Record supported metrics and mark unsupported field/restoration metrics as not
+  evaluable.
+- [x] Preserve the teacher-data ingress for compatibility without using teacher
+  data in this delivery.
+
+A real-model cost/quality comparison is intentionally out of scope because this
+delivery makes no real-provider claim and baseline CI remains credential-free.
 
 ## Freeze policy
 

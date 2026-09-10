@@ -1,0 +1,3 @@
+scenario,source_ground_truth_csv,start_time,end_time,time_basis,purpose
+browser_extension_drakon_dropper,E3-THEIA/node_Browser_Extension_Drakon_Dropper.csv,2018-04-12 12:40:00,2018-04-12 13:30:00,dataset timestamp basis as published by Theseus,attack-context window for behavior grouping
+firefox_backdoor_drakon_in_memory,E3-THEIA/node_Firefox_Backdoor_Drakon_In_Memory.csv,2018-04-10 14:30:00,2018-04-10 15:00:00,dataset timestamp basis as published by Theseus,attack-context window for behavior grouping

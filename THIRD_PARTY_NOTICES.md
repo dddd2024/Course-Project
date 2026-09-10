@@ -31,3 +31,23 @@ hooks. PyInstaller is Copyright (c) 2010-2023, PyInstaller Development Team; Cop
 
 The upstream licensing terms grant permission to embed and distribute the compiled bootloader with
 other programs. See https://github.com/pyinstaller/pyinstaller/blob/v6.22.2/COPYING.txt.
+
+## Wireshark `snakeoil-dtls.pcap` derived test data
+
+This repository redistributes two small binary test fixtures derived from the Wireshark test capture
+`test/captures/snakeoil-dtls.pcap`:
+
+- `test-data/dat/public-dtls-snakeoil-session.dat`
+- `test-data/dat/public-dtls-snakeoil-application-data.dat`
+
+Upstream:
+- https://gitlab.com/wireshark/wireshark/-/blob/master/test/captures/snakeoil-dtls.pcap
+- https://wiki.wireshark.org/SampleCaptures
+
+Upstream project license: GPL-2.0-or-later. The Wireshark sample catalog describes this capture as
+"DTLS handshake and encrypted payload." This project does not vendor or link Wireshark code.
+
+Project modification: the classic PCAP container and Ethernet/IPv4/UDP headers were removed, UDP
+payloads were concatenated in capture order, and a second fixture was filtered to the three
+post-handshake DTLS Application Data records. Exact provenance, hashes and byte ranges are recorded
+in `test-data/dat/public-dtls-snakeoil.source.json`.

@@ -65,3 +65,10 @@ Producers may report the following optional artifact metadata values without cha
 - `contentDescription` for a short factual label.
 
 Recognized states are complete, unavailable, failed, incomplete, not-required and unknown. Missing metadata remains unknown; the desktop does not infer successful decryption merely because a restored artifact exists. The built-in browser fixture is explicitly synthetic and exercises this UI before a Track A/C/D producer publishes a real restored artifact.
+
+
+## Session-only model settings
+
+The Chinese desktop interface includes a model settings drawer for an OpenAI-compatible Base URL, model/deployment name, API key, and structured-output mode. Settings are sent through typed Tauri IPC and kept only in Rust process memory. The key is injected into the Sidecar child environment and is not included in JSONL analysis requests, result files, exports, or logs.
+
+Changing or clearing model settings restarts the Sidecar and requires the input file to be selected again. Live model assistance is optional; the deterministic offline path remains the default.

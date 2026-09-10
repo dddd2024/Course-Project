@@ -35,6 +35,22 @@ export interface RangeData {
   eof: boolean;
 }
 
+export type StructuredOutputMode = "json_object" | "prompt_only";
+
+export interface LlmSessionSettings {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  structuredOutput: StructuredOutputMode;
+}
+
+export interface LlmConfigurationStatus {
+  configured: boolean;
+  endpointHost?: string;
+  model?: string;
+  inputReselectionRequired: boolean;
+}
+
 export interface RestoredArtifactPreview {
   artifactId: string;
   format: ArtifactRef["format"];
@@ -57,6 +73,55 @@ export function isDesktopRuntime() {
   return hasTauriRuntime();
 }
 
+function normalizeOpenAIEndpoint(baseUrl: string) {
+  const parsed = new URL(baseUrl.trim());
+  if (parsed.protocol !== "https:") throw new Error("Base URL 必须使用 HTTPS。");
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error("Base URL 不能包含凭据、查询参数或片段。");
+  }
+  let path = parsed.pathname;
+  while (path.endsWith("/")) path = path.slice(0, -1);
+  if (path.endsWith("/chat/completions")) {
+    parsed.pathname = path;
+  } else if (path.endsWith("/v1")) {
+    parsed.pathname = path + "/chat/completions";
+  } else if (!path) {
+    parsed.pathname = "/v1/chat/completions";
+  } else {
+    parsed.pathname = path + "/chat/completions";
+  }
+  return parsed.toString();
+}
+
+export async function configureLlmSession(settings: LlmSessionSettings): Promise<LlmConfigurationStatus> {
+  const endpoint = normalizeOpenAIEndpoint(settings.baseUrl);
+  if (!settings.model.trim()) throw new Error("请填写模型名称。");
+  if (!settings.apiKey.trim()) throw new Error("请填写 API Key。");
+  if (!hasTauriRuntime()) {
+    return {
+      configured: true,
+      endpointHost: new URL(endpoint).hostname,
+      model: settings.model.trim(),
+      inputReselectionRequired: false,
+    };
+  }
+  return invoke<LlmConfigurationStatus>("configure_llm", {
+    settings: {
+      endpoint,
+      model: settings.model.trim(),
+      apiKey: settings.apiKey.trim(),
+      structuredOutput: settings.structuredOutput,
+    },
+  });
+}
+
+export async function clearLlmSession(): Promise<LlmConfigurationStatus> {
+  if (!hasTauriRuntime()) {
+    return { configured: false, inputReselectionRequired: false };
+  }
+  return invoke<LlmConfigurationStatus>("configure_llm", { settings: null });
+}
+
 export async function selectInput(): Promise<InputMetadata | null> {
   if (!hasTauriRuntime()) return null;
   return invoke<InputMetadata | null>("select_input");
@@ -70,9 +135,9 @@ export async function inspectInput(inputRef: string): Promise<InputMetadata> {
   return invoke<InputMetadata>("inspect_file", { inputRef });
 }
 
-export async function startTask(failureMode: boolean, inputRef?: string): Promise<string> {
+export async function startTask(failureMode: boolean, inputRef?: string, llmEnabled = false): Promise<string> {
   if (hasTauriRuntime()) {
-    return invoke<string>("start_contract_spike", { failureMode, inputRef });
+    return invoke<string>("start_contract_spike", { failureMode, inputRef, llmEnabled });
   }
 
   const id = `browser-${Date.now()}`;
@@ -80,7 +145,8 @@ export async function startTask(failureMode: boolean, inputRef?: string): Promis
     ["INSPECTING", "inspect_file", 0.12, "Inspecting file contract"],
     ["ANALYZING", "calculate_features", 0.44, "Calculating byte-level features"],
     ["ANALYZING", "detect_boundaries", 0.72, "Scoring message boundaries"],
-    ["VERIFYING", "verify_hypotheses", 0.9, "Preparing verification result"],
+    ...(llmEnabled ? [["ANALYZING", "llm", 0.82, "正在请求模型生成候选假设"]] as const : []),
+    ["VERIFYING", "verify_hypotheses", 0.9, "正在验证候选假设"],
     ["COMPLETED", "completed", 1, "Contract spike completed"],
   ] as const;
 

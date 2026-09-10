@@ -24,6 +24,7 @@ struct AppState {
     tasks: Arc<Mutex<HashMap<String, TaskLifecycle>>>,
     sidecar: Arc<Mutex<Option<SidecarClient>>>,
     next_id: Arc<AtomicU64>,
+    llm_config: Arc<Mutex<Option<LlmSessionConfig>>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,6 +40,7 @@ impl Default for AppState {
             tasks: Arc::new(Mutex::new(HashMap::new())),
             sidecar: Arc::new(Mutex::new(None)),
             next_id: Arc::new(AtomicU64::new(1)),
+            llm_config: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -86,6 +88,34 @@ struct RangeData {
     encoding: String,
     bytes: String,
     eof: bool,
+}
+
+#[derive(Clone)]
+struct LlmSessionConfig {
+    endpoint: String,
+    model: String,
+    api_key: String,
+    structured_output: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LlmSessionSettings {
+    endpoint: String,
+    model: String,
+    api_key: String,
+    structured_output: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LlmConfigurationStatus {
+    configured: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    endpoint_host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<String>,
+    input_reselection_required: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -195,7 +225,7 @@ impl Drop for SidecarClient {
 }
 
 impl SidecarClient {
-    fn spawn() -> Result<Self, String> {
+    fn spawn(llm_config: Option<&LlmSessionConfig>) -> Result<Self, String> {
         let state_dir = sidecar_state_dir()?;
         fs::create_dir_all(&state_dir)
             .map_err(|error| format!("cannot create sidecar state directory: {error}"))?;
@@ -220,6 +250,16 @@ impl SidecarClient {
         let program_display = program.display().to_string();
         let mut command = Command::new(program);
         command.args(args);
+        if let Some(config) = llm_config {
+            command
+                .env("COURSE_PROJECT_LLM_ENDPOINT", &config.endpoint)
+                .env("COURSE_PROJECT_LLM_MODEL", &config.model)
+                .env("COURSE_PROJECT_LLM_API_KEY", &config.api_key)
+                .env(
+                    "COURSE_PROJECT_LLM_STRUCTURED_OUTPUT",
+                    &config.structured_output,
+                );
+        }
         if python_mode {
             let mut python_paths = vec![Path::new(env!("CARGO_MANIFEST_DIR"))
                 .ancestors()
@@ -392,12 +432,17 @@ fn sidecar_request<T: DeserializeOwned>(
     method: &str,
     params: Value,
 ) -> Result<T, String> {
+    let llm_config = state
+        .llm_config
+        .lock()
+        .map_err(|_| "model configuration is unavailable".to_string())?
+        .clone();
     let mut guard = state
         .sidecar
         .lock()
         .map_err(|_| "sidecar state is unavailable".to_string())?;
     if guard.is_none() {
-        *guard = Some(SidecarClient::spawn()?);
+        *guard = Some(SidecarClient::spawn(llm_config.as_ref())?);
     }
     let result = guard
         .as_mut()
@@ -460,6 +505,91 @@ fn read_range(
         "read_range",
         json!({"inputRef": input_ref, "offset": offset, "length": length}),
     )
+}
+
+fn validate_llm_settings(
+    settings: LlmSessionSettings,
+) -> Result<(LlmSessionConfig, String), String> {
+    let endpoint = settings.endpoint.trim().to_string();
+    let remainder = endpoint
+        .strip_prefix("https://")
+        .ok_or_else(|| "model endpoint must use HTTPS".to_string())?;
+    let authority = remainder.split('/').next().unwrap_or_default();
+    let endpoint_host = authority.to_string();
+    if authority.is_empty()
+        || authority.contains('@')
+        || endpoint.contains('?')
+        || endpoint.contains('#')
+        || endpoint.chars().any(char::is_whitespace)
+        || endpoint.len() > 2048
+    {
+        return Err("model endpoint is not a safe OpenAI-compatible HTTPS URL".to_string());
+    }
+
+    let model = settings.model.trim().to_string();
+    if model.is_empty() || model.len() > 200 || model.chars().any(char::is_control) {
+        return Err("model name must contain 1 to 200 printable characters".to_string());
+    }
+    let api_key = settings.api_key.trim().to_string();
+    if api_key.is_empty() || api_key.len() > 8192 || api_key.chars().any(char::is_whitespace) {
+        return Err("API key must be non-empty and contain no whitespace".to_string());
+    }
+    if !matches!(
+        settings.structured_output.as_str(),
+        "json_object" | "prompt_only"
+    ) {
+        return Err("unsupported structured output mode".to_string());
+    }
+
+    Ok((
+        LlmSessionConfig {
+            endpoint,
+            model,
+            api_key,
+            structured_output: settings.structured_output,
+        },
+        endpoint_host,
+    ))
+}
+
+#[tauri::command]
+fn configure_llm(
+    settings: Option<LlmSessionSettings>,
+    state: State<'_, AppState>,
+) -> Result<LlmConfigurationStatus, String> {
+    let has_running_task = state
+        .tasks
+        .lock()
+        .map_err(|_| "task state is unavailable".to_string())?
+        .values()
+        .any(|lifecycle| *lifecycle == TaskLifecycle::Running);
+    if has_running_task {
+        return Err("cannot change model settings while an analysis task is running".to_string());
+    }
+
+    let prepared = settings.map(validate_llm_settings).transpose()?;
+    let endpoint_host = prepared.as_ref().map(|(_, host)| host.clone());
+    let model = prepared.as_ref().map(|(config, _)| config.model.clone());
+    let config = prepared.map(|(config, _)| config);
+    let configured = config.is_some();
+    *state
+        .llm_config
+        .lock()
+        .map_err(|_| "model configuration is unavailable".to_string())? = config;
+
+    let input_reselection_required = state
+        .sidecar
+        .lock()
+        .map_err(|_| "sidecar state is unavailable".to_string())?
+        .take()
+        .is_some();
+
+    Ok(LlmConfigurationStatus {
+        configured,
+        endpoint_host,
+        model,
+        input_reselection_required,
+    })
 }
 
 fn emit_update(app: &AppHandle, update: TaskUpdate) {
@@ -538,12 +668,17 @@ fn read_controlled_result(result_ref: &str) -> Result<Value, String> {
 }
 
 fn request_task_result_ref(state: &AppState, task_id: &str) -> Result<String, String> {
+    let llm_config = state
+        .llm_config
+        .lock()
+        .map_err(|_| "model configuration is unavailable".to_string())?
+        .clone();
     let mut guard = state
         .sidecar
         .lock()
         .map_err(|_| "sidecar state is unavailable".to_string())?;
     if guard.is_none() {
-        *guard = Some(SidecarClient::spawn()?);
+        *guard = Some(SidecarClient::spawn(llm_config.as_ref())?);
     }
     let result = guard
         .as_mut()
@@ -638,12 +773,40 @@ fn run_sidecar_analysis(
     state: &AppState,
     task_id: &str,
     input_ref: &str,
+    llm_enabled: bool,
 ) -> Result<(), String> {
+    let mode = if llm_enabled {
+        "evidencegraph"
+    } else {
+        "baseline"
+    };
+    let stages = if llm_enabled {
+        vec![
+            "inspect",
+            "features",
+            "boundary",
+            "inference",
+            "evidence",
+            "llm",
+            "verification",
+            "behavior",
+        ]
+    } else {
+        vec![
+            "inspect",
+            "features",
+            "boundary",
+            "inference",
+            "evidence",
+            "verification",
+            "behavior",
+        ]
+    };
     let params = json!({
         "inputRef": input_ref,
-        "mode": "baseline",
-        "stages": ["inspect", "features", "boundary", "inference", "evidence", "verification", "behavior"],
-        "llmEnabled": false,
+        "mode": mode,
+        "stages": stages,
+        "llmEnabled": llm_enabled,
         "verificationEnabled": true,
         "behaviorEnabled": true,
         "timeoutSeconds": 300,
@@ -664,12 +827,17 @@ fn run_sidecar_analysis(
     );
 
     let messages = {
+        let llm_config = state
+            .llm_config
+            .lock()
+            .map_err(|_| "model configuration is unavailable".to_string())?
+            .clone();
         let mut guard = state
             .sidecar
             .lock()
             .map_err(|_| "sidecar state is unavailable".to_string())?;
         if guard.is_none() {
-            *guard = Some(SidecarClient::spawn()?);
+            *guard = Some(SidecarClient::spawn(llm_config.as_ref())?);
         }
         let result = guard
             .as_mut()
@@ -798,7 +966,19 @@ fn start_contract_spike(
     state: State<'_, AppState>,
     failure_mode: bool,
     input_ref: Option<String>,
+    llm_enabled: bool,
 ) -> Result<String, String> {
+    if llm_enabled
+        && state
+            .llm_config
+            .lock()
+            .map_err(|_| "model configuration is unavailable".to_string())?
+            .is_none()
+    {
+        return Err(
+            "configure an OpenAI-compatible model before enabling LLM analysis".to_string(),
+        );
+    }
     let id = format!("contract-{}", state.next_id.fetch_add(1, Ordering::SeqCst));
     state
         .tasks
@@ -810,7 +990,9 @@ fn start_contract_spike(
     let task_id = id.clone();
     tauri::async_runtime::spawn(async move {
         if let Some(input_ref) = input_ref {
-            if let Err(error) = run_sidecar_analysis(&app, &task_state, &task_id, &input_ref) {
+            if let Err(error) =
+                run_sidecar_analysis(&app, &task_state, &task_id, &input_ref, llm_enabled)
+            {
                 if !finish_task_if_running(&task_state, &task_id) {
                     return;
                 }
@@ -947,8 +1129,9 @@ fn cancel_contract_spike(
 mod tests {
     use super::{
         bundled_sidecar_candidates, cancel_task_if_running, find_restored_artifact,
-        finish_task_if_running, read_artifact_preview, resolve_controlled_path, AppState,
-        SidecarClient, TaskLifecycle, SIDECAR_EXECUTABLE_NAME,
+        finish_task_if_running, read_artifact_preview, resolve_controlled_path,
+        validate_llm_settings, AppState, LlmConfigurationStatus, LlmSessionSettings, SidecarClient,
+        TaskLifecycle, SIDECAR_EXECUTABLE_NAME,
     };
 
     #[test]
@@ -986,6 +1169,53 @@ mod tests {
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    #[test]
+    fn llm_session_settings_are_validated_without_serializing_the_secret() {
+        let (config, host) = validate_llm_settings(LlmSessionSettings {
+            endpoint: "https://provider.example/v1/chat/completions".to_string(),
+            model: "deployment-name".to_string(),
+            api_key: "session-secret".to_string(),
+            structured_output: "json_object".to_string(),
+        })
+        .expect("valid HTTPS settings should be accepted");
+        assert_eq!(host, "provider.example");
+        assert_eq!(
+            config.endpoint,
+            "https://provider.example/v1/chat/completions"
+        );
+
+        let status = LlmConfigurationStatus {
+            configured: true,
+            endpoint_host: Some(host),
+            model: Some(config.model),
+            input_reselection_required: true,
+        };
+        let serialized = serde_json::to_string(&status).expect("status should serialize");
+        assert!(!serialized.contains("session-secret"));
+        assert!(!serialized.contains("apiKey"));
+
+        for endpoint in [
+            "http://provider.example/v1/chat/completions",
+            "https://user:pass@provider.example/v1/chat/completions",
+            "https://provider.example/v1/chat/completions?debug=true",
+        ] {
+            assert!(validate_llm_settings(LlmSessionSettings {
+                endpoint: endpoint.to_string(),
+                model: "deployment-name".to_string(),
+                api_key: "session-secret".to_string(),
+                structured_output: "json_object".to_string(),
+            })
+            .is_err());
+        }
+        assert!(validate_llm_settings(LlmSessionSettings {
+            endpoint: "https://provider.example/v1/chat/completions".to_string(),
+            model: "deployment-name".to_string(),
+            api_key: "secret with whitespace".to_string(),
+            structured_output: "json_object".to_string(),
+        })
+        .is_err());
+    }
 
     #[test]
     fn bundled_sidecar_candidates_cover_release_and_test_executables() {
@@ -1072,7 +1302,7 @@ mod tests {
         let sample = root.join("sample.dat");
         fs::write(&sample, b"header\0payload").expect("sample should be writable");
 
-        let mut client = SidecarClient::spawn().expect("Python sidecar should start");
+        let mut client = SidecarClient::spawn(None).expect("Python sidecar should start");
         let registered: serde_json::Value = client
             .request(
                 "register_input",
@@ -1139,7 +1369,7 @@ mod tests {
         let sample = root.join("sample.dat");
         fs::write(&sample, b"header\0payload").expect("sample should be writable");
 
-        let mut client = SidecarClient::spawn().expect("Python sidecar should start");
+        let mut client = SidecarClient::spawn(None).expect("Python sidecar should start");
         let registered: serde_json::Value = client
             .request(
                 "register_input",
@@ -1173,6 +1403,7 @@ fn main() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             start_contract_spike,
+            configure_llm,
             get_analysis_result,
             read_restored_artifact,
             export_restored_artifact,

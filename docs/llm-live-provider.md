@@ -108,3 +108,12 @@ A working live-provider path is **mechanism infrastructure**, not an LLM benchma
 ## Testing
 
 CI never calls a real provider. Provider unit tests inject deterministic JSON transports. Production semantic-path tests inject deterministic provider implementations and separately verify that missing live configuration fails closed. The blocking deterministic/desktop path continues to require no external network access or credentials.
+
+
+### Desktop session configuration
+
+The Tauri desktop UI exposes an OpenAI-compatible model settings drawer. The user supplies a Base URL, model identifier, API key, and structured-output mode for the current application session.
+
+The WebView normalizes a Base URL to the chat-completions endpoint and sends the settings through a typed Tauri command. Rust validates the HTTPS endpoint and holds the secret only in process memory. When it starts the Python Sidecar, it injects the existing `COURSE_PROJECT_LLM_*` environment variables into that child process. The API key is never added to the Sidecar JSON Lines request, analysis config, task result, provider metadata, or logs.
+
+Changing or clearing model settings restarts the Sidecar. Because input handles belong to one Sidecar process, the UI clears the current input and asks the user to select it again. The offline deterministic path remains the default and works without credentials or network access.

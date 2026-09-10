@@ -15,7 +15,7 @@ def _run(script: str, *args: str) -> None:
         [sys.executable, str(EXAMPLES / script), *args],
         check=True,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
 
 

@@ -239,6 +239,11 @@ def run_dataset_c(dataset_dir: Path) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows stdout/stderr may not be UTF-8; the summary prints Chinese.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset_dir", help="generated dataset directory")
     args = parser.parse_args(argv)

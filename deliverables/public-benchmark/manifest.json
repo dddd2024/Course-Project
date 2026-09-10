@@ -1,0 +1,133 @@
+{
+  "artifacts": [
+    "behavior-benchmark.json",
+    "protocol-e2e.json"
+  ],
+  "captures": [
+    {
+      "behavior_label": "QUERY",
+      "expected_sha256": "0362de174ab2e801fee7508f3582e1e260e05cc2483b13162458852ebf415208",
+      "expected_size": 172,
+      "name": "dns_doh.pcap",
+      "pcap_sha256": "b1459348b4a72c24e5646fdc05131ded69afb2fc543dc5568d004807939554c4",
+      "pcap_size": 22658,
+      "role": "behavior",
+      "split": "train"
+    },
+    {
+      "behavior_label": "QUERY",
+      "expected_sha256": "688d881d97f306f62ff48b207a7fabf86f4895dd87a5b0c6741280f7f2be3c1f",
+      "expected_size": 170,
+      "name": "dns_dot.pcap",
+      "pcap_sha256": "8f6125abecbf0e28ab824246581ba5fa3b42dcdeb8626d191f25e63699b5fb78",
+      "pcap_size": 6277,
+      "role": "behavior",
+      "split": "train"
+    },
+    {
+      "behavior_label": "QUERY",
+      "expected_sha256": "79a7a735bd087dbd264b5d8d406c84bb4cc3aec7c375a07dcdfc7b285f90a3d5",
+      "expected_size": 170,
+      "name": "quic_q43.pcap",
+      "pcap_sha256": "22e7770422ca53b91a77da4876312ae4dbfc39e25116b9e21bf2efaeb01a07a7",
+      "pcap_size": 1520,
+      "role": "behavior",
+      "split": "test"
+    },
+    {
+      "behavior_label": "DOWNLOAD",
+      "expected_sha256": "ce4185c92e47281eabafc7812cad738137c022cb532fcd76d97c307606b0d5cb",
+      "expected_size": 167,
+      "name": "exe_download.pcap",
+      "pcap_sha256": "7e08d61b8eec4d2ff98fa7a2443a989d7a856d32a2117eef77c6f01b7b74e0f1",
+      "pcap_size": 728735,
+      "role": "behavior",
+      "split": "train"
+    },
+    {
+      "behavior_label": "DOWNLOAD",
+      "expected_sha256": "2892c0900acf3596115aecf820ec54af82532aff1ef7ae0dbeace9a72e9f5aff",
+      "expected_size": 171,
+      "name": "bittorrent_utp.pcap",
+      "pcap_sha256": "ceea173e2af386e5e25952053b449b2ffcb86169dce3b2e0c6e26b2013758cc0",
+      "pcap_size": 42889,
+      "role": "behavior",
+      "split": "test"
+    },
+    {
+      "behavior_label": "UPLOAD",
+      "expected_sha256": "47d45c8021ee0357b690ebd51f5d80e5f9ecaeba26511eaf8b91d539e7649c23",
+      "expected_size": 258,
+      "name": "youtubeupload.pcap",
+      "pcap_sha256": "3400d571eb44598093e084ca39707e28a230dc897ec6b133df58e92cea741861",
+      "pcap_size": 131592,
+      "role": "behavior",
+      "split": "train"
+    },
+    {
+      "behavior_label": "UPLOAD",
+      "expected_sha256": "356046b355d8f7e6eb06a6541170aeb7790350e97862d1f1538e22359f3fb384",
+      "expected_size": 175,
+      "name": "quic_q46_b.pcap",
+      "pcap_sha256": "7d8de27e2c1b9979109b9295e133f790f46afab50abf8be49b4bc0cc78402d53",
+      "pcap_size": 7364,
+      "role": "behavior",
+      "split": "test"
+    },
+    {
+      "behavior_label": "STREAM",
+      "expected_sha256": "0e4236d4b1eab976fe5a16caa0de362f76ad061952a77bb02316ac794b45cd46",
+      "expected_size": 167,
+      "name": "mpeg.pcap",
+      "pcap_sha256": "88a72f98e1f4e2875c09f2502f6aea288329bb7cc419822fdca7b9b4e7ba45bf",
+      "pcap_size": 11964,
+      "role": "behavior",
+      "split": "train"
+    },
+    {
+      "behavior_label": "STREAM",
+      "expected_sha256": "a5f34a1fd936a1c4611dffc24a3efc83c4aa457b056af155a3238455c5d3f9a5",
+      "expected_size": 171,
+      "name": "quic046.pcap",
+      "pcap_sha256": "f21beb7c3340ecbd15b6203179854e45816daa0b831090ed7c39957211c425fc",
+      "pcap_size": 92921,
+      "role": "behavior",
+      "split": "train"
+    },
+    {
+      "behavior_label": "STREAM",
+      "expected_sha256": "fd23d5f2e9e93b14c5a17a7bce7c3e3376e6b068688ce98bc16380b33cf212d8",
+      "expected_size": 163,
+      "name": "mpegts.pcap",
+      "pcap_sha256": "61c6a263a09c8bae574007d292058ca9218d3d80f223cc269c2ca66a00d37d68",
+      "pcap_size": 1402,
+      "role": "behavior",
+      "split": "test"
+    },
+    {
+      "behavior_label": "STREAM",
+      "expected_sha256": "7c6bf4ce12e0ac1f8aa4d305a7b094663d88d0df5c28712bb3708b74b5f973e7",
+      "expected_size": 159,
+      "name": "rtsp_setup_http.pcapng",
+      "pcap_sha256": "a0df37ae11d9351f58a0ef0976fba55557055b6de1ce9de9d380dde747f7b8f0",
+      "pcap_size": 708,
+      "role": "behavior",
+      "split": "test"
+    },
+    {
+      "behavior_label": null,
+      "expected_sha256": "aad86b077562ff911fe6fffac4338e1e85b67b4feb85e49ae75c0a9bdebd9f52",
+      "expected_size": 168,
+      "name": "modbus.pcap",
+      "pcap_sha256": "9e055a2d15a8e447be131002137341ae5f8f8b91b64576cd2fdbd854e141373e",
+      "pcap_size": 8337,
+      "role": "protocol",
+      "split": null
+    }
+  ],
+  "rawCapturesCommitted": false,
+  "schemaVersion": 1,
+  "sourceCommit": "1426d78597bbb8dcf556d65e9b413208c898444f",
+  "sourceLicense": "LGPL-3.0",
+  "sourceRepository": "https://github.com/nfstream/nfstream"
+}

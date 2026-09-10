@@ -6,6 +6,7 @@ import {
   cancelTask,
   clearLlmSession,
   configureLlmSession,
+  exportReviewJson,
   getAnalysisResult,
   inspectInput,
   isDesktopRuntime,
@@ -340,6 +341,8 @@ export function App() {
   const [llmStatus, setLlmStatus] = useState<LlmConfigurationStatus>({ configured: false, inputReselectionRequired: false });
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const [reviewExporting, setReviewExporting] = useState(false);
+  const [reviewExportError, setReviewExportError] = useState<string | null>(null);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -458,6 +461,7 @@ export function App() {
     setAnalysisError(null);
     setFindingReviews({});
     setSessionNotice(null);
+    setReviewExportError(null);
     setUpdate({ ...initialUpdate, message: "正在启动分析任务。" });
     try {
       setTaskId(await startTask(failureMode, input?.inputRef, llmEnabled));
@@ -479,6 +483,7 @@ export function App() {
     setActiveView("findings");
     setFocusedLocation(null);
     setFindingReviews({});
+    setReviewExportError(null);
   }
 
   function jumpToLocation(location: ByteLocation) {
@@ -490,8 +495,8 @@ export function App() {
     setFindingReviews((current) => ({ ...current, [findingId]: review }));
   }
 
-  function exportReview() {
-    if (!analysisResult) return;
+  async function exportReview() {
+    if (!analysisResult || reviewExporting) return;
     const payload = {
       protocolVersion: 1,
       taskId: analysisResult.taskId,
@@ -504,13 +509,17 @@ export function App() {
       })),
       limitations: ["本地复核文件不包含原始字节，也不等同于已验证的协议结论。"],
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = analysisResult.taskId + "-review.json";
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setReviewExporting(true);
+    setReviewExportError(null);
+    setSessionNotice(null);
+    try {
+      const exportedName = await exportReviewJson(payload, analysisResult.taskId + "-review.json");
+      setSessionNotice(exportedName ? "复核 JSON 已导出：" + exportedName : "已取消导出复核 JSON。");
+    } catch (error) {
+      setReviewExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setReviewExporting(false);
+    }
   }
 
   async function stopTask() {
@@ -660,9 +669,12 @@ export function App() {
               </div>
               <div className="result-actions">
                 <button className="quiet-button" onClick={loadFixture}>载入合成示例</button>
-                <button className="quiet-button" disabled={!analysisResult} onClick={exportReview}>导出复核 JSON</button>
+                <button className="quiet-button" disabled={!analysisResult || reviewExporting} onClick={() => void exportReview()}>
+                  {reviewExporting ? "正在导出…" : "导出复核 JSON"}
+                </button>
               </div>
             </div>
+            {reviewExportError && <p className="error">导出复核 JSON 失败：{reviewExportError}</p>}
             {analysisResult && <p className="review-summary">已在本地复核 {Object.keys(findingReviews).length} / {analysisResult.findings.length} 条结论；分析器原始状态保持不变。</p>}
             <AnalysisTabs active={activeView} onChange={setActiveView} hasResult={analysisResult !== null} />
             {focusedLocation && (

@@ -1,3 +1,5 @@
+mod review_export;
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -1407,6 +1409,7 @@ fn main() {
             get_analysis_result,
             read_restored_artifact,
             export_restored_artifact,
+            review_export::export_review_json,
             cancel_contract_spike,
             select_input,
             inspect_file,

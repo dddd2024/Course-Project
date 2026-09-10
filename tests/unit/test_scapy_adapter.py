@@ -6,7 +6,12 @@ import struct
 import pytest
 
 from course_project.io import scapy_adapter
-from course_project.io.scapy_adapter import extract_packets, is_dpkt_available, is_scapy_available
+from course_project.io.scapy_adapter import (
+    PcapExtractionResult,
+    extract_packets,
+    is_dpkt_available,
+    is_scapy_available,
+)
 
 
 def _dtls_pcap() -> bytes:
@@ -34,11 +39,10 @@ def _dtls_pcap() -> bytes:
     return global_header + packet_header + ethernet
 
 
-def _assert_dtls_packet(result: object) -> None:
-    assert getattr(result, "status") == "ok"
-    packets = getattr(result, "packets")
-    assert len(packets) == 1
-    packet = packets[0]
+def _assert_dtls_packet(result: PcapExtractionResult) -> None:
+    assert result.status == "ok"
+    assert len(result.packets) == 1
+    packet = result.packets[0]
     assert packet.index == 0
     assert packet.transport == "udp"
     assert packet.src == "10.0.0.1:50000"

@@ -16,7 +16,9 @@ For that reason the blocking runtime contains only a small Python-standard-libra
 
 ## Production EvidenceGraph-PRE integration
 
-`llmEnabled=true` now makes the production Track C semantic backend invoke the configured `LLMHypothesisProvider`. The provider is resolved lazily: when `llmEnabled=false`, the backend delegates to the deterministic path without loading LLM configuration, reading an API-key environment variable, or performing network work.
+`llmEnabled=true` makes the production Track C semantic backend invoke the configured `LLMHypothesisProvider`. The provider is resolved lazily: when LLM use is disabled, the backend delegates to the deterministic path without loading LLM configuration, reading an API-key environment variable, or performing network work.
+
+The desktop application keeps its frozen request offline-safe, but the CLI/packaged Sidecar now supports an explicit process-level opt-in through `COURSE_PROJECT_LLM_ENABLED=1`. When that variable is enabled, the Sidecar upgrades the effective semantic configuration to `llmEnabled=true`; when it is absent or false, the existing deterministic behavior is unchanged. Invalid enable values fail closed instead of silently enabling network access.
 
 The integration is deliberately narrower than a general agent or provider gateway:
 
@@ -50,6 +52,7 @@ Default environment variables:
 
 | Variable | Meaning |
 | --- | --- |
+| `COURSE_PROJECT_LLM_ENABLED` | Desktop/Sidecar live-LLM opt-in. Accepts `1/0`, `true/false`, `yes/no`, or `on/off`; defaults off. |
 | `COURSE_PROJECT_LLM_ENDPOINT` | Exact HTTPS chat-completions endpoint, for example a provider's `/v1/chat/completions` URL |
 | `COURSE_PROJECT_LLM_MODEL` | Provider model identifier |
 | `COURSE_PROJECT_LLM_API_KEY_ENV` | Optional name of the environment variable that holds the secret; defaults to `COURSE_PROJECT_LLM_API_KEY` |
@@ -57,7 +60,21 @@ Default environment variables:
 | `COURSE_PROJECT_LLM_TIMEOUT_SECONDS` | Positive finite request timeout, default `30` |
 | `COURSE_PROJECT_LLM_STRUCTURED_OUTPUT` | `json_object` (default) or `prompt_only` |
 
-The API key value is not stored on the config object, returned in provider metadata, or written to experiment records. It is resolved from the configured secret environment variable at call time.
+The API key value is not stored on the provider config object, returned in provider metadata, or written to experiment records. It is resolved from the configured secret environment variable at call time.
+
+For PowerShell development, set the variables in the same shell before starting Tauri:
+
+```powershell
+$env:COURSE_PROJECT_LLM_ENABLED="1"
+$env:COURSE_PROJECT_LLM_ENDPOINT="https://provider.example/v1/chat/completions"
+$env:COURSE_PROJECT_LLM_MODEL="provider-model-id"
+$env:COURSE_PROJECT_LLM_API_KEY="replace-with-local-secret"
+$env:COURSE_PROJECT_LLM_STRUCTURED_OUTPUT="json_object"
+cd apps\desktop
+npm run tauri dev
+```
+
+The repository `.env.example` is a configuration reference; the application does not silently load secrets from that file. For an installed application launched outside the configuring PowerShell process, provide the variables through the normal user/process environment before launch. Never commit a populated `.env` or API key.
 
 ## Security and fail-closed behavior
 

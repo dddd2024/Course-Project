@@ -154,3 +154,11 @@ def test_boundary_and_inference_chain_join() -> None:
     assert {m.message_id for m in messages_dto} == {
         id_ for f in families for id_ in f.message_ids
     }
+
+
+def test_input_metadata_detects_pcap_disguised_as_dat() -> None:
+    stream = load_raw(b"\xd4\xc3\xb2\xa1" + b"\x00" * 16, source_id="s", format="dat")
+    meta = input_metadata(stream)
+    assert meta.kind == "pcap"
+    assert meta.metadata["declared_format"] == "dat"
+    assert meta.metadata["container"] == "pcap"

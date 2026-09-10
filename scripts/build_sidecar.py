@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -164,11 +165,46 @@ def _read_response(stream: IO[str]) -> dict[str, Any]:
     return response
 
 
+def _await_result_ref(stream: IO[str]) -> str:
+    for _ in range(32):
+        response = _read_response(stream)
+        result_ref = response.get("resultRef")
+        if isinstance(result_ref, str) and result_ref.startswith("tasks/"):
+            return result_ref
+    raise RuntimeError("packaged sidecar analyze did not return a controlled resultRef")
+
+
+def _dtls_pcap_fixture() -> bytes:
+    """Return a minimal classic-PCAP Ethernet/IPv4/UDP/DTLS fixture."""
+    dtls = b"\x17\xfe\xfd\x00\x01" + b"\x00" * 6 + b"\x00\x04test"
+    udp = struct.pack("!HHHH", 50000, 443, 8 + len(dtls), 0) + dtls
+    ipv4 = struct.pack(
+        "!BBHHHBBH4s4s",
+        0x45,
+        0,
+        20 + len(udp),
+        0,
+        0,
+        64,
+        17,
+        0,
+        b"\x0a\x00\x00\x01",
+        b"\x0a\x00\x00\x02",
+    ) + udp
+    ethernet = b"\x00" * 6 + b"\x01" * 6 + b"\x08\x00" + ipv4
+    global_header = struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1)
+    packet_header = struct.pack("<IIII", 1, 0, len(ethernet), len(ethernet))
+    return global_header + packet_header + ethernet
+
+
 def smoke_sidecar(executable: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="course-project-sidecar-smoke-") as temp:
         temp_root = Path(temp)
+        state_dir = temp_root / "state"
         sample = temp_root / "sample.dat"
         sample.write_bytes(b"header\x00payload")
+        capture = temp_root / "dtls-capture.dat"
+        capture.write_bytes(_dtls_pcap_fixture())
         child_environment = dict(os.environ)
         child_environment.pop("PYTHONHOME", None)
         child_environment.pop("PYTHONPATH", None)
@@ -176,7 +212,7 @@ def smoke_sidecar(executable: Path) -> None:
             Path(child_environment.get("SystemRoot", r"C:\Windows")) / "System32"
         )
         process = subprocess.Popen(
-            [str(executable), "--state-dir", str(temp_root / "state")],
+            [str(executable), "--state-dir", str(state_dir)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -221,18 +257,53 @@ def smoke_sidecar(executable: Path) -> None:
                 },
                 task_id,
             )
-            result_ref = None
-            for _ in range(32):
-                response = _read_response(process.stdout)
-                if "resultRef" in response:
-                    result_ref = response["resultRef"]
-                    break
-            if not isinstance(result_ref, str) or not result_ref.startswith("tasks/"):
-                raise RuntimeError("packaged sidecar analyze did not return a controlled resultRef")
+            result_ref = _await_result_ref(process.stdout)
             _write_request(process.stdin, "get_result", {"taskId": task_id}, "package-smoke-result")
             result = _read_response(process.stdout)
             if result.get("resultRef") != result_ref:
                 raise RuntimeError("packaged sidecar get_result did not return the analysis result")
+
+            _write_request(
+                process.stdin,
+                "register_input",
+                {"sourceRef": capture.as_posix()},
+                "package-pcap-register",
+            )
+            pcap_registered = _read_response(process.stdout)
+            pcap_input_ref = pcap_registered["data"]["inputRef"]
+            pcap_task_id = "package-pcap-dtls-analysis"
+            _write_request(
+                process.stdin,
+                "analyze",
+                {
+                    "inputRef": pcap_input_ref,
+                    "mode": "baseline",
+                    "stages": ["inspect", "features"],
+                    "llmEnabled": False,
+                    "verificationEnabled": False,
+                    "behaviorEnabled": False,
+                    "timeoutSeconds": 30,
+                    "optionalDependencyPolicy": "fail",
+                },
+                pcap_task_id,
+            )
+            pcap_result_ref = _await_result_ref(process.stdout)
+            pcap_result_path = state_dir / pcap_result_ref
+            pcap_result = json.loads(pcap_result_path.read_text(encoding="utf-8"))
+            metrics = pcap_result.get("metrics", {})
+            expected = {
+                "preprocessContainer": "pcap",
+                "protocolHint": "dtls",
+                "genericInferenceGated": True,
+                "fieldCandidateCount": 0,
+            }
+            for key, value in expected.items():
+                if metrics.get(key) != value:
+                    raise RuntimeError(
+                        "packaged Sidecar PCAP/DTLS smoke failed: "
+                        f"expected metrics[{key!r}]={value!r}, got {metrics.get(key)!r}"
+                    )
+
             process.stdin.close()
             return_code = process.wait(timeout=15)
             if return_code != 0:
@@ -253,7 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--smoke",
         action="store_true",
-        help="exercise register_input and read_range using the packaged executable",
+        help="exercise raw and PCAP/DTLS analysis using the packaged executable",
     )
     parser.add_argument(
         "--smoke-executable",

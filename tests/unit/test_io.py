@@ -109,3 +109,17 @@ def test_load_raw_rejects_str() -> None:
 def test_byte_stream_requires_non_empty_source_id() -> None:
     with pytest.raises(ValueError):
         ByteStream(source_id="", data=b"\x00")
+
+
+def test_load_dat_can_read_bounded_prefix(tmp_path) -> None:
+    path = tmp_path / "capture.dat"
+    path.write_bytes(RAW * 10)
+    stream = load_dat(path, max_bytes=7)
+    assert stream.data == (RAW * 10)[:7]
+
+
+def test_load_dat_rejects_invalid_max_bytes(tmp_path) -> None:
+    path = tmp_path / "capture.dat"
+    path.write_bytes(RAW)
+    with pytest.raises(InputError):
+        load_dat(path, max_bytes=0)

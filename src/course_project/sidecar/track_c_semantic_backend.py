@@ -89,7 +89,7 @@ class DeterministicTrackCSemanticBackend:
                 ),
             )
 
-        raw = input_path.read_bytes()
+        raw = _read_message_window(input_path, messages)
         message_bytes = _message_bytes(raw, messages)
         family_message_ids = {
             family.family_id: family.message_ids for family in families
@@ -462,6 +462,16 @@ def _selection_metric(
         "verificationScore": item.verification_score,
     }
 
+
+def _read_message_window(
+    input_path: Path, messages: tuple[MessageCandidate, ...]
+) -> bytes:
+    """Read only the source prefix referenced by Track D message candidates."""
+    end_offset = max((message.end_offset for message in messages), default=0)
+    if end_offset <= 0:
+        return b""
+    with input_path.open("rb") as handle:
+        return handle.read(end_offset)
 
 def _message_bytes(
     raw: bytes, messages: tuple[MessageCandidate, ...]

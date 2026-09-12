@@ -330,6 +330,7 @@ export function App() {
   const [rangeOffset, setRangeOffset] = useState(0);
   const [loadingRange, setLoadingRange] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [selectingInput, setSelectingInput] = useState(false);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -397,19 +398,23 @@ export function App() {
   const isRunning = taskId !== null && !["COMPLETED", "FAILED", "CANCELLED"].includes(update.status);
   const stageName = useMemo(() => stageLabel[update.stage] || update.stage.replace(/_/g, " "), [update.stage]);
   const assistantText = useMemo(() => {
+    if (selectingInput) return "正在读取文件元数据并计算 SHA-256。大文件会分块处理，界面仍可继续响应。";
     if (update.status === "FAILED") return "分析未完成。请查看错误信息，修正配置或输入后重新运行。";
     if (update.status === "COMPLETED" && analysisResult) {
+      const largeProfile = analysisResult.metrics?.largeRawProfile as { summary?: string } | null | undefined;
+      if (largeProfile?.summary) return largeProfile.summary + "。详细统计已保存到大文件画像工件中。";
       return "分析已完成，共生成 " + analysisResult.findings.length + " 条结论和 " + (analysisResult.evidence?.length || 0) + " 条证据记录。模型输出仍需经过确定性验证后才会成为已接受结论。";
     }
     if (update.status === "COMPLETED") return "分析已完成，正在读取结构化结果。";
     if (isRunning) return "正在执行“" + stageName + "”。界面会保留每条结论对应的证据与字节位置。";
     if (input) return "文件已登记。你可以使用离线分析，也可以启用已配置的模型来辅助生成协议语义假设。";
     return "选择一个 .dat、.bin、.pcap 或 .pcapng 文件开始。原始字节只通过受控范围读取。";
-  }, [analysisResult, input, isRunning, stageName, update.status]);
+  }, [analysisResult, input, isRunning, selectingInput, stageName, update.status]);
 
   async function handleSelectInput() {
     setInputError(null);
     setSessionNotice(null);
+    setSelectingInput(true);
     try {
       const selected = await selectInput();
       if (!selected) {
@@ -421,6 +426,8 @@ export function App() {
       setRangeOffset(0);
     } catch (error) {
       setInputError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSelectingInput(false);
     }
   }
 
@@ -558,10 +565,10 @@ export function App() {
 
           <section className="sidebar-section">
             <div className="step-label"><span>1</span>选择数据</div>
-            <button className="file-drop" onClick={() => void handleSelectInput()}>
+            <button className="file-drop" disabled={selectingInput || isRunning} onClick={() => void handleSelectInput()}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5" /></svg>
-              <strong>{input ? "更换输入文件" : "选择二进制文件"}</strong>
-              <small>.dat · .bin · .pcap · .pcapng</small>
+              <strong>{selectingInput ? "正在登记大文件…" : input ? "更换输入文件" : "选择二进制文件"}</strong>
+              <small>{selectingInput ? "正在分块计算文件哈希，请稍候" : ".dat · .bin · .pcap · .pcapng"}</small>
             </button>
             {input && (
               <div className="file-summary">
@@ -718,3 +725,4 @@ export function App() {
     </main>
   );
 }
+

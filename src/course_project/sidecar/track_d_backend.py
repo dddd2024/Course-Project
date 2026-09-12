@@ -10,7 +10,14 @@ from course_project.behavior import extract_behavior_features, from_packet_candi
 from course_project.boundary import detect_boundaries, to_message_candidates
 from course_project.exporters.protocol_schema import build_protocol_schema
 from course_project.inference import family_analysis, infer_field_candidates
-from course_project.io import ExtractedPacket, load_bin, load_dat, load_raw, preprocess
+from course_project.io import (
+    ExtractedPacket,
+    detect_container,
+    load_bin,
+    load_dat,
+    load_raw,
+    preprocess,
+)
 from course_project.models import (
     AnalysisResult,
     ArtifactRef,
@@ -18,11 +25,15 @@ from course_project.models import (
     InputMetadata,
     PacketCandidate,
 )
+from course_project.sidecar.large_raw_profile import profile_large_raw_file
 from course_project.sidecar.semantic_bridge import (
     SemanticAnalysis,
     SemanticBackend,
     validate_semantic_analysis,
 )
+
+_DEFAULT_RAW_ANALYSIS_BYTES = 1024 * 1024
+_CONTAINER_SNIFF_BYTES = 4
 
 _EVALUATION_ONLY_CONFIG_KEYS = frozenset(
     {
@@ -59,9 +70,17 @@ class TrackDBaselineBackend:
         *,
         state_dir: Path,
         semantic_backend: SemanticBackend | None = None,
+        max_raw_analysis_bytes: int = _DEFAULT_RAW_ANALYSIS_BYTES,
     ) -> None:
+        if (
+            not isinstance(max_raw_analysis_bytes, int)
+            or isinstance(max_raw_analysis_bytes, bool)
+            or max_raw_analysis_bytes < 1
+        ):
+            raise ValueError("max_raw_analysis_bytes must be a positive integer")
         self.state_dir = state_dir.expanduser().resolve()
         self.semantic_backend = semantic_backend
+        self.max_raw_analysis_bytes = max_raw_analysis_bytes
 
     def analyze(
         self,
@@ -104,10 +123,57 @@ class TrackDBaselineBackend:
                 ),
             )
 
+        with input_path.open("rb") as handle:
+            detected_container = detect_container(handle.read(_CONTAINER_SNIFF_BYTES))
+        analysis_truncated = input_metadata.size_bytes > self.max_raw_analysis_bytes
+        if analysis_truncated and detected_container in {"pcap", "pcapng"}:
+            input_metadata.kind = detected_container
+            input_metadata.metadata["container"] = detected_container
+            input_metadata.metadata.setdefault("declaredKind", kind)
+            return AnalysisResult(
+                task_id=task_id,
+                status="partial",
+                input_id=input_metadata.input_id,
+                metrics={
+                    "analysisBackend": "track-d-baseline-v1",
+                    "inputSizeBytes": input_metadata.size_bytes,
+                    "analyzedBytes": _CONTAINER_SNIFF_BYTES,
+                    "analysisTruncated": True,
+                    "analysisWindowBytes": self.max_raw_analysis_bytes,
+                    "mode": config["mode"],
+                    "trackDExecuted": False,
+                    "semanticExecuted": False,
+                    "preprocessContainer": detected_container,
+                    "genericInferenceGated": True,
+                },
+                limitations=(
+                    (
+                        f"The {detected_container.upper()} container is larger than the "
+                        f"{self.max_raw_analysis_bytes}-byte safe analysis window. Its container "
+                        "was identified without loading the complete capture; streaming packet "
+                        "extraction is required before deeper analysis."
+                    ),
+                ),
+            )
+
+        large_raw_profile = (
+            profile_large_raw_file(input_path, size_bytes=input_metadata.size_bytes)
+            if analysis_truncated and detected_container == "unknown"
+            else None
+        )
+        raw_limit = self.max_raw_analysis_bytes if analysis_truncated else None
         if kind == "dat":
-            source_stream = load_dat(input_path, source_id=input_metadata.input_id)
+            source_stream = load_dat(
+                input_path,
+                source_id=input_metadata.input_id,
+                max_bytes=raw_limit,
+            )
         elif kind == "bin":
-            source_stream = load_bin(input_path, source_id=input_metadata.input_id)
+            source_stream = load_bin(
+                input_path,
+                source_id=input_metadata.input_id,
+                max_bytes=raw_limit,
+            )
         else:
             source_stream = load_raw(
                 input_path.read_bytes(),
@@ -204,6 +270,18 @@ class TrackDBaselineBackend:
                 count=len(field_candidates),
             ),
         ]
+        if large_raw_profile is not None:
+            artifacts.append(
+                self._write_artifact(
+                    artifact_dir=artifact_dir,
+                    task_id=task_id,
+                    artifact_id="track-d-large-raw-profile",
+                    artifact_type="statistics",
+                    filename="large-raw-profile.json",
+                    payload=large_raw_profile,
+                    count=len(large_raw_profile.get("conclusions", [])),
+                )
+            )
 
         behavior = None
         requested_stages = set(config.get("stages") or ())
@@ -276,6 +354,10 @@ class TrackDBaselineBackend:
 
         statistics = {
             "inputSizeBytes": input_metadata.size_bytes,
+            "analyzedBytes": len(source_stream.data),
+            "analysisTruncated": analysis_truncated,
+            "analysisWindowBytes": self.max_raw_analysis_bytes,
+            "largeRawProfile": large_raw_profile,
             "packetCount": len(packets),
             "messageCount": len(messages),
             "familyCount": len(families),
@@ -304,6 +386,13 @@ class TrackDBaselineBackend:
         )
 
         limitations = list(semantic.limitations if semantic is not None else ())
+        if analysis_truncated:
+            limitations.append(
+                f"Analysis used the first {len(source_stream.data)} bytes of the "
+                f"{input_metadata.size_bytes}-byte raw input to keep memory and runtime "
+                "bounded. Reported offsets remain absolute, and range inspection remains "
+                "available for the complete registered file."
+            )
         if known_protocol_gated:
             limitations.append(
                 f"Known protocol {prepared.protocol_hint!r} was structurally identified after "
@@ -477,3 +566,4 @@ def _reject_evaluation_only_config(config: Mapping[str, Any]) -> None:
                 )
             if isinstance(value, Mapping):
                 pending.append((path, value))
+

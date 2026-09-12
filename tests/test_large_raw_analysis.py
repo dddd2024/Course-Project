@@ -66,3 +66,53 @@ def test_large_pcap_named_dat_is_sniffed_without_full_analysis(tmp_path: Path) -
     assert result.metrics["analyzedBytes"] == 4
     assert result.metrics["trackDExecuted"] is False
     assert "streaming packet extraction" in result.limitations[0]
+
+
+def test_large_raw_profile_conclusions_are_visible_findings(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    capture = tmp_path / "profiled.dat"
+    capture.write_bytes(bytes.fromhex("1000e8c0") * 2)
+    metadata = InputMetadata(
+        input_id="profiled-large-raw",
+        kind="dat",
+        size_bytes=capture.stat().st_size,
+    )
+    profile = {
+        "bytesScanned": capture.stat().st_size,
+        "conclusions": [
+            {
+                "claim": "候选负载呈高熵且不可压缩",
+                "confidence": "high",
+                "basis": ["熵接近 8 bit/Byte", "zlib 比率接近 1"],
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        "course_project.sidecar.track_d_backend.profile_large_raw_file",
+        lambda path, *, size_bytes: profile,
+    )
+
+    result = TrackDBaselineBackend(
+        state_dir=tmp_path / "state",
+        max_raw_analysis_bytes=4,
+    ).analyze(
+        task_id="large-profile-findings",
+        input_metadata=metadata,
+        input_path=capture,
+        config=_config(),
+    )
+
+    assert len(result.findings) == 1
+    assert result.findings[0].claim == "候选负载呈高熵且不可压缩"
+    assert result.findings[0].status == "uncertain"
+    assert result.findings[0].evidence_ids == ("track-d-large-raw-evidence-1",)
+    assert result.findings[0].scores["evidence"] == 0.9
+    assert result.evidence[0].observation["basis"] == [
+        "熵接近 8 bit/Byte",
+        "zlib 比率接近 1",
+    ]
+    assert result.metrics["findingCount"] == 1
+    assert result.metrics["largeRawFindingCount"] == 1
+    assert result.metrics["semanticFindingCount"] == 0

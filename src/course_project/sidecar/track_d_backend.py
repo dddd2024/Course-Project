@@ -19,9 +19,11 @@ from course_project.io import (
     preprocess,
 )
 from course_project.models import (
+    AnalysisFinding,
     AnalysisResult,
     ArtifactRef,
     ArtifactType,
+    Evidence,
     InputMetadata,
     PacketCandidate,
 )
@@ -34,6 +36,65 @@ from course_project.sidecar.semantic_bridge import (
 
 _DEFAULT_RAW_ANALYSIS_BYTES = 1024 * 1024
 _CONTAINER_SNIFF_BYTES = 4
+_LARGE_RAW_CONFIDENCE_SCORES = {
+    "high": 0.9,
+    "medium-high": 0.8,
+    "medium": 0.65,
+    "low": 0.4,
+}
+
+
+def _large_raw_result_items(
+    profile: dict[str, Any] | None,
+) -> tuple[tuple[AnalysisFinding, ...], tuple[Evidence, ...]]:
+    """Expose deterministic large-file claims without marking them verified."""
+
+    if profile is None:
+        return (), ()
+
+    findings: list[AnalysisFinding] = []
+    evidence: list[Evidence] = []
+    for index, item in enumerate(profile.get("conclusions") or (), start=1):
+        if not isinstance(item, Mapping):
+            continue
+        claim = item.get("claim")
+        if not isinstance(claim, str) or not claim.strip():
+            continue
+        confidence = str(item.get("confidence") or "medium")
+        score = _LARGE_RAW_CONFIDENCE_SCORES.get(confidence, 0.5)
+        basis_value = item.get("basis")
+        basis = (
+            [str(value) for value in basis_value] if isinstance(basis_value, (list, tuple)) else []
+        )
+        evidence_id = f"track-d-large-raw-evidence-{index}"
+        evidence.append(
+            Evidence(
+                evidence_id=evidence_id,
+                source_component="track-d-large-raw-profile",
+                method="bounded-full-file-structural-profile",
+                feature_family="encrypted-record-structure",
+                score=score,
+                observation={
+                    "claim": claim,
+                    "confidence": confidence,
+                    "basis": basis,
+                    "bytesScanned": int(profile.get("bytesScanned") or 0),
+                },
+                independence_group="track-d-large-raw-profile",
+            )
+        )
+        findings.append(
+            AnalysisFinding(
+                finding_id=f"track-d-large-raw-finding-{index}",
+                claim=claim,
+                status="uncertain",
+                evidence_ids=(evidence_id,),
+                semantic_type="encrypted-record-structure",
+                scores={"evidence": score},
+            )
+        )
+    return tuple(findings), tuple(evidence)
+
 
 _EVALUATION_ONLY_CONFIG_KEYS = frozenset(
     {
@@ -323,6 +384,11 @@ class TrackDBaselineBackend:
             and self.semantic_backend is not None
             else None
         )
+        large_raw_findings, large_raw_evidence = _large_raw_result_items(large_raw_profile)
+        semantic_findings = semantic.findings if semantic is not None else ()
+        semantic_evidence = semantic.evidence if semantic is not None else ()
+        findings = large_raw_findings + semantic_findings
+        evidence = large_raw_evidence + semantic_evidence
 
         if semantic is not None and semantic.evidence:
             artifacts.append(
@@ -365,8 +431,11 @@ class TrackDBaselineBackend:
             "fieldCandidateCount": len(field_candidates),
             "behaviorComputed": behavior is not None,
             "semanticExecuted": semantic is not None,
-            "findingCount": len(semantic.findings) if semantic is not None else 0,
-            "evidenceCount": len(semantic.evidence) if semantic is not None else 0,
+            "findingCount": len(findings),
+            "evidenceCount": len(evidence),
+            "semanticFindingCount": len(semantic_findings),
+            "semanticEvidenceCount": len(semantic_evidence),
+            "largeRawFindingCount": len(large_raw_findings),
             "verifiedFieldCount": len(semantic.verified_fields) if semantic is not None else 0,
             "preprocessContainer": prepared.container,
             "protocolHint": prepared.protocol_hint,
@@ -438,9 +507,9 @@ class TrackDBaselineBackend:
         return AnalysisResult(
             task_id=task_id,
             status=status,
-            findings=semantic.findings if semantic is not None else (),
+            findings=findings,
             input_id=input_metadata.input_id,
-            evidence=semantic.evidence if semantic is not None else (),
+            evidence=evidence,
             artifacts=tuple(artifacts),
             metrics=metrics,
             limitations=tuple(limitations),

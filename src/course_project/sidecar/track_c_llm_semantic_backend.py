@@ -47,6 +47,7 @@ from course_project.sidecar.track_c_semantic_backend import (
     _fusion_metric,
     _independence_group,
     _message_bytes,
+    _read_message_window,
     _register_hypotheses,
     _sample_ids,
     _selection_metric,
@@ -179,7 +180,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
             )
 
         del packets, behavior
-        raw = input_path.read_bytes()
+        raw = _read_message_window(input_path, messages)
         message_bytes = _message_bytes(raw, messages)
         family_message_ids = {
             family.family_id: family.message_ids for family in families

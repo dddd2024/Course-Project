@@ -430,7 +430,7 @@ impl SidecarClient {
 }
 
 fn sidecar_request<T: DeserializeOwned>(
-    state: &State<'_, AppState>,
+    state: &AppState,
     method: &str,
     params: Value,
 ) -> Result<T, String> {
@@ -479,17 +479,27 @@ async fn select_input(
     let path = file
         .into_path()
         .map_err(|error| format!("cannot access selected input: {error:?}"))?;
-    sidecar_request(
-        &state,
-        "register_input",
-        json!({"sourceRef": path.to_string_lossy().replace('\\', "/")}),
-    )
+    let source_ref = path.to_string_lossy().replace('\\', "/");
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        sidecar_request(
+            &app_state,
+            "register_input",
+            json!({"sourceRef": source_ref}),
+        )
+    })
+    .await
+    .map_err(|error| format!("input registration failed: {error}"))?
     .map(Some)
 }
 
 #[tauri::command]
 fn inspect_file(input_ref: String, state: State<'_, AppState>) -> Result<InputMetadata, String> {
-    sidecar_request(&state, "inspect_file", json!({"inputRef": input_ref}))
+    sidecar_request(
+        state.inner(),
+        "inspect_file",
+        json!({"inputRef": input_ref}),
+    )
 }
 
 #[tauri::command]
@@ -503,7 +513,7 @@ fn read_range(
         return Err("length must be between 1 and 1048576 bytes".to_string());
     }
     sidecar_request(
-        &state,
+        state.inner(),
         "read_range",
         json!({"inputRef": input_ref, "offset": offset, "length": length}),
     )

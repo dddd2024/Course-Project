@@ -456,6 +456,71 @@ fn sidecar_request<T: DeserializeOwned>(
     result
 }
 
+fn stage_selected_input(source: &Path, staging_root: &Path, id: u64) -> Result<PathBuf, String> {
+    fs::create_dir_all(staging_root)
+        .map_err(|error| format!("cannot create local input staging directory: {error}"))?;
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .filter(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "dat" | "bin" | "pcap" | "pcapng"
+            )
+        })
+        .unwrap_or("dat");
+    let target = staging_root.join(format!("selected-input-{id}.{extension}"));
+    if fs::hard_link(source, &target).is_err() {
+        fs::copy(source, &target)
+            .map_err(|error| format!("cannot copy selected input into local staging: {error}"))?;
+    }
+    Ok(target)
+}
+
+fn register_selected_input(state: &AppState, path: &Path) -> Result<InputMetadata, String> {
+    let source_metadata = fs::metadata(path)
+        .map_err(|error| format!("cannot access selected input file: {error}"))?;
+    if !source_metadata.is_file() {
+        return Err("selected input is not a regular file".to_string());
+    }
+    let original_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("selected input")
+        .to_string();
+    let source_ref = path.to_string_lossy().replace('\\', "/");
+    match sidecar_request::<InputMetadata>(
+        state,
+        "register_input",
+        json!({"sourceRef": source_ref}),
+    ) {
+        Ok(mut registered) => {
+            registered.source_name = original_name;
+            return Ok(registered);
+        }
+        Err(error) if error.contains("sourceRef must point to an existing regular file") => {}
+        Err(error) => return Err(error),
+    }
+
+    let staging_root = sidecar_state_dir()?.join("selected-inputs");
+    let sequence = state.next_id.fetch_add(1, Ordering::SeqCst);
+    let staged = stage_selected_input(path, &staging_root, sequence)?;
+    let staged_ref = staged.to_string_lossy().replace('\\', "/");
+    let result =
+        sidecar_request::<InputMetadata>(state, "register_input", json!({"sourceRef": staged_ref}));
+    match result {
+        Ok(mut registered) => {
+            registered.source_name = original_name;
+            Ok(registered)
+        }
+        Err(error) => {
+            let _ = fs::remove_file(staged);
+            Err(format!(
+                "selected file was staged locally but registration still failed: {error}"
+            ))
+        }
+    }
+}
 #[tauri::command]
 async fn select_input(
     app: AppHandle,
@@ -479,18 +544,11 @@ async fn select_input(
     let path = file
         .into_path()
         .map_err(|error| format!("cannot access selected input: {error:?}"))?;
-    let source_ref = path.to_string_lossy().replace('\\', "/");
     let app_state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        sidecar_request(
-            &app_state,
-            "register_input",
-            json!({"sourceRef": source_ref}),
-        )
-    })
-    .await
-    .map_err(|error| format!("input registration failed: {error}"))?
-    .map(Some)
+    tauri::async_runtime::spawn_blocking(move || register_selected_input(&app_state, &path))
+        .await
+        .map_err(|error| format!("input registration failed: {error}"))?
+        .map(Some)
 }
 
 #[tauri::command]
@@ -1142,8 +1200,8 @@ mod tests {
     use super::{
         bundled_sidecar_candidates, cancel_task_if_running, find_restored_artifact,
         finish_task_if_running, read_artifact_preview, resolve_controlled_path,
-        validate_llm_settings, AppState, LlmConfigurationStatus, LlmSessionSettings, SidecarClient,
-        TaskLifecycle, SIDECAR_EXECUTABLE_NAME,
+        stage_selected_input, validate_llm_settings, AppState, LlmConfigurationStatus,
+        LlmSessionSettings, SidecarClient, TaskLifecycle, SIDECAR_EXECUTABLE_NAME,
     };
 
     #[test]
@@ -1182,6 +1240,33 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    #[test]
+    fn selected_input_can_be_staged_from_unicode_path() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("selected-input-staging-{suffix}"));
+        let source_dir = root.join("中文 目录");
+        fs::create_dir_all(&source_dir).expect("unicode source directory should be writable");
+        let source = source_dir.join("测试 文件.dat");
+        fs::write(&source, b"large-input-probe").expect("source should be writable");
+
+        let staged = stage_selected_input(&source, &root.join("staged"), 7)
+            .expect("selected input should be staged");
+
+        assert_eq!(
+            staged.file_name().and_then(|value| value.to_str()),
+            Some("selected-input-7.dat")
+        );
+        assert_eq!(
+            fs::read(staged).expect("staged input should be readable"),
+            b"large-input-probe"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
     #[test]
     fn llm_session_settings_are_validated_without_serializing_the_secret() {
         let (config, host) = validate_llm_settings(LlmSessionSettings {

@@ -12,6 +12,15 @@ from course_project.sidecar.runtime import PROTOCOL_VERSION, SidecarRuntime
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 
+def configure_standard_streams() -> None:
+    """Keep the desktop JSON protocol UTF-8 on every Windows code page."""
+
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="strict")
+
+
 def serve_stream(
     runtime: SidecarRuntime,
     instream: TextIO,
@@ -69,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_standard_streams()
     args = build_parser().parse_args(argv)
     roots = tuple(args.allow_root) if args.allow_root else None
     runtime = SidecarRuntime(

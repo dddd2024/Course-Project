@@ -251,7 +251,13 @@ impl SidecarClient {
         };
         let program_display = program.display().to_string();
         let mut command = Command::new(program);
-        command.args(args);
+        command
+            .args(args)
+            // The desktop protocol is UTF-8 JSON. Windows otherwise lets the
+            // embedded Python runtime inherit the active legacy code page,
+            // which corrupts paths below non-ASCII user profile directories.
+            .env("PYTHONUTF8", "1")
+            .env("PYTHONIOENCODING", "utf-8");
         if let Some(config) = llm_config {
             command
                 .env("COURSE_PROJECT_LLM_ENDPOINT", &config.endpoint)

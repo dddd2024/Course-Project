@@ -25,6 +25,7 @@ from course_project.models import (
     InputMetadata,
     PacketCandidate,
 )
+from course_project.sidecar.large_raw_profile import profile_large_raw_file
 from course_project.sidecar.semantic_bridge import (
     SemanticAnalysis,
     SemanticBackend,
@@ -155,6 +156,11 @@ class TrackDBaselineBackend:
                 ),
             )
 
+        large_raw_profile = (
+            profile_large_raw_file(input_path, size_bytes=input_metadata.size_bytes)
+            if analysis_truncated and detected_container == "unknown"
+            else None
+        )
         raw_limit = self.max_raw_analysis_bytes if analysis_truncated else None
         if kind == "dat":
             source_stream = load_dat(
@@ -264,6 +270,18 @@ class TrackDBaselineBackend:
                 count=len(field_candidates),
             ),
         ]
+        if large_raw_profile is not None:
+            artifacts.append(
+                self._write_artifact(
+                    artifact_dir=artifact_dir,
+                    task_id=task_id,
+                    artifact_id="track-d-large-raw-profile",
+                    artifact_type="statistics",
+                    filename="large-raw-profile.json",
+                    payload=large_raw_profile,
+                    count=len(large_raw_profile.get("conclusions", [])),
+                )
+            )
 
         behavior = None
         requested_stages = set(config.get("stages") or ())
@@ -339,6 +357,7 @@ class TrackDBaselineBackend:
             "analyzedBytes": len(source_stream.data),
             "analysisTruncated": analysis_truncated,
             "analysisWindowBytes": self.max_raw_analysis_bytes,
+            "largeRawProfile": large_raw_profile,
             "packetCount": len(packets),
             "messageCount": len(messages),
             "familyCount": len(families),
@@ -547,3 +566,4 @@ def _reject_evaluation_only_config(config: Mapping[str, Any]) -> None:
                 )
             if isinstance(value, Mapping):
                 pending.append((path, value))
+

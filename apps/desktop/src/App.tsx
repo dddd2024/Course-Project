@@ -401,6 +401,8 @@ export function App() {
     if (selectingInput) return "正在读取文件元数据并计算 SHA-256。大文件会分块处理，界面仍可继续响应。";
     if (update.status === "FAILED") return "分析未完成。请查看错误信息，修正配置或输入后重新运行。";
     if (update.status === "COMPLETED" && analysisResult) {
+      const largeProfile = analysisResult.metrics?.largeRawProfile as { summary?: string } | null | undefined;
+      if (largeProfile?.summary) return largeProfile.summary + "。详细统计已保存到大文件画像工件中。";
       return "分析已完成，共生成 " + analysisResult.findings.length + " 条结论和 " + (analysisResult.evidence?.length || 0) + " 条证据记录。模型输出仍需经过确定性验证后才会成为已接受结论。";
     }
     if (update.status === "COMPLETED") return "分析已完成，正在读取结构化结果。";
@@ -723,3 +725,4 @@ export function App() {
     </main>
   );
 }
+

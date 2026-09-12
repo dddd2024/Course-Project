@@ -261,4 +261,5 @@ API Key 只在 React 表单和 Rust 进程内存中短暂存在。Rust 仅在启
 
 桌面端登记文件时以分块方式计算 SHA-256，并在后台线程等待 Sidecar 响应，因此选择 100MB 以上文件时界面仍会显示忙碌状态并保持响应。十六进制视图继续按需读取完整注册文件。
 
-对未知的原始 `.dat` / `.bin`，Track D 默认分析前 1MiB，结果的 `inputSizeBytes`、`analyzedBytes`、`analysisWindowBytes` 和 `analysisTruncated` 会明确区分完整文件与实际分析窗口。偏移量仍以原文件为基准。大型 PCAP/PCAPNG（包括使用 `.dat` 后缀的捕获文件）会先通过魔数识别并返回 `partial`，等待后续流式包提取支持，避免将整个容器载入内存。
+对未知的原始 `.dat` / `.bin`，Track D 默认用前 1MiB 运行通用边界和字段推断，同时以 4MiB 分块扫描完整文件。全文件画像会寻找重复记录标志，统计记录长度与 64/1514/1518 字节 Ethernet 边界的关系，并检验候选计数器、会话字段、熵、压缩率、16 字节块重复、同会话等长负载异或零比例和可校验 IPv4 头。结果的 `inputSizeBytes`、`analyzedBytes`、`analysisWindowBytes`、`analysisTruncated` 和 `largeRawProfile` 会明确区分完整扫描与深度分析窗口，偏移量仍以原文件为基准。大型 PCAP/PCAPNG（包括使用 `.dat` 后缀的捕获文件）会先通过魔数识别并返回 `partial`，等待后续流式包提取支持，避免将整个容器载入内存。
+

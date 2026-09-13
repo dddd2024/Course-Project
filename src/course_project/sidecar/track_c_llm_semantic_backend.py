@@ -18,6 +18,7 @@ from course_project.evidence.provenance_fusion import (
     fuse_hypothesis_evidence,
 )
 from course_project.llm import (
+    LiveLLMProviderError,
     LLMFileAnalysis,
     LLMHypothesisProvider,
     LLMHypothesisRequest,
@@ -525,7 +526,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
             except Exception as exc:
                 metrics["llmProviderFailureCount"] += 1
                 limitations.append(
-                    f"LLM full-file analysis request failed ({type(exc).__name__}); deterministic full-file profiling continued."
+                    f"LLM full-file analysis request failed ({_provider_failure_label(exc)}); deterministic full-file profiling continued."
                 )
             else:
                 metrics["llmExecuted"] = True
@@ -612,7 +613,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
             except Exception as exc:  # provider boundary: explicit failure, sanitized detail
                 metrics["llmProviderFailureCount"] += 1
                 limitations.append(
-                    f"LLM provider request failed for candidate {candidate.candidate_id!r} ({type(exc).__name__}); deterministic analysis continued."
+                    f"LLM provider request failed for candidate {candidate.candidate_id!r} ({_provider_failure_label(exc)}); deterministic analysis continued."
                 )
                 continue
 
@@ -707,6 +708,14 @@ def _provider_record(result: LLMProviderResult) -> dict[str, Any]:
         "mode": result.mode,
         **_safe_provider_metadata(result.metadata),
     }
+
+
+def _provider_failure_label(exc: Exception) -> str:
+    if isinstance(exc, LiveLLMProviderError):
+        detail = " ".join(str(exc).split())[:160]
+        if detail:
+            return f"{type(exc).__name__}: {detail}"
+    return type(exc).__name__
 
 
 def _valid_file_analysis(analysis: LLMFileAnalysis) -> bool:

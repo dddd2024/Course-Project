@@ -448,3 +448,80 @@ def test_stdlib_transport_rejects_non_json_response(monkeypatch: pytest.MonkeyPa
             payload={"model": "example-model"},
             timeout_seconds=3,
         )
+
+
+def test_response_parser_accepts_fenced_full_file_json_without_hypotheses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TEST_LLM_API_KEY", "secret-test-value")
+    document = {
+        "fileAnalysis": {
+            "summary": "分段统计显示稳定的记录边界",
+            "observations": ["全部分段均已扫描"],
+            "inference": "主体具有高熵负载特征",
+            "alternatives": ["强压缩负载"],
+            "uncertainties": ["无法仅凭统计确定算法"],
+            "recommendedNextSteps": ["验证候选长度字段"],
+            "confidence": 78,
+        }
+    }
+    response = _provider_response([])
+    response["choices"][0]["message"]["content"] = (
+        "```json\n" + json.dumps(document, ensure_ascii=False) + "\n```"
+    )
+    provider = OpenAICompatibleLLMProvider(_config(), transport=FakeTransport(response))
+
+    result = provider.propose(
+        LLMHypothesisRequest(
+            request_id="full-file:input-1",
+            input_id="input-1",
+            allowed_evidence_ids=("full-file-profile:input-1",),
+            context={"schemaVersion": "llm-full-file-context-v1"},
+        )
+    )
+
+    assert result.hypotheses == ()
+    assert result.file_analysis is not None
+    assert result.file_analysis.summary == "分段统计显示稳定的记录边界"
+    assert result.file_analysis.confidence == pytest.approx(0.78)
+
+
+def test_response_parser_accepts_openai_text_content_parts() -> None:
+    response = _provider_response([])
+    response["choices"][0]["message"]["content"] = [
+        {
+            "type": "text",
+            "text": json.dumps({"hypotheses": []}),
+        }
+    ]
+
+    assert parse_chat_completion_response(response) == ()
+
+
+def test_live_provider_retries_without_response_format_on_compatible_400(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TEST_LLM_API_KEY", "secret-test-value")
+
+    class FallbackTransport:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        def post_json(self, **kwargs: Any) -> dict[str, Any]:
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                raise LiveLLMTransportError(
+                    "provider returned HTTP status 400", status_code=400
+                )
+            return _provider_response([])
+
+    transport = FallbackTransport()
+    provider = OpenAICompatibleLLMProvider(_config(), transport=transport)
+
+    result = provider.propose(_request())
+
+    assert len(transport.calls) == 2
+    assert transport.calls[0]["payload"]["response_format"] == {"type": "json_object"}
+    assert "response_format" not in transport.calls[1]["payload"]
+    assert result.metadata["structuredOutput"] == "prompt_only"
+    assert result.metadata["structuredOutputFallback"] is True

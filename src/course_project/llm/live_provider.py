@@ -7,7 +7,7 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal, Protocol
 from urllib.parse import urlparse
 
@@ -95,6 +95,10 @@ class LiveLLMProviderError(RuntimeError):
 class LiveLLMTransportError(LiveLLMProviderError):
     """Raised when the HTTPS transport cannot obtain a valid JSON response."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class LiveLLMResponseError(LiveLLMProviderError):
     """Raised when a provider response violates the expected structured contract."""
@@ -121,7 +125,7 @@ class OpenAICompatibleProviderConfig:
     endpoint: str
     model: str
     api_key_env: str = _DEFAULT_SECRET_ENV
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = 120.0
     structured_output: StructuredOutputMode = "json_object"
 
     def __post_init__(self) -> None:
@@ -160,7 +164,7 @@ class OpenAICompatibleProviderConfig:
         endpoint = _required_environment_value(endpoint_name)
         model = _required_environment_value(model_name)
         api_key_env = os.environ.get(secret_env_name, _DEFAULT_SECRET_ENV)
-        timeout_text = os.environ.get(timeout_name, "30")
+        timeout_text = os.environ.get(timeout_name, "120")
         structured_output = os.environ.get(output_name, "json_object")
         try:
             timeout_seconds = float(timeout_text)
@@ -207,7 +211,7 @@ class UrllibJSONTransport:
                 body = response.read(_MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as exc:
             raise LiveLLMTransportError(
-                f"provider returned HTTP status {exc.code}"
+                f"provider returned HTTP status {exc.code}", status_code=exc.code
             ) from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise LiveLLMTransportError("provider HTTPS request failed") from exc
@@ -253,29 +257,47 @@ class OpenAICompatibleLLMProvider:
             proposals=(),
         )
         api_key = _required_environment_value(self.config.api_key_env)
-        payload = build_chat_completion_payload(self.config, request)
-        response = self._transport.post_json(
-            url=self.config.endpoint,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-            payload=payload,
-            timeout_seconds=self.config.timeout_seconds,
-        )
+        active_config = self.config
+        payload = build_chat_completion_payload(active_config, request)
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        used_prompt_only_fallback = False
+        try:
+            response = self._transport.post_json(
+                url=active_config.endpoint,
+                headers=headers,
+                payload=payload,
+                timeout_seconds=active_config.timeout_seconds,
+            )
+        except LiveLLMTransportError as exc:
+            if active_config.structured_output != "json_object" or exc.status_code not in {400, 422}:
+                raise
+            active_config = replace(active_config, structured_output="prompt_only")
+            used_prompt_only_fallback = True
+            response = self._transport.post_json(
+                url=active_config.endpoint,
+                headers=headers,
+                payload=build_chat_completion_payload(active_config, request),
+                timeout_seconds=active_config.timeout_seconds,
+            )
         parsed = _parse_chat_completion_document(response)
         hypotheses = materialize_hypotheses(
             provider_name=self.provider_name,
             request=request,
             proposals=parsed.hypotheses,
         )
+        metadata = _result_metadata(active_config, response)
+        if used_prompt_only_fallback:
+            metadata["structuredOutputFallback"] = True
         return LLMProviderResult(
             provider=self.provider_name,
             mode=self.mode,
             hypotheses=hypotheses,
             file_analysis=parsed.file_analysis,
-            metadata=_result_metadata(self.config, response),
+            metadata=metadata,
         )
 
 
@@ -332,6 +354,42 @@ def parse_chat_completion_response(
     return _parse_chat_completion_document(response).hypotheses
 
 
+def _message_content_text(value: Any) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if not isinstance(item, Mapping):
+                continue
+            text = item.get("text")
+            if item.get("type") in {"text", "output_text"} and isinstance(text, str) and text.strip():
+                parts.append(text.strip())
+        if parts:
+            return "\n".join(parts)
+    raise LiveLLMResponseError("provider message content must contain non-empty JSON text")
+
+
+def _json_message_document(content: str) -> dict[str, Any]:
+    candidate = content.strip()
+    fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", candidate, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        candidate = fenced.group(1).strip()
+    try:
+        document = json.loads(candidate)
+    except json.JSONDecodeError:
+        start = candidate.find("{")
+        if start < 0:
+            raise LiveLLMResponseError("provider message content is not valid JSON") from None
+        try:
+            document, _end = json.JSONDecoder().raw_decode(candidate[start:])
+        except json.JSONDecodeError as exc:
+            raise LiveLLMResponseError("provider message content is not valid JSON") from exc
+    if not isinstance(document, dict):
+        raise LiveLLMResponseError("provider message JSON must be an object")
+    return document
+
+
 def _parse_chat_completion_document(response: Mapping[str, Any]) -> _ParsedChatCompletion:
     if not isinstance(response, Mapping):
         raise TypeError("provider response must be a mapping")
@@ -350,21 +408,14 @@ def _parse_chat_completion_document(response: Mapping[str, Any]) -> _ParsedChatC
     refusal = message.get("refusal")
     if refusal not in (None, ""):
         raise LiveLLMResponseError("provider refused the structured hypothesis request")
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise LiveLLMResponseError("provider message content must be a non-empty JSON string")
-
-    try:
-        document = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise LiveLLMResponseError("provider message content is not valid JSON") from exc
-    if not isinstance(document, dict):
-        raise LiveLLMResponseError("provider message JSON must be an object")
-    if set(document) not in ({"hypotheses"}, {"hypotheses", "fileAnalysis"}):
+    content = _message_content_text(message.get("content"))
+    document = _json_message_document(content)
+    file_analysis_value = document.get("fileAnalysis", document.get("file_analysis"))
+    if "hypotheses" not in document and file_analysis_value is None:
         raise LiveLLMResponseError(
             "provider message JSON must contain exactly 'hypotheses' and optional 'fileAnalysis'"
         )
-    raw_hypotheses = document["hypotheses"]
+    raw_hypotheses = document.get("hypotheses", [])
     if not isinstance(raw_hypotheses, list):
         raise LiveLLMResponseError("provider hypotheses must be a list")
 
@@ -400,39 +451,31 @@ def _parse_chat_completion_document(response: Mapping[str, Any]) -> _ParsedChatC
             )
         )
 
-    file_analysis = _parse_file_analysis(document.get("fileAnalysis"))
+    file_analysis = _parse_file_analysis(file_analysis_value)
     return _ParsedChatCompletion(tuple(proposals), file_analysis)
 
 
 def _parse_file_analysis(value: Any) -> LLMFileAnalysis | None:
     if value is None:
         return None
-    required = {
-        "summary",
-        "observations",
-        "inference",
-        "alternatives",
-        "uncertainties",
-        "recommendedNextSteps",
-        "confidence",
-    }
-    if not isinstance(value, dict) or set(value) != required:
+    if not isinstance(value, dict):
         raise LiveLLMResponseError("provider fileAnalysis does not match the required schema")
-    confidence = value["confidence"]
+    confidence = value.get("confidence")
     if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
         raise LiveLLMResponseError("provider fileAnalysis confidence must be numeric")
     confidence_value = float(confidence)
+    if 1.0 < confidence_value <= 100.0:
+        confidence_value /= 100.0
     if not math.isfinite(confidence_value) or not 0.0 <= confidence_value <= 1.0:
         raise LiveLLMResponseError("provider fileAnalysis confidence must be within [0, 1]")
+    recommended = value.get("recommendedNextSteps", value.get("recommended_next_steps", []))
     return LLMFileAnalysis(
-        summary=_response_text(value["summary"], "summary"),
-        observations=_response_text_list(value["observations"], "observations"),
-        inference=_response_text(value["inference"], "inference"),
-        alternatives=_response_text_list(value["alternatives"], "alternatives"),
-        uncertainties=_response_text_list(value["uncertainties"], "uncertainties"),
-        recommended_next_steps=_response_text_list(
-            value["recommendedNextSteps"], "recommendedNextSteps"
-        ),
+        summary=_response_text(value.get("summary"), "summary"),
+        observations=_response_text_list(value.get("observations", []), "observations"),
+        inference=_response_text(value.get("inference"), "inference"),
+        alternatives=_response_text_list(value.get("alternatives", []), "alternatives"),
+        uncertainties=_response_text_list(value.get("uncertainties", []), "uncertainties"),
+        recommended_next_steps=_response_text_list(recommended, "recommendedNextSteps"),
         confidence=confidence_value,
     )
 

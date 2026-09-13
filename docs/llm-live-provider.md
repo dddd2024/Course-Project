@@ -67,7 +67,7 @@ Default environment variables:
 | `COURSE_PROJECT_LLM_MODEL` | Provider model identifier |
 | `COURSE_PROJECT_LLM_API_KEY_ENV` | Optional name of the environment variable that holds the secret; defaults to `COURSE_PROJECT_LLM_API_KEY` |
 | `COURSE_PROJECT_LLM_API_KEY` | Default secret environment variable; read only when a live request executes |
-| `COURSE_PROJECT_LLM_TIMEOUT_SECONDS` | Positive finite request timeout, default `30` |
+| `COURSE_PROJECT_LLM_TIMEOUT_SECONDS` | Positive finite request timeout, default `120` seconds for whole-file analysis |
 | `COURSE_PROJECT_LLM_STRUCTURED_OUTPUT` | `json_object` (default) or `prompt_only` |
 
 The API key value is not stored on the provider config object, returned in provider metadata, or written to experiment records. It is resolved from the configured secret environment variable at call time.
@@ -94,10 +94,10 @@ The live adapter:
 - rejects endpoints with embedded username/password, query strings, or fragments;
 - validates the project-native request before any network access;
 - sends credentials only as a Bearer `Authorization` header;
-- accepts only a JSON object response;
+- accepts an OpenAI-compatible JSON response envelope and extracts JSON from plain text, fenced JSON, or text content parts;
 - accepts only an OpenAI-compatible response with a non-empty `choices` list and message content;
 - fails closed on provider error envelopes, refusals, malformed or non-JSON content;
-- requires the message body to contain `hypotheses` and only the optional structured `fileAnalysis`;
+- requires the message body to contain field `hypotheses`, a structured whole-file `fileAnalysis`, or both;
 - requires every proposal to have the exact structured fields expected by `HypothesisProposal`;
 - routes every proposal back through shared `materialize_hypotheses()` validation, including evidence-reference and confidence/range checks;
 - never converts `modelConfidence` into executable verification or `ACCEPTED` status;
@@ -107,9 +107,9 @@ The production semantic layer additionally scopes returned hypotheses to the req
 
 ## Provider compatibility
 
-`json_object` adds the OpenAI-compatible `response_format={"type":"json_object"}` request field. Providers that expose a compatible endpoint but do not support that field can use `prompt_only`; the same strict local JSON/schema validation still applies.
+`json_object` adds the OpenAI-compatible `response_format={"type":"json_object"}` request field. If a compatible service rejects that field with HTTP 400 or 422, the provider retries the same request once in `prompt_only` mode. The local evidence-reference, numeric range, confidence, and executable-field validation remains in force.
 
-The current adapter intentionally does not implement provider-specific retry, rate-limit, billing, model discovery, or multi-provider routing. If those become requirements, prefer an external SDK/gateway such as LiteLLM behind this boundary rather than duplicating them in project code.
+The current adapter intentionally does not implement rate-limit retry, billing, model discovery, or multi-provider routing. If those become requirements, prefer an external SDK/gateway such as LiteLLM behind this boundary rather than duplicating them in project code.
 
 ## Claim boundary
 

@@ -407,11 +407,16 @@ export function App() {
       );
       const llmSummary = llmFileEvidence?.observation?.interpretation;
       if (typeof llmSummary === "string" && llmSummary.trim()) {
-        return "模型已基于完整文件的分段画像完成分析：" + llmSummary;
+        return "全文件模型分析完成。" + llmSummary;
       }
-      const largeProfile = analysisResult.metrics?.largeRawProfile as { summary?: string } | null | undefined;
-      if (largeProfile?.summary) return largeProfile.summary + "。详细统计已保存到大文件画像工件中。";
-      return "分析已完成，共生成 " + analysisResult.findings.length + " 条结论和 " + (analysisResult.evidence?.length || 0) + " 条证据记录。模型输出仍需经过确定性验证后才会成为已接受结论。";
+      const metrics = analysisResult.metrics || {};
+      const scanned = typeof metrics.fullFileBytesScanned === "number" ? metrics.fullFileBytesScanned : null;
+      const total = typeof metrics.inputSizeBytes === "number" ? metrics.inputSizeBytes : null;
+      const coverage = scanned !== null && total ? Math.min(100, scanned / total * 100).toFixed(1) + "%" : null;
+      return "全文件结构分析已完成"
+        + (coverage ? "，扫描覆盖率 " + coverage : "")
+        + "。共形成 " + analysisResult.findings.length + " 条结论和 "
+        + (analysisResult.evidence?.length || 0) + " 条可追溯证据。";
     }
     if (update.status === "COMPLETED") return "分析已完成，正在读取结构化结果。";
     if (isRunning) return "正在执行“" + stageName + "”。界面会保留每条结论对应的证据与字节位置。";
@@ -648,7 +653,6 @@ export function App() {
               {update.status === "COMPLETED" && analysisResult && (
                 <AnalysisTrace
                   result={analysisResult}
-                  llmEnabled={llmEnabled}
                   modelName={llmStatus.model}
                 />
               )}

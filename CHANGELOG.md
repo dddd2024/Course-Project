@@ -2,6 +2,17 @@
 
 All notable course-project delivery changes are summarized here. The repository remains explicit about evidence scope: public/synthetic fixtures are development and reproducibility evidence, while authoritative teacher-data claims remain unavailable until that data is supplied.
 
+## Unreleased
+
+### Changed
+
+- Whole-file LLM requests now allow 120 seconds, accept common OpenAI-compatible text/JSON response variants, and retry once without `response_format` when a provider returns HTTP 400 or 422.
+- The desktop analysis trace presents model reasoning only when model evidence was successfully parsed and stored; deterministic summaries no longer impersonate assistant output.
+- The analysis report uses a compact evidence-led layout with observations, inference, alternatives, uncertainty, next verification steps, and dynamic stage numbering.
+
+### Fixed
+
+- Sanitized transport details are retained in result artifacts for diagnostics without exposing API keys or internal failure placeholders in the professional report.
 ## v0.1.0-pre-teacher.2 — 2026-09-10
 
 ### Added

@@ -262,4 +262,10 @@ API Key 只在 React 表单和 Rust 进程内存中短暂存在。Rust 仅在启
 桌面端登记文件时以分块方式计算 SHA-256，并在后台线程等待 Sidecar 响应，因此选择 100MB 以上文件时界面仍会显示忙碌状态并保持响应。十六进制视图继续按需读取完整注册文件。
 
 对未知的原始 `.dat` / `.bin`，Track D 默认用前 1MiB 运行通用边界和字段推断，同时以 4MiB 分块扫描完整文件。全文件画像会寻找重复记录标志，统计记录长度与 64/1514/1518 字节 Ethernet 边界的关系，并检验候选计数器、会话字段、熵、压缩率、16 字节块重复、同会话等长负载异或零比例和可校验 IPv4 头。结果的 `inputSizeBytes`、`analyzedBytes`、`analysisWindowBytes`、`analysisTruncated` 和 `largeRawProfile` 会明确区分完整扫描与深度分析窗口，偏移量仍以原文件为基准。大型 PCAP/PCAPNG（包括使用 `.dat` 后缀的捕获文件）会先通过魔数识别并返回 `partial`，等待后续流式包提取支持，避免将整个容器载入内存。
+## 14. 完整 LLM 数据流演示
 
+1. 在“模型设置”中填写兼容服务的 Base URL、实际模型名称和 API Key。优先使用“JSON 对象模式”；服务不支持 `response_format` 时，后端会对 HTTP 400/422 自动改用提示词 JSON 约束重试一次。
+2. 保存后重新选择 `.dat` 文件，开启“模型辅助推理”，再开始分析。100MB 以上输入会按 4MiB 流式扫描，完整文件不会一次性进入内存。
+3. 等待全文件扫描与模型生成完成。模型请求默认允许 120 秒；提供器收到的是覆盖全文件的分段统计、结构候选和证据编号，不是 100MB 原始字节。
+4. 成功结果会出现“模型分析全文件画像与候选字段”，并展示关键观察、推断摘要、备选解释、不确定因素、建议验证、置信度和父证据。没有成功留存模型证据时，报告不会显示模型阶段或占位假设。
+5. 在“分析结果”的证据页确认存在 `track-c-llm-file-analysis`；在导出的复核 JSON 中确认 `semanticMetrics.llmFullFileAnalysisProduced=true`、`llmSuccessfulRequestCount>=1`、`fullFileCoverageRatio=1`。

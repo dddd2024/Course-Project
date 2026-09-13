@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 import zlib
 from collections import Counter, defaultdict
@@ -16,16 +17,31 @@ _MAX_OCCURRENCES_PER_MARKER = 50_000
 _MAX_RECORD_SAMPLES = 512
 _MAX_PAYLOAD_SAMPLE_BYTES = 4 * 1024 * 1024
 _ETHERNET_LENGTHS = frozenset({64, 1514, 1518})
+_PLAINTEXT_SIGNATURES = (
+    b"GET ",
+    b"POST ",
+    b"HTTP/",
+    b"SSH-",
+    b"\x16\x03\x01",
+    b"\x16\x03\x03",
+)
 
 
 def profile_large_raw_file(path: Path, *, size_bytes: int) -> dict[str, Any]:
     """Scan a large raw file in bounded chunks and return evidence-led inferences."""
     candidates, sampled_offsets = _discover_markers(path, size_bytes)
-    occurrences = _scan_occurrences(path, candidates)
+    occurrences, chunk_profiles, bytes_scanned, sha256 = _scan_occurrences(
+        path, candidates
+    )
     marker, offsets = _select_marker(occurrences)
     profile: dict[str, Any] = {
-        "schemaVersion": "large-raw-profile-v1",
-        "bytesScanned": size_bytes,
+        "schemaVersion": "large-raw-profile-v2",
+        "bytesScanned": bytes_scanned,
+        "coverageRatio": round(bytes_scanned / size_bytes, 8) if size_bytes else 1.0,
+        "sha256": sha256,
+        "chunkSizeBytes": _SCAN_CHUNK_BYTES,
+        "chunkCount": len(chunk_profiles),
+        "chunkProfiles": chunk_profiles,
         "sampleWindowOffsets": sampled_offsets,
         "candidateMarkerCount": len(candidates),
         "markerHex": marker.hex() if marker is not None else None,
@@ -94,13 +110,20 @@ def _discover_markers(path: Path, size_bytes: int) -> tuple[list[bytes], list[in
     return candidates, offsets
 
 
-def _scan_occurrences(path: Path, candidates: list[bytes]) -> dict[bytes, list[int]]:
+def _scan_occurrences(
+    path: Path,
+    candidates: list[bytes],
+) -> tuple[dict[bytes, list[int]], list[dict[str, Any]], int, str]:
     found = {candidate: [] for candidate in candidates}
     last_seen = {candidate: -1 for candidate in candidates}
     carry = b""
     consumed = 0
+    chunk_profiles: list[dict[str, Any]] = []
+    digest = hashlib.sha256()
     with path.open("rb") as handle:
         while chunk := handle.read(_SCAN_CHUNK_BYTES):
+            digest.update(chunk)
+            chunk_profiles.append(_chunk_profile(chunk, len(chunk_profiles), consumed))
             data = carry + chunk
             base = consumed - len(carry)
             for candidate in candidates:
@@ -116,8 +139,34 @@ def _scan_occurrences(path: Path, candidates: list[bytes]) -> dict[bytes, list[i
                     start = index + 1
             consumed += len(chunk)
             carry = data[-3:]
-    return found
+    return found, chunk_profiles, consumed, digest.hexdigest()
 
+
+def _chunk_profile(chunk: bytes, index: int, offset: int) -> dict[str, Any]:
+    counts = Counter(chunk)
+    length = len(chunk)
+    entropy = (
+        -sum((count / length) * math.log2(count / length) for count in counts.values())
+        if length
+        else 0.0
+    )
+    compressed_ratio = len(zlib.compress(chunk, 1)) / length if length else 0.0
+    printable = sum(32 <= value <= 126 or value in {9, 10, 13} for value in chunk)
+    signature_hits = sum(chunk.count(signature) for signature in _PLAINTEXT_SIGNATURES)
+    dominant_value, dominant_count = counts.most_common(1)[0] if counts else (0, 0)
+    return {
+        "index": index,
+        "offset": offset,
+        "size": length,
+        "entropyBitsPerByte": round(entropy, 6),
+        "zlibRatio": round(compressed_ratio, 6),
+        "distinctByteCount": len(counts),
+        "zeroByteRatio": round(counts.get(0, 0) / length, 6) if length else 0.0,
+        "printableByteRatio": round(printable / length, 6) if length else 0.0,
+        "dominantByteHex": f"{dominant_value:02x}",
+        "dominantByteRatio": round(dominant_count / length, 6) if length else 0.0,
+        "plaintextSignatureCount": signature_hits,
+    }
 
 def _select_marker(occurrences: dict[bytes, list[int]]) -> tuple[bytes | None, list[int]]:
     eligible = [(marker, offsets) for marker, offsets in occurrences.items() if len(offsets) >= 3]
@@ -268,8 +317,11 @@ def _payload_evidence(
     aligned = sum(len(payload) % 16 == 0 for payload in payloads)
     xor_zeros, xor_bytes = _xor_zero_counts(payload_entries)
     ipv4_valid = sum(_count_valid_ipv4_headers(payload) for payload in payloads)
-    signatures = (b"GET ", b"POST ", b"HTTP/", b"SSH-", b"\x16\x03\x01", b"\x16\x03\x03")
-    signature_hits = sum(payload.count(signature) for payload in payloads for signature in signatures)
+    signature_hits = sum(
+        payload.count(signature)
+        for payload in payloads
+        for signature in _PLAINTEXT_SIGNATURES
+    )
     return {
         "sampleCount": len(payloads),
         "sampledPayloadBytes": len(combined),

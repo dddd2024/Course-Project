@@ -104,7 +104,9 @@ export function AnalysisTrace({
   const largeProfile = asRecord(metrics.largeRawProfile);
   const evidence = result.evidence || [];
   const llmEvidence = evidence.filter(
-    (item) => item.sourceComponent === "track-c-llm-provider" || item.sourceComponent === "llm",
+    (item) => item.sourceComponent === "track-c-llm-provider"
+      || item.sourceComponent === "track-c-llm-file-analysis"
+      || item.sourceComponent === "llm",
   );
   const verificationEvidence = evidence.filter(
     (item) => item.sourceComponent === "track-c-executable-verifier"
@@ -121,10 +123,17 @@ export function AnalysisTrace({
     .map((item) => asText(item.model))
     .find((item): item is string => item !== null);
   const displayedModelName = recordedModelName || modelName;
+  const liveNetworkCall = providerMetadata.some((item) => item.networkAccess === true);
   const requestCount = asNumber(semanticMetrics.llmRequestCount) || 0;
+  const successfulRequestCount = asNumber(semanticMetrics.llmSuccessfulRequestCount) || 0;
   const hypothesisCount = asNumber(semanticMetrics.llmHypothesisCount) || llmEvidence.length;
   const fullSize = asNumber(metrics.inputSizeBytes);
   const analyzedBytes = asNumber(metrics.analyzedBytes);
+  const fullFileBytesScanned = asNumber(metrics.fullFileBytesScanned)
+    ?? asNumber(largeProfile.bytesScanned);
+  const fullFileCoverageRatio = asNumber(metrics.fullFileCoverageRatio)
+    ?? asNumber(largeProfile.coverageRatio);
+  const fullFileAnalysisProduced = semanticMetrics.llmFullFileAnalysisProduced === true;
   const profileConclusions = Array.isArray(largeProfile.conclusions)
     ? largeProfile.conclusions
       .map((item) => asText(asRecord(item).claim))
@@ -141,7 +150,9 @@ export function AnalysisTrace({
 
   const inputFacts = [
     ["完整文件", formatBytes(fullSize)],
-    ["主要分析窗口", formatBytes(analyzedBytes)],
+    ["全文件扫描", formatBytes(fullFileBytesScanned)],
+    ["扫描覆盖率", formatScore(fullFileCoverageRatio)],
+    ["字段推断窗口", formatBytes(analyzedBytes)],
     ["数据包候选", String(asNumber(metrics.packetCount) || 0)],
     ["消息候选", String(asNumber(metrics.messageCount) || 0)],
     ["字段候选", String(asNumber(metrics.fieldCandidateCount) || 0)],
@@ -170,7 +181,7 @@ export function AnalysisTrace({
             </div>
             {metrics.analysisTruncated === true && (
               <p className="analysis-callout">
-                通用字段推断只读取前 {formatBytes(analyzedBytes)}；大型文件画像仍按分块方式扫描完整文件。
+                字段级推断读取前 {formatBytes(analyzedBytes)}；全文件画像已流式扫描 {formatBytes(fullFileBytesScanned)}，其分段摘要用于模型的整体分析。
               </p>
             )}
           </TraceStep>
@@ -192,8 +203,12 @@ export function AnalysisTrace({
 
           <TraceStep
             index={3}
-            title="模型提出候选解释"
-            meta={llmExecuted ? requestCount + " 次请求 · " + hypothesisCount + " 个假设" : modelState}
+            title="模型分析全文件画像与候选字段"
+            meta={llmExecuted
+              ? successfulRequestCount + "/" + requestCount + " 次请求成功 · "
+                + hypothesisCount + " 个字段假设"
+                + (fullFileAnalysisProduced ? " · 已生成全文件解释" : "")
+              : modelState}
           >
             {llmEvidence.length > 0 ? (
               <div className="analysis-hypothesis-list">
@@ -344,6 +359,11 @@ export function AnalysisTrace({
         </ol>
         {displayedModelName && llmRequested && (
           <p className="analysis-model-name">本次分析模型：{displayedModelName}</p>
+        )}
+        {llmExecuted && (
+          <p className="analysis-model-name">
+            接口调用：{liveNetworkCall ? "已完成 OpenAI 兼容 HTTPS 请求" : "Provider 已执行（无网络或未记录网络元数据）"}
+          </p>
         )}
       </div>
     </details>

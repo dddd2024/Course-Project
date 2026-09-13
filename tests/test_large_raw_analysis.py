@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import math
 from pathlib import Path
 
 from course_project.models import InputMetadata
+from course_project.sidecar.large_raw_profile import profile_large_raw_file
 from course_project.sidecar.track_d_backend import TrackDBaselineBackend
 
 
@@ -15,6 +18,29 @@ def _config() -> dict[str, object]:
         "optionalDependencyPolicy": "degrade",
     }
 
+
+def test_large_raw_profile_scans_and_accounts_for_every_byte(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    capture = tmp_path / "complete.dat"
+    payload = bytes(range(256)) * 9 + b"final-tail"
+    capture.write_bytes(payload)
+    monkeypatch.setattr(
+        "course_project.sidecar.large_raw_profile._SCAN_CHUNK_BYTES", 257
+    )
+
+    profile = profile_large_raw_file(capture, size_bytes=len(payload))
+
+    assert profile["bytesScanned"] == len(payload)
+    assert profile["coverageRatio"] == 1.0
+    assert profile["sha256"] == hashlib.sha256(payload).hexdigest()
+    assert profile["chunkCount"] == math.ceil(len(payload) / 257)
+    assert sum(item["size"] for item in profile["chunkProfiles"]) == len(payload)
+    assert [item["offset"] for item in profile["chunkProfiles"]] == [
+        index * 257 for index in range(profile["chunkCount"])
+    ]
+    assert all("entropyBitsPerByte" in item for item in profile["chunkProfiles"])
 
 def test_large_raw_input_uses_bounded_analysis_window(tmp_path: Path) -> None:
     capture = tmp_path / "large.dat"

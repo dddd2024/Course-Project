@@ -53,6 +53,7 @@ class SemanticBackend(Protocol):
         families: tuple[MessageFamily, ...],
         alignments: tuple[AlignmentResult, ...],
         field_candidates: tuple[FieldCandidate, ...],
+        large_raw_profile: Mapping[str, Any] | None,
         behavior: BehaviorFeatures | None,
         config: Mapping[str, Any],
     ) -> SemanticAnalysis: ...

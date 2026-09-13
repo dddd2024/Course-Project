@@ -22,6 +22,7 @@ from course_project.llm.live_provider import (
 from course_project.llm.provider import (
     DeterministicMockLLMProvider,
     HypothesisProposal,
+    LLMFileAnalysis,
     LLMHypothesisProvider,
     LLMHypothesisRequest,
     LLMProviderResult,
@@ -37,6 +38,7 @@ __all__ = [
     "HypothesisProposal",
     "HypothesisProvider",
     "JSONTransport",
+    "LLMFileAnalysis",
     "LLMHypothesisProvider",
     "LLMHypothesisRequest",
     "LLMProviderResult",

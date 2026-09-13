@@ -187,6 +187,43 @@ def test_live_provider_materializes_project_native_hypotheses_without_verificati
     assert call["timeout_seconds"] == 12.0
 
 
+def test_live_provider_materializes_full_file_analysis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TEST_LLM_API_KEY", "secret-test-value")
+    response = _provider_response([])
+    document = json.loads(response["choices"][0]["message"]["content"])
+    document["fileAnalysis"] = {
+        "summary": "完整文件表现为高熵分段记录流",
+        "observations": ["33 个分段均已统计", "各段熵接近 8 bit/Byte"],
+        "inference": "主体可能经过长度保持型加密",
+        "alternatives": ["强压缩数据"],
+        "uncertainties": ["无法仅凭密文区分具体算法"],
+        "recommendedNextSteps": ["对记录头执行计数器一致性验证"],
+        "confidence": 0.78,
+    }
+    response["choices"][0]["message"]["content"] = json.dumps(document)
+    provider = OpenAICompatibleLLMProvider(
+        _config(), transport=FakeTransport(response)
+    )
+    request = LLMHypothesisRequest(
+        request_id="full-file:input-1",
+        input_id="input-1",
+        allowed_evidence_ids=("full-file-profile:input-1",),
+        context={"schemaVersion": "llm-full-file-context-v1"},
+    )
+
+    result = provider.propose(request)
+
+    assert result.hypotheses == ()
+    assert result.file_analysis is not None
+    assert result.file_analysis.summary == "完整文件表现为高熵分段记录流"
+    assert result.file_analysis.observations == (
+        "33 个分段均已统计",
+        "各段熵接近 8 bit/Byte",
+    )
+    assert result.file_analysis.confidence == pytest.approx(0.78)
+
 def test_payload_is_deterministic_and_contains_only_provider_neutral_request_context() -> None:
     request = _request()
     first = build_chat_completion_payload(_config(), request)
@@ -201,6 +238,8 @@ def test_payload_is_deterministic_and_contains_only_provider_neutral_request_con
     assert "analysisSummary" in system_prompt
     assert "observations, inference, plausible alternatives" in system_prompt
     assert "Simplified Chinese" in system_prompt
+    assert "llm-full-file-context-v1" in system_prompt
+    assert "recommendedNextSteps" in system_prompt
     user_payload = json.loads(first["messages"][1]["content"])
     assert user_payload == {
         "requestId": "req-1",

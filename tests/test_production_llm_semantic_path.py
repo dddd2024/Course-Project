@@ -249,6 +249,7 @@ def test_llm_hypotheses_enter_real_verification_fusion_and_ignore_confidence_ran
         assert len(item.parent_evidence_ids) == 1
         parent = candidate_evidence[item.parent_evidence_ids[0]]
         assert item.independence_group == parent.independence_group
+        assert isinstance(item.observation["competingHypothesisIds"], list)
 
     evidence_by_hypothesis = {
         item.observation["hypothesisId"]: item

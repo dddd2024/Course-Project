@@ -40,6 +40,9 @@ _REQUIRED_PROPOSAL_KEYS = frozenset(
 _SYSTEM_PROMPT = """You infer candidate semantic fields in an unknown binary protocol.
 Return JSON only. Do not claim a hypothesis is verified: modelConfidence is model confidence only.
 Use only evidence IDs listed in allowedEvidenceIds. Do not invent evidence IDs.
+Write interpretation and analysisSummary display text in Simplified Chinese.
+Do not provide hidden chain-of-thought. analysisSummary must be a concise, evidence-led audit summary
+that states observations, inference, plausible alternatives, and remaining uncertainty.
 The response must be exactly one JSON object with this shape:
 {
   "hypotheses": [
@@ -47,14 +50,23 @@ The response must be exactly one JSON object with this shape:
       "offset": 0,
       "size": 1,
       "semanticType": "length|sequence|enum|timestamp|constant|checksum|other",
-      "interpretation": "short human-readable interpretation",
-      "parameters": {},
+      "interpretation": "简短、可读的候选字段解释",
+      "parameters": {
+        "protocolParameter": "parameters required by the executable checker",
+        "analysisSummary": {
+          "observations": ["从给定样本和证据直接观察到的事实"],
+          "inference": "这些观察为何支持当前候选解释",
+          "alternatives": ["仍然合理的其他解释"],
+          "uncertainties": ["需要更多样本或验证才能解决的问题"]
+        }
+      },
       "modelConfidence": 0.0,
       "supportingEvidenceIds": []
     }
   ]
 }
 Every offset must be a non-negative integer; size is a positive integer or null; confidence is in [0,1].
+Keep executable parameters such as endian, target, mode, or step alongside analysisSummary.
 If there is insufficient evidence, return {"hypotheses": []}.
 """
 

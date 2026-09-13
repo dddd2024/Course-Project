@@ -8,6 +8,7 @@ import pytest
 
 from course_project.llm import (
     HypothesisProposal,
+    LLMFileAnalysis,
     LLMHypothesisRequest,
     LLMProviderResult,
     materialize_hypotheses,
@@ -146,6 +147,32 @@ class StructuralLengthProvider:
             },
         )
 
+
+class FullFileAnalysisProvider:
+    provider_name = "full-file-analysis-test"
+    mode = "mock"
+
+    def __init__(self) -> None:
+        self.requests: list[LLMHypothesisRequest] = []
+
+    def propose(self, request: LLMHypothesisRequest) -> LLMProviderResult:
+        self.requests.append(request)
+        if request.context.get("schemaVersion") != "llm-full-file-context-v1":
+            return LLMProviderResult(provider=self.provider_name, mode="mock")
+        return LLMProviderResult(
+            provider=self.provider_name,
+            mode="mock",
+            file_analysis=LLMFileAnalysis(
+                summary="完整文件的各分段均呈高熵，且存在重复记录结构",
+                observations=("所有分段均已覆盖", "分段熵分布稳定"),
+                inference="数据更符合带明文记录头的加密负载流",
+                alternatives=("强压缩记录流",),
+                uncertainties=("无法仅凭统计区分具体加密算法",),
+                recommended_next_steps=("验证记录头计数器和长度关系",),
+                confidence=0.81,
+            ),
+            metadata={"networkAccess": True, "model": "full-file-test-model"},
+        )
 
 class OutOfRegionProvider:
     provider_name = "out-of-region-test"
@@ -288,6 +315,59 @@ def test_llm_hypotheses_enter_real_verification_fusion_and_ignore_confidence_ran
     assert llm_ids & fusion_ids
     assert {hypothesis_id for hypothesis_id, _ in correct} & selection_ids
 
+
+def test_large_raw_file_always_reaches_provider_and_surfaces_full_file_analysis(
+    tmp_path: Path,
+) -> None:
+    payload = bytes(range(256)) * 32
+    sample = tmp_path / "large-full-file.dat"
+    sample.write_bytes(payload)
+    provider = FullFileAnalysisProvider()
+
+    result = TrackDBaselineBackend(
+        state_dir=tmp_path / "state-full-file",
+        semantic_backend=DeterministicTrackCSemanticBackend(llm_provider=provider),
+        max_raw_analysis_bytes=1024,
+    ).analyze(
+        task_id="production-full-file-llm",
+        input_metadata=InputMetadata(
+            input_id="input-full-file-llm",
+            kind="dat",
+            size_bytes=len(payload),
+        ),
+        input_path=sample,
+        config=_config(llm_enabled=True),
+    )
+
+    full_file_requests = [
+        request
+        for request in provider.requests
+        if request.context.get("schemaVersion") == "llm-full-file-context-v1"
+    ]
+    assert len(full_file_requests) == 1
+    context = full_file_requests[0].context
+    assert context["file"]["bytesScanned"] == len(payload)
+    assert context["file"]["coverageRatio"] == 1.0
+    assert context["privacy"]["localScannerInspectedEveryByte"] is True
+    assert context["allChunkSummariesIncluded"] is True
+    assert sum(item["size"] for item in context["chunkProfiles"]) == len(payload)
+
+    semantic = result.metrics["semanticMetrics"]
+    assert semantic["llmExecuted"] is True
+    assert semantic["llmFullFileRequested"] is True
+    assert semantic["llmFullFileExecuted"] is True
+    assert semantic["llmFullFileAnalysisProduced"] is True
+    assert semantic["llmFullFileBytesScanned"] == len(payload)
+    assert semantic["llmFullFileCoverageRatio"] == 1.0
+    assert any(
+        item.source_component == "track-c-llm-file-analysis"
+        for item in result.evidence
+    )
+    assert any(
+        finding.semantic_type == "full-file-structure"
+        and "完整文件" in finding.claim
+        for finding in result.findings
+    )
 
 def test_out_of_region_llm_output_fails_closed_without_llm_evidence(tmp_path: Path) -> None:
     result = _run(

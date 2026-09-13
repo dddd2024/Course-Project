@@ -18,8 +18,10 @@ from course_project.evidence.provenance_fusion import (
     fuse_hypothesis_evidence,
 )
 from course_project.llm import (
+    LLMFileAnalysis,
     LLMHypothesisProvider,
     LLMHypothesisRequest,
+    LLMProviderResult,
     OpenAICompatibleLLMProvider,
     OpenAICompatibleProviderConfig,
 )
@@ -70,6 +72,7 @@ _SemanticEntry = tuple[
 ]
 _MAX_CONTEXT_SAMPLES = 16
 _MAX_CONTEXT_FIELD_BYTES = 8
+_MAX_FULL_FILE_CHUNK_SUMMARIES = 64
 _SUPPORTED_LLM_TYPES = frozenset({"length", "sequence"})
 _SAFE_PROVIDER_METADATA_KEYS = frozenset(
     {"networkAccess", "endpointHost", "model", "responseModel", "structuredOutput"}
@@ -79,6 +82,7 @@ _SAFE_PROVIDER_METADATA_KEYS = frozenset(
 @dataclass(slots=True)
 class _LLMRun:
     entries: list[_SemanticEntry]
+    findings: list[AnalysisFinding]
     evidence: list[Evidence]
     hypothesis_ids: set[str]
     limitations: list[str]
@@ -127,6 +131,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
         families: tuple[MessageFamily, ...],
         alignments: tuple[AlignmentResult, ...],
         field_candidates: tuple[FieldCandidate, ...],
+        large_raw_profile: Mapping[str, Any] | None,
         behavior: BehaviorFeatures | None,
         config: Mapping[str, Any],
     ) -> SemanticAnalysis:
@@ -141,6 +146,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
                 families=families,
                 alignments=alignments,
                 field_candidates=field_candidates,
+                large_raw_profile=large_raw_profile,
                 behavior=behavior,
                 config=config,
             )
@@ -155,6 +161,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
                 families=families,
                 alignments=alignments,
                 field_candidates=field_candidates,
+                large_raw_profile=large_raw_profile,
                 behavior=behavior,
                 config=config,
             )
@@ -246,8 +253,9 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
 
         candidate_entry_count = len(entries)
         llm_run = self._run_llm(
-            input_id=input_metadata.input_id,
+            input_metadata=input_metadata,
             candidate_contexts=candidate_contexts,
+            large_raw_profile=large_raw_profile,
         )
         evidence.extend(llm_run.evidence)
         entries.extend(llm_run.entries)
@@ -256,7 +264,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
 
         _register_hypotheses(manager, entries)
 
-        findings: list[AnalysisFinding] = []
+        findings: list[AnalysisFinding] = list(llm_run.findings)
         findings_by_hypothesis: dict[str, AnalysisFinding] = {}
         accepted_promotions: list[_AcceptedPromotion] = []
         verification_decision_counts = {"accepted": 0, "rejected": 0, "uncertain": 0}
@@ -411,26 +419,33 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
     def _run_llm(
         self,
         *,
-        input_id: str,
+        input_metadata: InputMetadata,
         candidate_contexts: list[_SemanticEntry],
+        large_raw_profile: Mapping[str, Any] | None,
     ) -> _LLMRun:
         metrics: dict[str, Any] = {
             "llmRequested": True,
             "llmExecuted": False,
             "llmContextPolicy": "structural-summary-v1",
+            "llmFullFileContextPolicy": "full-file-chunk-summary-v1",
             "llmRequestCount": 0,
             "llmSuccessfulRequestCount": 0,
             "llmHypothesisCount": 0,
             "llmOutOfScopeHypothesisCount": 0,
             "llmProviderFailureCount": 0,
             "llmProviderMetadata": [],
+            "llmFullFileRequested": large_raw_profile is not None,
+            "llmFullFileExecuted": False,
+            "llmFullFileAnalysisProduced": False,
         }
-        if not candidate_contexts:
+        full_file_context = _full_file_context(input_metadata, large_raw_profile)
+        if not candidate_contexts and full_file_context is None:
             return _LLMRun(
                 entries=[],
+                findings=[],
                 evidence=[],
                 hypothesis_ids=set(),
-                limitations=["LLM reasoning was requested, but no executable candidate region was available."],
+                limitations=["LLM reasoning was requested, but no executable candidate region or full-file profile was available."],
                 metrics=metrics,
             )
 
@@ -440,10 +455,11 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
             metrics["llmProviderFailureCount"] = 1
             return _LLMRun(
                 entries=[],
+                findings=[],
                 evidence=[],
                 hypothesis_ids=set(),
                 limitations=[
-                    f"LLM provider could not be initialized ({type(exc).__name__}); no LLM hypothesis was accepted."
+                    f"LLM provider could not be initialized ({type(exc).__name__}); no LLM analysis was accepted."
                 ],
                 metrics=metrics,
             )
@@ -452,24 +468,141 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
             metrics["llmProviderFailureCount"] = 1
             return _LLMRun(
                 entries=[],
+                findings=[],
                 evidence=[],
                 hypothesis_ids=set(),
-                limitations=["Configured LLM provider does not satisfy LLMHypothesisProvider; no LLM hypothesis was accepted."],
+                limitations=["Configured LLM provider does not satisfy LLMHypothesisProvider; no LLM analysis was accepted."],
                 metrics=metrics,
             )
 
         generated_entries: list[_SemanticEntry] = []
+        generated_findings: list[AnalysisFinding] = []
         generated_evidence: list[Evidence] = []
         generated_ids: set[str] = set()
         limitations: list[str] = []
         deterministic_ids = {entry[1].hypothesis_id for entry in candidate_contexts}
         provider_records: list[dict[str, Any]] = []
 
+        if full_file_context is not None:
+            profile_evidence_id = f"full-file-profile:{input_metadata.input_id}"
+            profile_observation = {
+                "bytesScanned": full_file_context["file"]["bytesScanned"],
+                "coverageRatio": full_file_context["file"]["coverageRatio"],
+                "sha256": full_file_context["file"]["sha256"],
+                "chunkCount": full_file_context["file"]["chunkCount"],
+                "chunkSummariesIncluded": len(full_file_context["chunkProfiles"]),
+                "allChunkSummariesIncluded": full_file_context["allChunkSummariesIncluded"],
+                "summary": full_file_context["deterministicSummary"],
+            }
+            generated_evidence.append(
+                Evidence(
+                    evidence_id=profile_evidence_id,
+                    source_component="track-d-large-raw-profile",
+                    method="full-file-streaming-chunk-profile",
+                    feature_family="full-file-structure",
+                    score=float(full_file_context["file"]["coverageRatio"]),
+                    observation=profile_observation,
+                    independence_group=f"full-file-profile:{input_metadata.input_id}",
+                )
+            )
+            metrics.update(
+                {
+                    "llmFullFileBytesScanned": full_file_context["file"]["bytesScanned"],
+                    "llmFullFileCoverageRatio": full_file_context["file"]["coverageRatio"],
+                    "llmFullFileChunkCount": full_file_context["file"]["chunkCount"],
+                    "llmFullFileChunkCountIncluded": len(full_file_context["chunkProfiles"]),
+                }
+            )
+            request = LLMHypothesisRequest(
+                request_id=f"full-file:{input_metadata.input_id}",
+                input_id=input_metadata.input_id,
+                allowed_evidence_ids=(profile_evidence_id,),
+                context=full_file_context,
+            )
+            metrics["llmRequestCount"] += 1
+            try:
+                result = provider.propose(request)
+            except Exception as exc:
+                metrics["llmProviderFailureCount"] += 1
+                limitations.append(
+                    f"LLM full-file analysis request failed ({type(exc).__name__}); deterministic full-file profiling continued."
+                )
+            else:
+                metrics["llmExecuted"] = True
+                metrics["llmFullFileExecuted"] = True
+                metrics["llmSuccessfulRequestCount"] += 1
+                provider_records.append(_provider_record(result))
+                if result.file_analysis is None:
+                    limitations.append(
+                        "LLM provider completed the full-file request but returned no structured fileAnalysis."
+                    )
+                elif _valid_file_analysis(result.file_analysis):
+                    file_analysis = result.file_analysis
+                    llm_evidence_id = f"llm-file-analysis:{input_metadata.input_id}"
+                    generated_evidence.append(
+                        Evidence(
+                            evidence_id=llm_evidence_id,
+                            source_component="track-c-llm-file-analysis",
+                            method=result.provider,
+                            feature_family="full-file-structure",
+                            score=float(file_analysis.confidence),
+                            observation={
+                                "analysisType": "full-file-profile",
+                                "provider": result.provider,
+                                "mode": result.mode,
+                                "semanticType": "full-file-structure",
+                                "interpretation": file_analysis.summary,
+                                "parameters": {
+                                    "analysisSummary": {
+                                        "observations": list(file_analysis.observations),
+                                        "inference": file_analysis.inference,
+                                        "alternatives": list(file_analysis.alternatives),
+                                        "uncertainties": list(file_analysis.uncertainties),
+                                    },
+                                    "recommendedNextSteps": list(
+                                        file_analysis.recommended_next_steps
+                                    ),
+                                    "coverage": profile_observation,
+                                },
+                                "modelConfidence": float(file_analysis.confidence),
+                                "stance": "interpretation",
+                            },
+                            parent_evidence_ids=(profile_evidence_id,),
+                            independence_group=f"full-file-profile:{input_metadata.input_id}",
+                        )
+                    )
+                    generated_findings.append(
+                        AnalysisFinding(
+                            finding_id=f"llm-full-file-finding:{input_metadata.input_id}",
+                            claim=f"模型对完整文件画像的综合解释：{file_analysis.summary}",
+                            status="uncertain",
+                            evidence_ids=(profile_evidence_id, llm_evidence_id),
+                            semantic_type="full-file-structure",
+                            scores={
+                                "model": float(file_analysis.confidence),
+                                "evidence": float(full_file_context["file"]["coverageRatio"]),
+                            },
+                        )
+                    )
+                    metrics["llmFullFileAnalysisProduced"] = True
+                else:
+                    limitations.append(
+                        "LLM provider returned an invalid full-file analysis object; it was ignored."
+                    )
+                if result.hypotheses:
+                    limitations.append(
+                        "Unscoped hypotheses returned for the full-file summary request were ignored."
+                    )
+                if result.limitations:
+                    limitations.append(
+                        f"LLM provider reported {len(result.limitations)} limitation(s) for the full-file request."
+                    )
+
         for candidate, _baseline, samples, sample_ids, independence_group in candidate_contexts:
             candidate_evidence_id = f"candidate:{candidate.candidate_id}"
             request = LLMHypothesisRequest(
-                request_id=f"semantic:{input_id}:{candidate.candidate_id}",
-                input_id=input_id,
+                request_id=f"semantic:{input_metadata.input_id}:{candidate.candidate_id}",
+                input_id=input_metadata.input_id,
                 allowed_evidence_ids=(candidate_evidence_id,),
                 context=_structural_context(candidate, samples, sample_ids),
             )
@@ -485,13 +618,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
 
             metrics["llmExecuted"] = True
             metrics["llmSuccessfulRequestCount"] += 1
-            provider_records.append(
-                {
-                    "provider": result.provider,
-                    "mode": result.mode,
-                    **_safe_provider_metadata(result.metadata),
-                }
-            )
+            provider_records.append(_provider_record(result))
             if result.limitations:
                 limitations.append(
                     f"LLM provider reported {len(result.limitations)} limitation(s) for candidate {candidate.candidate_id!r}."
@@ -567,11 +694,95 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
         metrics["llmProviderMetadata"] = _deduplicate_metadata(provider_records)
         return _LLMRun(
             entries=generated_entries,
+            findings=generated_findings,
             evidence=generated_evidence,
             hypothesis_ids=generated_ids,
             limitations=limitations,
             metrics=metrics,
         )
+
+def _provider_record(result: LLMProviderResult) -> dict[str, Any]:
+    return {
+        "provider": result.provider,
+        "mode": result.mode,
+        **_safe_provider_metadata(result.metadata),
+    }
+
+
+def _valid_file_analysis(analysis: LLMFileAnalysis) -> bool:
+    if not isinstance(analysis, LLMFileAnalysis):
+        return False
+    if not analysis.summary.strip() or not analysis.inference.strip():
+        return False
+    if isinstance(analysis.confidence, bool) or not isinstance(
+        analysis.confidence, (int, float)
+    ):
+        return False
+    return math.isfinite(float(analysis.confidence)) and 0.0 <= analysis.confidence <= 1.0
+
+
+def _full_file_context(
+    input_metadata: InputMetadata,
+    profile: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if profile is None:
+        return None
+    raw_chunks = profile.get("chunkProfiles")
+    chunks = [dict(item) for item in raw_chunks if isinstance(item, Mapping)] if isinstance(raw_chunks, list) else []
+    selected_chunks = _select_chunk_summaries(chunks, _MAX_FULL_FILE_CHUNK_SUMMARIES)
+    bytes_scanned = int(profile.get("bytesScanned") or 0)
+    chunk_count = int(profile.get("chunkCount") or len(chunks))
+    coverage_ratio = float(profile.get("coverageRatio") or 0.0)
+    return {
+        "schemaVersion": "llm-full-file-context-v1",
+        "taskKind": "full-file-structural-analysis",
+        "privacy": {
+            "wholeRawPayloadIncluded": False,
+            "derivedStatisticsOnly": True,
+            "localScannerInspectedEveryByte": bytes_scanned == input_metadata.size_bytes,
+        },
+        "file": {
+            "sizeBytes": input_metadata.size_bytes,
+            "bytesScanned": bytes_scanned,
+            "coverageRatio": coverage_ratio,
+            "sha256": profile.get("sha256"),
+            "chunkSizeBytes": profile.get("chunkSizeBytes"),
+            "chunkCount": chunk_count,
+        },
+        "allChunkSummariesIncluded": len(selected_chunks) == chunk_count,
+        "chunkProfiles": selected_chunks,
+        "deterministicSummary": profile.get("summary"),
+        "deterministicConclusions": profile.get("conclusions") or [],
+        "recordStructure": {
+            "markerHex": profile.get("markerHex"),
+            "markerOccurrenceCount": profile.get("markerOccurrenceCount"),
+            "recordCount": profile.get("recordCount"),
+            "commonRecordLengths": profile.get("commonRecordLengths") or [],
+            "inferredHeaderBytes": profile.get("inferredHeaderBytes"),
+            "lengthEvidence": profile.get("lengthEvidence") or {},
+            "headerEvidence": profile.get("headerEvidence") or {},
+            "payloadEvidence": profile.get("payloadEvidence") or {},
+        },
+        "requirements": {
+            "analyzeStructure": True,
+            "analyzeEncryptionRangeAndPattern": True,
+            "identifyPlaintextSignals": True,
+            "compareChunkVariation": True,
+            "stateUncertainty": True,
+        },
+    }
+
+
+def _select_chunk_summaries(
+    chunks: list[dict[str, Any]], limit: int
+) -> list[dict[str, Any]]:
+    if len(chunks) <= limit:
+        return chunks
+    indexes = {
+        round(index * (len(chunks) - 1) / (limit - 1))
+        for index in range(limit)
+    }
+    return [chunks[index] for index in sorted(indexes)]
 
 
 def _structural_context(

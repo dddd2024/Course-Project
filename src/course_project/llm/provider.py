@@ -36,14 +36,28 @@ class HypothesisProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class LLMFileAnalysis:
+    """Evidence-led model interpretation of a complete-file structural profile."""
+
+    summary: str
+    observations: tuple[str, ...]
+    inference: str
+    alternatives: tuple[str, ...] = ()
+    uncertainties: tuple[str, ...] = ()
+    recommended_next_steps: tuple[str, ...] = ()
+    confidence: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
 class LLMProviderResult:
-    """Provider-neutral result containing only project-native hypotheses."""
+    """Provider-neutral result containing hypotheses and an optional file analysis."""
 
     provider: str
     mode: ProviderMode
     hypotheses: tuple[ProtocolHypothesis, ...] = ()
     limitations: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    file_analysis: LLMFileAnalysis | None = None
 
 
 @runtime_checkable

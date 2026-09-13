@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from course_project.llm.provider import (
     HypothesisProposal,
+    LLMFileAnalysis,
     LLMHypothesisProvider,
     LLMHypothesisRequest,
     LLMProviderResult,
@@ -37,13 +38,19 @@ _REQUIRED_PROPOSAL_KEYS = frozenset(
     }
 )
 
-_SYSTEM_PROMPT = """You infer candidate semantic fields in an unknown binary protocol.
-Return JSON only. Do not claim a hypothesis is verified: modelConfidence is model confidence only.
+_SYSTEM_PROMPT = """You analyze unknown binary protocol data from bounded structural evidence.
+Return JSON only. Never claim that model confidence is deterministic verification.
 Use only evidence IDs listed in allowedEvidenceIds. Do not invent evidence IDs.
-Write interpretation and analysisSummary display text in Simplified Chinese.
-Do not provide hidden chain-of-thought. analysisSummary must be a concise, evidence-led audit summary
-that states observations, inference, plausible alternatives, and remaining uncertainty.
-The response must be exactly one JSON object with this shape:
+Write all display text in Simplified Chinese. Do not provide hidden chain-of-thought.
+Provide concise, evidence-led audit summaries with observations, inference, plausible alternatives,
+remaining uncertainty, and useful next verification steps.
+
+The context schema determines the task:
+- llm-structural-context-v1: propose scoped field hypotheses for the exact candidate region.
+- llm-full-file-context-v1: analyze the complete-file chunk profile. The local scanner has
+  inspected every byte, while you receive derived statistics rather than all raw bytes.
+
+Return exactly one JSON object with hypotheses and an optional fileAnalysis:
 {
   "hypotheses": [
     {
@@ -63,13 +70,23 @@ The response must be exactly one JSON object with this shape:
       "modelConfidence": 0.0,
       "supportingEvidenceIds": []
     }
-  ]
+  ],
+  "fileAnalysis": {
+    "summary": "对完整文件画像的简明结论",
+    "observations": ["跨分段直接观察到的事实"],
+    "inference": "结构、加密范围和可能模式的综合解释",
+    "alternatives": ["仍合理的其他解释"],
+    "uncertainties": ["现有证据无法确定的事项"],
+    "recommendedNextSteps": ["可执行的进一步验证"],
+    "confidence": 0.0
+  }
 }
-Every offset must be a non-negative integer; size is a positive integer or null; confidence is in [0,1].
+For a field request, fileAnalysis may be null. For a full-file request, hypotheses should be
+empty unless an exact candidate constraint is present, and fileAnalysis is required.
+Every offset must be non-negative; size is positive or null; confidence is in [0,1].
 Keep executable parameters such as endian, target, mode, or step alongside analysisSummary.
-If there is insufficient evidence, return {"hypotheses": []}.
+If evidence is insufficient, state that in uncertainties instead of inventing facts.
 """
-
 
 class LiveLLMProviderError(RuntimeError):
     """Base class for fail-closed live-provider failures."""
@@ -247,16 +264,17 @@ class OpenAICompatibleLLMProvider:
             payload=payload,
             timeout_seconds=self.config.timeout_seconds,
         )
-        proposals = parse_chat_completion_response(response)
+        parsed = _parse_chat_completion_document(response)
         hypotheses = materialize_hypotheses(
             provider_name=self.provider_name,
             request=request,
-            proposals=proposals,
+            proposals=parsed.hypotheses,
         )
         return LLMProviderResult(
             provider=self.provider_name,
             mode=self.mode,
             hypotheses=hypotheses,
+            file_analysis=parsed.file_analysis,
             metadata=_result_metadata(self.config, response),
         )
 
@@ -300,11 +318,21 @@ def build_chat_completion_payload(
     return payload
 
 
+@dataclass(frozen=True, slots=True)
+class _ParsedChatCompletion:
+    hypotheses: tuple[HypothesisProposal, ...]
+    file_analysis: LLMFileAnalysis | None
+
+
 def parse_chat_completion_response(
     response: Mapping[str, Any],
 ) -> tuple[HypothesisProposal, ...]:
-    """Parse an OpenAI-compatible response envelope into strict structured proposals."""
+    """Parse field proposals while preserving the original public return type."""
 
+    return _parse_chat_completion_document(response).hypotheses
+
+
+def _parse_chat_completion_document(response: Mapping[str, Any]) -> _ParsedChatCompletion:
     if not isinstance(response, Mapping):
         raise TypeError("provider response must be a mapping")
     if response.get("error") is not None:
@@ -332,9 +360,9 @@ def parse_chat_completion_response(
         raise LiveLLMResponseError("provider message content is not valid JSON") from exc
     if not isinstance(document, dict):
         raise LiveLLMResponseError("provider message JSON must be an object")
-    if set(document) != {"hypotheses"}:
+    if set(document) not in ({"hypotheses"}, {"hypotheses", "fileAnalysis"}):
         raise LiveLLMResponseError(
-            "provider message JSON must contain exactly the 'hypotheses' property"
+            "provider message JSON must contain exactly 'hypotheses' and optional 'fileAnalysis'"
         )
     raw_hypotheses = document["hypotheses"]
     if not isinstance(raw_hypotheses, list):
@@ -371,8 +399,56 @@ def parse_chat_completion_response(
                 supporting_evidence_ids=tuple(supporting),
             )
         )
-    return tuple(proposals)
 
+    file_analysis = _parse_file_analysis(document.get("fileAnalysis"))
+    return _ParsedChatCompletion(tuple(proposals), file_analysis)
+
+
+def _parse_file_analysis(value: Any) -> LLMFileAnalysis | None:
+    if value is None:
+        return None
+    required = {
+        "summary",
+        "observations",
+        "inference",
+        "alternatives",
+        "uncertainties",
+        "recommendedNextSteps",
+        "confidence",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise LiveLLMResponseError("provider fileAnalysis does not match the required schema")
+    confidence = value["confidence"]
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise LiveLLMResponseError("provider fileAnalysis confidence must be numeric")
+    confidence_value = float(confidence)
+    if not math.isfinite(confidence_value) or not 0.0 <= confidence_value <= 1.0:
+        raise LiveLLMResponseError("provider fileAnalysis confidence must be within [0, 1]")
+    return LLMFileAnalysis(
+        summary=_response_text(value["summary"], "summary"),
+        observations=_response_text_list(value["observations"], "observations"),
+        inference=_response_text(value["inference"], "inference"),
+        alternatives=_response_text_list(value["alternatives"], "alternatives"),
+        uncertainties=_response_text_list(value["uncertainties"], "uncertainties"),
+        recommended_next_steps=_response_text_list(
+            value["recommendedNextSteps"], "recommendedNextSteps"
+        ),
+        confidence=confidence_value,
+    )
+
+
+def _response_text(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise LiveLLMResponseError(f"provider fileAnalysis {label} must be non-empty text")
+    return value.strip()
+
+
+def _response_text_list(value: Any, label: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item.strip() for item in value
+    ):
+        raise LiveLLMResponseError(f"provider fileAnalysis {label} must be a text list")
+    return tuple(item.strip() for item in value[:32])
 
 def _result_metadata(
     config: OpenAICompatibleProviderConfig,

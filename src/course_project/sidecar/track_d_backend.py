@@ -376,6 +376,7 @@ class TrackDBaselineBackend:
                 families=tuple(families),
                 alignments=tuple(alignments),
                 field_candidates=tuple(field_candidates),
+                large_raw_profile=large_raw_profile,
                 behavior=behavior,
                 config=config,
             )
@@ -421,6 +422,16 @@ class TrackDBaselineBackend:
         statistics = {
             "inputSizeBytes": input_metadata.size_bytes,
             "analyzedBytes": len(source_stream.data),
+            "fullFileBytesScanned": (
+                int(large_raw_profile.get("bytesScanned") or 0)
+                if large_raw_profile is not None
+                else len(source_stream.data)
+            ),
+            "fullFileCoverageRatio": (
+                float(large_raw_profile.get("coverageRatio") or 0.0)
+                if large_raw_profile is not None
+                else 1.0
+            ),
             "analysisTruncated": analysis_truncated,
             "analysisWindowBytes": self.max_raw_analysis_bytes,
             "largeRawProfile": large_raw_profile,
@@ -456,11 +467,12 @@ class TrackDBaselineBackend:
 
         limitations = list(semantic.limitations if semantic is not None else ())
         if analysis_truncated:
+            scanned = int((large_raw_profile or {}).get("bytesScanned") or 0)
             limitations.append(
-                f"Analysis used the first {len(source_stream.data)} bytes of the "
-                f"{input_metadata.size_bytes}-byte raw input to keep memory and runtime "
-                "bounded. Reported offsets remain absolute, and range inspection remains "
-                "available for the complete registered file."
+                f"Generic boundary and field inference used the first {len(source_stream.data)} "
+                f"bytes of the {input_metadata.size_bytes}-byte raw input. The full-file profiler "
+                f"streamed and analyzed {scanned} bytes across every chunk; reported field offsets "
+                "from the generic inference window remain absolute."
             )
         if known_protocol_gated:
             limitations.append(
@@ -525,6 +537,7 @@ class TrackDBaselineBackend:
         families: tuple[Any, ...],
         alignments: tuple[Any, ...],
         field_candidates: tuple[Any, ...],
+        large_raw_profile: Mapping[str, Any] | None,
         behavior: Any,
         config: Mapping[str, Any],
     ) -> SemanticAnalysis:
@@ -538,6 +551,7 @@ class TrackDBaselineBackend:
             families=families,
             alignments=alignments,
             field_candidates=field_candidates,
+            large_raw_profile=large_raw_profile,
             behavior=behavior,
             config=config,
         )

@@ -31,6 +31,16 @@ The integration is deliberately narrower than a general agent or provider gatewa
 
 Provider initialization failures, request failures, unsupported/out-of-region hypotheses, and hypotheses that cannot be translated into a safe executable check remain explicit limitations. The deterministic path continues, but the result is not allowed to fabricate successful LLM execution.
 
+### Large raw whole-file path
+
+For large unknown `.dat`/`.bin` inputs, Track D streams the complete file in 4 MiB chunks. Every chunk records its byte range, entropy, compression ratio, distinct/zero/printable/dominant-byte ratios and obvious plaintext-signature count; the same pass records the actual covered byte count and SHA-256. The full chunk list remains in the local `large-raw-profile.json` artifact.
+
+When live LLM analysis is enabled, Track C always sends one `llm-full-file-context-v1` request for this profile even when the bounded field-inference window produced no executable candidate. A 130 MiB file produces about 33 chunk summaries, so all summaries fit under the current 64-summary model-context cap. Larger inputs retain full local coverage but use evenly distributed chunk summaries in the provider request and report whether every chunk summary was included.
+
+The provider receives derived statistics, record-marker/header evidence and deterministic conclusions rather than 130 MiB of raw bytes. It returns a structured `fileAnalysis` containing a summary, observations, inference, alternatives, uncertainties, recommended next steps and confidence. The result is stored as `track-c-llm-file-analysis` evidence and an `UNCERTAIN` full-file finding. It is never promoted to a verified protocol field without an executable field-level check.
+
+`semanticMetrics` separately records whether the full-file request was requested, executed and produced an analysis, as well as bytes scanned, coverage ratio, chunk counts, successful request count and sanitized provider metadata. The desktop trace shows these values and labels a live call only when provider metadata records network access.
+
 ### Structural-context privacy boundary
 
 Whole binary payloads are **not** sent to the provider by default. Each request contains only project-native structural information for one candidate:
@@ -87,7 +97,7 @@ The live adapter:
 - accepts only a JSON object response;
 - accepts only an OpenAI-compatible response with a non-empty `choices` list and message content;
 - fails closed on provider error envelopes, refusals, malformed or non-JSON content;
-- requires the message body to contain exactly `{ "hypotheses": [...] }`;
+- requires the message body to contain `hypotheses` and only the optional structured `fileAnalysis`;
 - requires every proposal to have the exact structured fields expected by `HypothesisProposal`;
 - routes every proposal back through shared `materialize_hypotheses()` validation, including evidence-reference and confidence/range checks;
 - never converts `modelConfidence` into executable verification or `ACCEPTED` status;

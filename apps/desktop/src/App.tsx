@@ -407,7 +407,7 @@ export function App() {
       );
       const llmSummary = llmFileEvidence?.observation?.interpretation;
       if (typeof llmSummary === "string" && llmSummary.trim()) {
-        return "全文件模型分析完成。" + llmSummary;
+        return "完整包流模型分析完成。" + llmSummary;
       }
       const metrics = analysisResult.metrics || {};
       const scanned = typeof metrics.fullFileBytesScanned === "number" ? metrics.fullFileBytesScanned : null;

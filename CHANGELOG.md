@@ -8,6 +8,7 @@ All notable course-project delivery changes are summarized here. The repository 
 
 - Whole-file LLM requests now allow 120 seconds, accept common OpenAI-compatible text/JSON response variants, and retry once without `response_format` when a provider returns HTTP 400 or 422.
 - The desktop analysis trace presents model reasoning only when model evidence was successfully parsed and stored; deterministic summaries no longer impersonate assistant output.
+- The desktop report now describes the complete streamed packet flow, expands record/header/length/payload reasoning, and promotes the model synthesis to a clearer evidence-linked conclusion.
 - The analysis report uses a compact evidence-led layout with observations, inference, alternatives, uncertainty, next verification steps, and dynamic stage numbering.
 
 ### Fixed

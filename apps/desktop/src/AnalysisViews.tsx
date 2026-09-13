@@ -27,9 +27,14 @@ const labels: Record<AnalysisViewName, string> = {
 };
 
 const decisionLabels: Record<AnalysisFinding["status"], string> = {
-  ACCEPTED: "已接受",
-  REJECTED: "已拒绝",
-  UNCERTAIN: "待确认",
+  ACCEPTED: "已验证",
+  REJECTED: "已排除",
+  UNCERTAIN: "待验证",
+};
+
+const findingTypeLabels: Record<string, string> = {
+  "full-file-structure": "完整包流结构",
+  "encrypted-record-structure": "加密记录结构",
 };
 
 const artifactTypes: Partial<Record<AnalysisViewName, string[]>> = {
@@ -242,22 +247,31 @@ function FindingCard({
   review?: FindingReview;
   onReviewChange: (review: FindingReview) => void;
 }) {
+  const isModelConclusion = finding.scores?.model !== undefined;
+  const displayClaim = finding.claim.replace(/^模型对完整文件画像的综合解释：/, "");
+  const scoreItems = [
+    finding.scores?.model !== undefined ? "模型置信度 " + scoreLabel(finding.scores.model) : null,
+    finding.scores?.evidence !== undefined ? "证据支持度 " + scoreLabel(finding.scores.evidence) : null,
+    finding.scores?.verification !== undefined ? "验证得分 " + scoreLabel(finding.scores.verification) : null,
+  ].filter((item): item is string => item !== null);
   const setDecision = (decision: FindingReview["decision"]) => {
-    onReviewChange({ decision, correction: review?.correction || finding.claim });
+    onReviewChange({ decision, correction: review?.correction || displayClaim });
   };
   return (
-    <article className="finding-card">
+    <article className={isModelConclusion ? "finding-card finding-card-primary" : "finding-card"}>
       <div className="finding-heading">
-        <div><span className="finding-id">{finding.findingId}</span><StatusBadge status={finding.status} /></div>
-        {finding.semanticType && <span className="finding-type">{finding.semanticType}</span>}
+        <div>
+          <span className="finding-source">{isModelConclusion ? "模型综合研判" : "结构证据判断"}</span>
+          <StatusBadge status={finding.status} />
+        </div>
+        {finding.semanticType && <span className="finding-type">{findingTypeLabels[finding.semanticType] || finding.semanticType}</span>}
       </div>
-      <p className="finding-claim">{finding.claim}</p>
+      <p className="finding-claim">{displayClaim}</p>
       <div className="finding-meta">
-        <span>模型 {scoreLabel(finding.scores?.model)}</span>
-        <span>证据 {scoreLabel(finding.scores?.evidence)}</span>
-        <span>验证 {scoreLabel(finding.scores?.verification)}</span>
-        <span>{finding.evidenceIds.length} 证据 link{finding.evidenceIds.length === 1 ? "" : "s"}</span>
+        {scoreItems.map((item) => <span key={item}>{item}</span>)}
+        <span>{finding.evidenceIds.length} 条关联证据</span>
       </div>
+      <span className="finding-id finding-id-block">{finding.findingId}</span>
       {finding.location && (
         <button className="link-button" onClick={() => onJump(finding.location as ByteLocation)}>
           查看偏移 +{finding.location.offset} ({finding.location.length} 字节)
@@ -284,7 +298,7 @@ function FindingCard({
         <label className="review-correction">
           <span>修正草稿（仅保存在本地，不代表已接受的协议事实）</span>
           <textarea
-            value={review?.correction ?? finding.claim}
+            value={review?.correction ?? displayClaim}
             onChange={(event) => onReviewChange({
               decision: review?.decision ?? "UNCERTAIN",
               correction: event.target.value,
@@ -396,9 +410,14 @@ export function AnalysisViewContent({
 }) {
   if (!result) return <EmptyResult />;
   if (view === "findings") {
+    const orderedFindings = [...result.findings].sort((left, right) => {
+      const leftModel = left.scores?.model === undefined ? 0 : 1;
+      const rightModel = right.scores?.model === undefined ? 0 : 1;
+      return rightModel - leftModel;
+    });
     return (
       <div className="result-list">
-        {result.findings.length > 0 ? result.findings.map((finding) => (
+        {orderedFindings.length > 0 ? orderedFindings.map((finding) => (
           <FindingCard
             key={finding.findingId}
             finding={finding}

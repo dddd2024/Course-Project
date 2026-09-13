@@ -529,6 +529,7 @@ class DeterministicTrackCSemanticBackend(_DeterministicTrackCSemanticBackend):
                             "interpretation": hypothesis.interpretation,
                             "parameters": _json_copy(hypothesis.parameters),
                             "modelConfidence": float(hypothesis.model_confidence),
+                            "competingHypothesisIds": list(hypothesis.competing_hypothesis_ids),
                             "stance": "support",
                         },
                         parent_evidence_ids=(candidate_evidence_id,),

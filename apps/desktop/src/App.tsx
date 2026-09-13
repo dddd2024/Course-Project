@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AnalysisTrace } from "./AnalysisTrace";
 import { AnalysisTabs, AnalysisViewContent } from "./AnalysisViews";
 import { demoAnalysisResult } from "./fixtures/demoAnalysisResult";
 import type { AnalysisViewName, ByteLocation, FindingReview, AnalysisResult } from "./analysisContracts";
@@ -637,6 +638,13 @@ export function App() {
                 <span>{llmEnabled ? "模型辅助 · " + (llmStatus.model || "") : "离线确定性分析"}</span>
               </div>
               <p>{assistantText}</p>
+              {update.status === "COMPLETED" && analysisResult && (
+                <AnalysisTrace
+                  result={analysisResult}
+                  llmEnabled={llmEnabled}
+                  modelName={llmStatus.model}
+                />
+              )}
               {(isRunning || update.status === "COMPLETED") && (
                 <div className="progress-row">
                   <div className="progress-track" aria-label={"任务进度 " + Math.round(update.progress * 100) + "%"}>

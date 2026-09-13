@@ -92,7 +92,16 @@ def _provider_response(
                 "size": 2,
                 "semanticType": "length",
                 "interpretation": "big-endian payload length",
-                "parameters": {"endian": "big", "target": "payload"},
+                "parameters": {
+                    "endian": "big",
+                    "target": "payload",
+                    "analysisSummary": {
+                        "observations": ["两字节字段随负载长度变化"],
+                        "inference": "字段值与负载长度一致",
+                        "alternatives": ["总消息长度"],
+                        "uncertainties": ["需要更多长度样本"],
+                    },
+                },
                 "modelConfidence": 0.82,
                 "supportingEvidenceIds": ["ev-length"],
             },
@@ -154,6 +163,7 @@ def test_live_provider_materializes_project_native_hypotheses_without_verificati
     assert len(result.hypotheses) == 2
     first, second = result.hypotheses
     assert first.model_confidence == pytest.approx(0.82)
+    assert first.parameters["analysisSummary"]["inference"] == "字段值与负载长度一致"
     assert second.model_confidence == pytest.approx(0.44)
     assert first.competing_hypothesis_ids == (second.hypothesis_id,)
     assert second.competing_hypothesis_ids == (first.hypothesis_id,)
@@ -187,6 +197,10 @@ def test_payload_is_deterministic_and_contains_only_provider_neutral_request_con
     assert first["stream"] is False
     assert first["response_format"] == {"type": "json_object"}
     assert [message["role"] for message in first["messages"]] == ["system", "user"]
+    system_prompt = first["messages"][0]["content"]
+    assert "analysisSummary" in system_prompt
+    assert "observations, inference, plausible alternatives" in system_prompt
+    assert "Simplified Chinese" in system_prompt
     user_payload = json.loads(first["messages"][1]["content"])
     assert user_payload == {
         "requestId": "req-1",

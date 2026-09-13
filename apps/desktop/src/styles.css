@@ -1417,3 +1417,423 @@ h2 {
     transition-duration: 0.01ms !important;
   }
 }
+.analysis-trace {
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(96, 108, 56, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 252, 244, 0.35);
+}
+
+.analysis-trace > summary {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 17px;
+  cursor: pointer;
+  list-style: none;
+  transition: background 150ms ease;
+}
+
+.analysis-trace > summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysis-trace > summary:hover {
+  background: rgba(96, 108, 56, 0.06);
+}
+
+.analysis-trace > summary > span {
+  display: grid;
+  gap: 3px;
+}
+
+.analysis-trace > summary strong {
+  font-size: 0.82rem;
+}
+
+.analysis-trace > summary small {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.analysis-trace > summary em {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.analysis-trace > summary em[data-state="executed"] {
+  color: #496029;
+  background: rgba(96, 108, 56, 0.13);
+}
+
+.analysis-trace > summary em[data-state="skipped"] {
+  color: #8a6321;
+  background: rgba(192, 142, 58, 0.14);
+}
+
+.analysis-trace > summary em[data-state="offline"] {
+  color: var(--muted);
+  background: rgba(57, 67, 39, 0.08);
+}
+
+.analysis-trace-content {
+  padding: 0 17px 18px;
+  border-top: 1px solid rgba(96, 108, 56, 0.13);
+}
+
+.analysis-trace-note {
+  margin: 15px 0 17px;
+  color: var(--muted);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif !important;
+  font-size: 0.68rem !important;
+  line-height: 1.55 !important;
+}
+
+.analysis-trace-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-trace-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  position: relative;
+  padding-bottom: 22px;
+}
+
+.analysis-trace-step:not(:last-child)::before {
+  position: absolute;
+  top: 26px;
+  bottom: 0;
+  left: 13px;
+  width: 1px;
+  content: "";
+  background: rgba(96, 108, 56, 0.18);
+}
+
+.analysis-step-index {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(198, 107, 61, 0.28);
+  border-radius: 9px;
+  color: var(--terracotta);
+  background: #ede2cf;
+  font-size: 0.58rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-step-body {
+  min-width: 0;
+  padding-top: 3px;
+}
+
+.analysis-step-body > p {
+  margin: 9px 0 0;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif !important;
+  font-size: 0.75rem !important;
+  line-height: 1.65 !important;
+}
+
+.analysis-step-heading {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.analysis-step-heading strong {
+  font-size: 0.78rem;
+}
+
+.analysis-step-heading span {
+  color: var(--muted);
+  font-size: 0.61rem;
+  text-align: right;
+}
+
+.analysis-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.analysis-fact-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(96, 108, 56, 0.055);
+}
+
+.analysis-fact-grid span {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.analysis-fact-grid strong {
+  overflow: hidden;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-callout,
+.analysis-next-step {
+  padding: 9px 11px;
+  border-left: 2px solid var(--ochre);
+  border-radius: 0 9px 9px 0;
+  background: rgba(192, 142, 58, 0.08);
+}
+
+.analysis-bullet-list {
+  display: grid;
+  gap: 6px;
+  margin: 9px 0 0;
+  padding-left: 18px;
+  color: var(--deep-moss);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.analysis-hypothesis-list,
+.analysis-check-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 11px;
+}
+
+.analysis-hypothesis,
+.analysis-check {
+  padding: 12px;
+  border: 1px solid rgba(96, 108, 56, 0.15);
+  border-radius: 12px;
+  background: rgba(232, 220, 199, 0.42);
+}
+
+.analysis-hypothesis-heading,
+.analysis-check > div:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.analysis-hypothesis-heading strong,
+.analysis-check strong {
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.analysis-hypothesis-heading span,
+.analysis-check > div:first-child > span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.analysis-region,
+.analysis-check > p {
+  margin: 5px 0 0 !important;
+  color: var(--muted);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif !important;
+  font-size: 0.62rem !important;
+  line-height: 1.5 !important;
+}
+
+.analysis-rationale-group {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(96, 108, 56, 0.12);
+}
+
+.analysis-rationale-group > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--moss);
+  font-size: 0.62rem;
+}
+
+.analysis-rationale-group p,
+.analysis-rationale-group ul {
+  margin: 0;
+  padding-left: 17px;
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
+.analysis-rationale-group p {
+  padding-left: 0;
+}
+
+.analysis-parameters {
+  margin-top: 9px;
+}
+
+.analysis-parameters > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--moss);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.analysis-parameters pre {
+  max-height: 190px;
+  margin: 8px 0 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 9px;
+  color: #4b5336;
+  background: rgba(57, 67, 39, 0.055);
+  font-size: 0.6rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.analysis-evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-top: 9px;
+}
+
+.analysis-evidence-links > span,
+.analysis-evidence-links em {
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-style: normal;
+}
+
+.analysis-evidence-links code {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: 6px;
+  color: var(--moss);
+  background: rgba(96, 108, 56, 0.08);
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+}
+
+.analysis-empty-stage {
+  margin-top: 9px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: rgba(192, 142, 58, 0.09);
+}
+
+.analysis-empty-stage strong {
+  font-size: 0.7rem;
+}
+
+.analysis-empty-stage p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.55;
+}
+
+.analysis-check > div:first-child > span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(96, 108, 56, 0.08);
+  text-transform: uppercase;
+}
+
+.analysis-finding-list {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-finding-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.analysis-finding-list li > span {
+  margin-top: 1px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 0.55rem;
+  font-weight: 800;
+}
+
+.analysis-finding-list li > span[data-status="ACCEPTED"] {
+  color: #496029;
+  background: rgba(96, 108, 56, 0.13);
+}
+
+.analysis-finding-list li > span[data-status="REJECTED"] {
+  color: #9a4d2e;
+  background: rgba(198, 107, 61, 0.12);
+}
+
+.analysis-finding-list li > span[data-status="UNCERTAIN"] {
+  color: #8a6321;
+  background: rgba(192, 142, 58, 0.13);
+}
+
+.analysis-finding-list li div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.analysis-finding-list li strong {
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.analysis-finding-list li small {
+  color: var(--muted);
+  font-size: 0.57rem;
+}
+
+.analysis-model-name {
+  margin: -4px 0 0 40px !important;
+  color: var(--muted);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif !important;
+  font-size: 0.58rem !important;
+}
+
+@media (max-width: 640px) {
+  .analysis-trace-content {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .analysis-fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-hypothesis-heading,
+  .analysis-check > div:first-child,
+  .analysis-step-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
